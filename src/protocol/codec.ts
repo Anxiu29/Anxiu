@@ -7,10 +7,23 @@ export interface ProtocolPacket {
 
 export type CrcStrategy = (bytes: Uint8Array) => number
 
-// 协议文档未给出 CRC 算法。默认策略是常见的 8-bit 累加反码；真机联调时只需替换此函数。
-export const checksum8: CrcStrategy = (bytes) => (-bytes.reduce((sum, byte) => (sum + byte) & 0xff, 0)) & 0xff
+/**
+ * 星闪悦动协议的 1 字节包头校验。
+ *
+ * 参与字段：固定初值 0x35、Head、len、cmd，以及 data 的最后一个字节。
+ * HID 报告剩余的 0x00 填充不参与计算。JavaScript 不会自动按 uint8
+ * 溢出，因此返回前必须显式截断到低 8 位。
+ */
+export const computePacketCrc: CrcStrategy = (bytes) => {
+  if (bytes.length < 3) throw new Error('CRC 输入缺少 head、len 或 cmd')
+  const head = bytes[0] ?? 0
+  const len = bytes[1] ?? 0
+  const command = bytes[2] ?? 0
+  const lastDataByte = len > 0 ? (bytes[bytes.length - 1] ?? 0) : 0
+  return (0x35 + head + len + command + lastDataByte) & 0xff
+}
 
-export function encodePacket(command: number, data: Uint8Array, crc: CrcStrategy = checksum8): Uint8Array {
+export function encodePacket(command: number, data: Uint8Array, crc: CrcStrategy = computePacketCrc): Uint8Array {
   if (data.length > 60) throw new Error('协议数据超过 60 字节')
   const packet = new Uint8Array(4 + data.length)
   packet[0] = PACKET_HEAD
@@ -21,7 +34,7 @@ export function encodePacket(command: number, data: Uint8Array, crc: CrcStrategy
   return packet
 }
 
-export function decodePacket(report: Uint8Array, crc: CrcStrategy = checksum8): ProtocolPacket {
+export function decodePacket(report: Uint8Array, crc: CrcStrategy = computePacketCrc): ProtocolPacket {
   if (report.length < 4 || report[0] !== PACKET_HEAD) throw new Error('无效协议包头')
   const length = report[1] ?? 0
   if (length > report.length - 4) throw new Error('协议包长度错误')

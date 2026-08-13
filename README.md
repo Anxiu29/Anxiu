@@ -20,8 +20,8 @@ npm run dev
 
 WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支持桌面 Chrome/Edge。
 
-## 真机联调前必须确认
+## 包头校验
 
-协议文档未定义包头 CRC 的具体算法。目前 `src/protocol/codec.ts` 使用 8 位累加反码作为默认策略。请用固件实现或抓包数据确认，并只替换 `checksum8`，其余协议层无需改动。
+协议的 1 字节包头校验为 `uint8(0x35 + head + len + cmd + data[len - 1])`；当数据为空时不累加数据字节。HID 报告尾部的 `0x00` 填充不参与计算。实现位于 `src/protocol/codec.ts`，并使用真机抓包建立了测试向量。
 
 设备筛选参数集中在 `src/config/devices.ts`。当前参数来自 `doc/C98.txt`。
