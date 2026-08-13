@@ -7,8 +7,15 @@ defineProps<{ current?: number }>()
 const emit = defineEmits<{ select: [code: number] }>()
 const search = ref('')
 const category = ref<KeyCategory | 'all'>('all')
-const categories: Array<{ id: KeyCategory | 'all'; label: string }> = [{ id: 'all', label: '全部' }, { id: 'basic', label: '基础键' }, { id: 'modifier', label: '修饰键' }, { id: 'navigation', label: '导航' }, { id: 'function', label: '功能键' }, { id: 'special', label: '特殊' }]
-const filtered = computed(() => KEYCODES.filter((key) => (category.value === 'all' || key.category === category.value) && key.label.toLowerCase().includes(search.value.toLowerCase())))
+const categories: Array<{ id: KeyCategory | 'all'; label: string }> = [{ id: 'all', label: '全部' }, { id: 'basic', label: '基础键' }, { id: 'modifier', label: '修饰键' }, { id: 'navigation', label: '导航' }, { id: 'function', label: '功能键' }, { id: 'media', label: '媒体' }, { id: 'special', label: '特殊' }]
+const filtered = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  return KEYCODES.filter((key) => {
+    const matchesCategory = category.value === 'all' || key.category === category.value
+    const hex = key.code.toString(16).padStart(4, '0').toLowerCase()
+    return matchesCategory && (key.label.toLowerCase().includes(query) || String(key.code).includes(query) || hex.includes(query.replace(/^0x/, '')))
+  })
+})
 </script>
 
 <template>
