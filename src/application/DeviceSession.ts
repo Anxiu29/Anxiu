@@ -29,7 +29,12 @@ export class DeviceSession {
     if (!this.profile) throw new Error('尚未读取设备配置')
     const errors = validateAssignments(this.profile, this.draft)
     if (errors.length) throw new Error(errors[0])
-    await this.protocol.writeAssignments(this.draft)
+    const changes = this.draft.filter((draft) => {
+      const original = this.original.find((item) => item.positionId === draft.positionId && item.layer === draft.layer)
+      return !original || original.keyCode !== draft.keyCode
+    })
+    if (!changes.length) return
+    await this.protocol.writeAssignments(changes)
     await this.protocol.save()
     const verified = await this.protocol.getProfile()
     if (!assignmentsEqual(verified.assignments, this.draft)) throw new Error('写入后的回读配置不一致，草稿已保留')
@@ -39,6 +44,6 @@ export class DeviceSession {
   }
 
   async reload() { await this.protocol.reload(); return this.load() }
-  async restoreFactory() { await this.protocol.restoreFactory(); return this.load() }
+  async restoreFactory() { await this.protocol.restoreFactory() }
   async close() { this.protocol.close(); await this.transport?.close() }
 }

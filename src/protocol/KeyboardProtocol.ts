@@ -67,7 +67,8 @@ export class XsydKeyboardProtocol implements KeyboardProtocol {
 
   private async sync(): Promise<DeviceInfo> {
     const random = crypto.getRandomValues(new Uint8Array(4))
-    const data = await this.request(COMMAND.SYNC, random)
+    const syncPayload = new Uint8Array([...random, 0xff, 0xff])
+    const data = await this.request(COMMAND.SYNC, syncPayload)
     const ascii = (start: number, length: number) => new TextDecoder().decode(data.slice(start + 1, start + length)).replace(/\0/g, '').trim()
     const hex = (start: number, length: number) => Array.from(data.slice(start, start + length), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase()
     return {

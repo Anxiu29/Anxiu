@@ -32,7 +32,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <p>连接 RK-C98，读取键盘配置并直接在浏览器中完成键位映射。配置写入后自动回读验证。</p>
       <div class="hero-actions"><button class="primary large" :disabled="busy()" @click="store.connect(false)">连接我的键盘 <b>→</b></button><button class="text-button" :disabled="busy()" @click="store.connect(true)">没有设备？体验演示</button></div>
       <div class="requirements"><span>● Chrome 89+</span><span>● Edge 89+</span><span>● USB HID</span><span>● HTTPS</span></div>
-      <div v-if="error" class="notice error">{{ error }}</div>
+      <div v-if="error || message" class="notice" :class="{ error }">{{ error || message }}</div>
     </section>
 
     <section v-else class="workspace">
@@ -46,7 +46,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
       <div class="editor-grid">
         <section class="editor panel">
-          <div class="panel-heading"><div><span class="eyebrow">KEYMAP EDITOR</span><h2>键位映射</h2></div><div class="layer-tabs"><button v-for="index in profile.capabilities.layers" :key="index" :class="{ active: layer === index - 1 }" @click="layer = index - 1">FN {{ index - 1 }}</button></div></div>
+          <div class="panel-heading"><div><span class="eyebrow">KEYMAP EDITOR</span><h2>键位映射</h2></div><div class="layer-tabs"><button v-for="index in profile.capabilities.layers" :key="index" :class="{ active: layer === index - 1 }" @click="layer = index - 1">FN {{ index }}</button></div></div>
           <p class="hint">选择一个按键，再从右侧键库分配新功能。小字显示物理键位，青色标记表示已修改。</p>
           <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :selected="selectedPositionId" @select="selectedPositionId = $event" />
           <div class="editor-footer"><div><i :class="{ dirty }"></i><span>{{ dirty ? '存在未保存的修改' : '配置与设备一致' }}</span></div><button class="primary save" :disabled="!dirty || busy()" @click="store.save"><span v-if="status === 'writing'" class="spinner"></span>{{ status === 'writing' ? '正在写入并验证…' : '写入键盘' }}</button></div>

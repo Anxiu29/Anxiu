@@ -82,7 +82,15 @@ export const useDriverStore = defineStore('driver', () => {
   async function restoreFactory() {
     if (!session) return
     clearFeedback(); status.value = 'writing'
-    try { profile.value = await session.restoreFactory(); revision.value++; status.value = 'ready'; message.value = '已恢复出厂配置' }
+    try {
+      await session.restoreFactory(); revision.value++
+      if (demo.value) {
+        profile.value = await session.load(); status.value = 'ready'; message.value = '已恢复出厂配置'
+      } else {
+        profile.value = undefined; selectedPositionId.value = undefined; status.value = 'disconnected'
+        message.value = '已恢复出厂配置，设备将重新枚举，请等待后点击“连接键盘”'
+      }
+    }
     catch (cause) { fail(cause) }
   }
 
