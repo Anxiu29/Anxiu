@@ -1,0 +1,5 @@
+    name: "RK-C98",
+    vendorId: 0x1CA2,
+    productId: 0x1604,
+    usagePage: 0xFFA0,
+    usage: 0x0001,
