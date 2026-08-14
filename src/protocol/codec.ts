@@ -1,4 +1,5 @@
 export const PACKET_HEAD = 0x5c
+import { DriverError } from '@/application/DriverError'
 
 export interface ProtocolPacket {
   command: number
@@ -35,13 +36,13 @@ export function encodePacket(command: number, data: Uint8Array, crc: CrcStrategy
 }
 
 export function decodePacket(report: Uint8Array, crc: CrcStrategy = computePacketCrc): ProtocolPacket {
-  if (report.length < 4 || report[0] !== PACKET_HEAD) throw new Error('无效协议包头')
+  if (report.length < 4 || report[0] !== PACKET_HEAD) throw new DriverError('PROTOCOL_REJECTED', '无效协议包头')
   const length = report[1] ?? 0
-  if (length > report.length - 4) throw new Error('协议包长度错误')
+  if (length > report.length - 4) throw new DriverError('PROTOCOL_REJECTED', '协议包长度错误')
   const command = report[2] ?? 0
   const data = report.slice(4, 4 + length)
   const expected = crc(new Uint8Array([report[0]!, report[1]!, command, ...data]))
-  if (report[3] !== expected) throw new Error('协议 CRC 校验失败')
+  if (report[3] !== expected) throw new DriverError('PROTOCOL_CRC_ERROR', '协议 CRC 校验失败', true, { details: { expected, actual: report[3] } })
   return { command, data }
 }
 

@@ -1,4 +1,5 @@
 import type { DeviceTransport } from '@/application/ports'
+import { DriverError } from '@/application/DriverError'
 
 export interface HidDeviceFilterConfig {
   vendorId: number
@@ -33,7 +34,7 @@ export class WebHidTransport implements DeviceTransport {
   async requestDevice() {
     this.ensureSupported()
     const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: this.config.vendorId, productId: this.config.productId, usagePage: this.config.usagePage, usage: this.config.usage }] })
-    if (!devices[0]) throw new Error('未选择键盘')
+    if (!devices[0]) throw new DriverError('DEVICE_NOT_SELECTED', '未选择键盘')
     this.setDevice(devices[0])
   }
 
@@ -47,7 +48,7 @@ export class WebHidTransport implements DeviceTransport {
   }
 
   async open() {
-    if (!this.device) throw new Error('尚未选择键盘')
+    if (!this.device) throw new DriverError('DEVICE_NOT_SELECTED', '尚未选择键盘')
     if (!this.device.opened) await this.device.open()
   }
 
@@ -56,7 +57,7 @@ export class WebHidTransport implements DeviceTransport {
   }
 
   async send(report: Uint8Array) {
-    if (!this.device?.opened) throw new Error('键盘未连接')
+    if (!this.device?.opened) throw new DriverError('DEVICE_NOT_CONNECTED', '键盘未连接')
     const payload = new Uint8Array(this.config.reportSize)
     payload.fill(0xff)
     payload.set(report.slice(0, payload.length))
@@ -80,6 +81,6 @@ export class WebHidTransport implements DeviceTransport {
   }
 
   private ensureSupported() {
-    if (!('hid' in navigator)) throw new Error('当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge')
+    if (!('hid' in navigator)) throw new DriverError('UNSUPPORTED_BROWSER', '当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge', false)
   }
 }

@@ -4,6 +4,7 @@ import { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardDevice } from '@/application/ports'
 import { DeviceDriverRegistry, type DeviceDriver } from '@/devices/DeviceDriver'
 import { HID_KEY_CATALOG } from '@/domain/keycodes'
+import { DriverError, toDriverError } from '@/application/DriverError'
 
 const device = (): KeyboardDevice => ({
   profile: { getProfile: async () => ({
@@ -42,7 +43,13 @@ describe('replaceable architecture', () => {
   it('allows a read-only device to omit unsupported capabilities', async () => {
     const readOnly = new DeviceSession({ profile: device().profile, close: () => undefined }, HID_KEY_CATALOG)
     await readOnly.load()
-    await expect(readOnly.reload()).rejects.toThrow('不支持重新加载配置')
-    await expect(readOnly.restoreFactory()).rejects.toThrow('不支持恢复出厂设置')
+    await expect(readOnly.reload()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    await expect(readOnly.restoreFactory()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+  })
+
+  it('preserves stable error codes across UI adapters', () => {
+    const known = new DriverError('DEVICE_NOT_CONNECTED', '键盘未连接')
+    expect(toDriverError(known)).toBe(known)
+    expect(toDriverError(new Error('unexpected'))).toMatchObject({ code: 'UNKNOWN', message: 'unexpected' })
   })
 })

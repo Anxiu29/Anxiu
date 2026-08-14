@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { DeviceSession } from '@/application/DeviceSession'
 import { keyboardDriverService } from '@/composition/root'
 import type { KeyboardProfile, SessionStatus } from '@/domain/keyboard'
+import { toDriverError, type DriverErrorCode } from '@/application/DriverError'
 
 export const useDriverStore = defineStore('driver', () => {
   const status = ref<SessionStatus>('idle')
@@ -10,6 +11,7 @@ export const useDriverStore = defineStore('driver', () => {
   const layer = ref(0)
   const selectedPositionId = ref<string>()
   const error = ref('')
+  const errorCode = ref<DriverErrorCode>()
   const message = ref('')
   const demo = ref(false)
   const revision = ref(0)
@@ -86,8 +88,11 @@ export const useDriverStore = defineStore('driver', () => {
     catch (cause) { fail(cause) }
   }
 
-  function clearFeedback() { error.value = ''; message.value = '' }
-  function fail(cause: unknown) { status.value = 'error'; error.value = cause instanceof Error ? cause.message : String(cause) }
+  function clearFeedback() { error.value = ''; errorCode.value = undefined; message.value = '' }
+  function fail(cause: unknown) {
+    const driverError = toDriverError(cause)
+    status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
+  }
 
-  return { status, profile, layer, selectedPositionId, error, message, demo, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, save, reload, restoreFactory }
+  return { status, profile, layer, selectedPositionId, error, errorCode, message, demo, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, save, reload, restoreFactory }
 })

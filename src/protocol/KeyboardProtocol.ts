@@ -2,6 +2,7 @@ import type { DeviceInfo, KeyAssignment, KeyPosition, KeyboardProfile } from '@/
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceTransport, KeyboardDevice } from '@/application/ports'
 import { decodePacket, encodePacket, readUint16le, uint16le, type CrcStrategy } from './codec'
+import { DriverError } from '@/application/DriverError'
 
 const COMMAND = { SYNC: 0x01, ACTION: 0x00, KEY: 0x23, DEFAULT_KEY: 0x2b, FAIL: 0xff } as const
 const ORDER = { PROTOCOL_VERSION: 0x01, SAVE: 0x02, RELOAD: 0x03, RESTORE_FACTORY: 0x11 } as const
@@ -125,7 +126,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
       const responseCommand = command | 0x80
       const timer = setTimeout(() => {
         this.pending = undefined
-        reject(new Error(`设备响应超时（命令 0x${command.toString(16)}）`))
+        reject(new DriverError('PROTOCOL_TIMEOUT', `设备响应超时（命令 0x${command.toString(16)}）`, true, { details: { command } }))
       }, timeout)
       this.pending = { command: responseCommand, resolve, reject, timer }
       try { await this.transport.send(encodePacket(command, data, this.crc)) }
@@ -142,13 +143,13 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
       const packet = decodePacket(report, this.crc)
       if (packet.command === COMMAND.FAIL) {
         const error = packet.data[0] ?? 0xff
-        throw new Error(`键盘拒绝命令，错误码 0x${error.toString(16).padStart(2, '0')}`)
+        throw new DriverError('PROTOCOL_REJECTED', `键盘拒绝命令，错误码 0x${error.toString(16).padStart(2, '0')}`, true, { details: { errorCode: error } })
       }
       if (packet.command !== this.pending.command) return
       const { resolve, timer } = this.pending
       clearTimeout(timer)
       this.pending = undefined
-      if ((packet.data[0] ?? 0) !== 0) throw new Error(`设备返回错误码 0x${packet.data[0]!.toString(16)}`)
+      if ((packet.data[0] ?? 0) !== 0) throw new DriverError('PROTOCOL_REJECTED', `设备返回错误码 0x${packet.data[0]!.toString(16)}`, true, { details: { errorCode: packet.data[0] } })
       resolve(packet.data)
     } catch (error) {
       const pending = this.pending

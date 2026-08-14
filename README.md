@@ -42,6 +42,8 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 
 键码通过 `KeyCatalog` 注入会话：领域层的 `HID_KEY_CATALOG` 只包含公共 HID 定义，星闪扩展位于 `protocol/xsyd/keyCatalog.ts`，C98 驱动使用 `CompositeKeyCatalog` 组合两者。UI 从当前会话获取目录，因此增加其他编码体系不会修改 Vue 组件或污染公共键码。
 
+跨层错误统一为带稳定 `DriverErrorCode` 的 `DriverError`。应用和 UI 可根据 `UNSUPPORTED_BROWSER`、`DEVICE_NOT_CONNECTED`、`PROTOCOL_TIMEOUT`、`PROTOCOL_CRC_ERROR`、`PROTOCOL_REJECTED`、`VERIFY_FAILED` 等错误码决定恢复动作，同时继续展示本地化消息。
+
 ## 协议依据
 
 - 星闪悦动键盘 SDK 文档：https://sparklinkplayjoy.github.io/keyboard-docs/keyboard/

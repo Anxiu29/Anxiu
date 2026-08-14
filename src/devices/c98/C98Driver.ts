@@ -5,6 +5,7 @@ import { XsydKeyboardProtocol } from '@/protocol/KeyboardProtocol'
 import { WebHidTransport } from '@/transport/HidTransport'
 import type { DeviceDriver } from '../DeviceDriver'
 import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
+import { DriverError } from '@/application/DriverError'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
 export class C98Driver implements DeviceDriver {
@@ -41,7 +42,7 @@ export class C98Driver implements DeviceDriver {
   }
 
   private createTransport(onDisconnect: () => void) {
-    if (!('hid' in navigator)) throw new Error('当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge')
+    if (!('hid' in navigator)) throw new DriverError('UNSUPPORTED_BROWSER', '当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge', false)
     const transport = new WebHidTransport(C98_DEVICE)
     transport.onDisconnect(onDisconnect)
     return transport
