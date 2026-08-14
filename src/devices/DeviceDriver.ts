@@ -1,8 +1,8 @@
 import type { DeviceSession } from '@/application/DeviceSession'
+import type { DeviceManifest } from '@/domain/deviceManifest'
 
 export interface DeviceDriver {
-  readonly id: string
-  readonly displayName: string
+  readonly manifest: DeviceManifest
   connect(onDisconnect: () => void): Promise<DeviceSession>
   reconnectAuthorized(onDisconnect: () => void): Promise<DeviceSession | undefined>
   createDemoSession(): DeviceSession
@@ -12,8 +12,8 @@ export class DeviceDriverRegistry {
   private readonly drivers = new Map<string, DeviceDriver>()
 
   register(driver: DeviceDriver) {
-    if (this.drivers.has(driver.id)) throw new Error(`设备驱动已注册：${driver.id}`)
-    this.drivers.set(driver.id, driver)
+    if (this.drivers.has(driver.manifest.id)) throw new Error(`设备驱动已注册：${driver.manifest.id}`)
+    this.drivers.set(driver.manifest.id, driver)
     return this
   }
 

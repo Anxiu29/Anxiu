@@ -1,4 +1,4 @@
-import type { DeviceTransport, KeyboardProtocol } from './ports'
+import type { DeviceTransport, KeyboardDevice } from './ports'
 import type { KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import { assignmentsEqual, cloneAssignments, validateAssignments } from '@/domain/keyboard'
 
@@ -7,12 +7,12 @@ export class DeviceSession {
   original: KeyAssignment[] = []
   draft: KeyAssignment[] = []
 
-  constructor(private readonly protocol: KeyboardProtocol, private readonly transport?: DeviceTransport) {}
+  constructor(private readonly device: KeyboardDevice, private readonly transport?: DeviceTransport) {}
 
   get dirty() { return !assignmentsEqual(this.original, this.draft) }
 
   async load() {
-    this.profile = await this.protocol.getProfile()
+    this.profile = await this.device.profile.getProfile()
     this.original = cloneAssignments(this.profile.assignments)
     this.draft = cloneAssignments(this.profile.assignments)
     return this.profile
@@ -33,16 +33,25 @@ export class DeviceSession {
       return !original || original.keyCode !== draft.keyCode
     })
     if (!changes.length) return
-    await this.protocol.writeAssignments(changes)
-    await this.protocol.save()
-    const verified = await this.protocol.getProfile()
+    if (!this.device.keymap) throw new Error('当前设备不支持改键')
+    if (!this.device.configuration) throw new Error('当前设备不支持保存配置')
+    await this.device.keymap.writeAssignments(changes)
+    await this.device.configuration.save()
+    const verified = await this.device.profile.getProfile()
     if (!assignmentsEqual(verified.assignments, this.draft)) throw new Error('写入后的回读配置不一致，草稿已保留')
     this.profile = verified
     this.original = cloneAssignments(verified.assignments)
     this.draft = cloneAssignments(verified.assignments)
   }
 
-  async reload() { await this.protocol.reload(); return this.load() }
-  async restoreFactory() { await this.protocol.restoreFactory() }
-  async close() { this.protocol.close(); await this.transport?.close() }
+  async reload() {
+    if (!this.device.configuration) throw new Error('当前设备不支持重新加载配置')
+    await this.device.configuration.reload()
+    return this.load()
+  }
+  async restoreFactory() {
+    if (!this.device.factoryReset) throw new Error('当前设备不支持恢复出厂设置')
+    await this.device.factoryReset.restoreFactory()
+  }
+  async close() { this.device.close(); await this.transport?.close() }
 }

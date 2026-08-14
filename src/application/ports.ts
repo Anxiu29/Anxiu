@@ -15,12 +15,28 @@ export interface DeviceTransport {
   onDisconnect(listener: () => void): () => void
 }
 
-/** 应用核心依赖的键盘能力端口；每套设备协议提供一个实现。 */
-export interface KeyboardProtocol {
+export interface DeviceProfileCapability {
   getProfile(): Promise<KeyboardProfile>
+}
+
+export interface KeymapCapability {
   writeAssignments(assignments: KeyAssignment[]): Promise<void>
+}
+
+export interface ConfigurationCapability {
   save(): Promise<void>
   reload(): Promise<void>
+}
+
+export interface FactoryResetCapability {
   restoreFactory(): Promise<void>
+}
+
+/** 协议适配器按能力组合；未支持的能力保持 undefined。 */
+export interface KeyboardDevice {
+  readonly profile: DeviceProfileCapability
+  readonly keymap?: KeymapCapability
+  readonly configuration?: ConfigurationCapability
+  readonly factoryReset?: FactoryResetCapability
   close(): void
 }

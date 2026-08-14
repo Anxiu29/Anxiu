@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DeviceSession } from '@/application/DeviceSession'
-import type { KeyboardProtocol } from '@/application/ports'
+import type { KeyboardDevice } from '@/application/ports'
 import type { KeyboardProfile, KeyAssignment } from '@/domain/keyboard'
 
 const assignments: KeyAssignment[] = [
@@ -21,18 +21,17 @@ describe('DeviceSession', () => {
   it('writes only changed assignments and verifies the full profile', async () => {
     let current = profile()
     const writes: KeyAssignment[][] = []
-    const protocol: KeyboardProtocol = {
-      getProfile: async () => current,
-      writeAssignments: async (changes) => {
+    const device: KeyboardDevice = {
+      profile: { getProfile: async () => current },
+      keymap: { writeAssignments: async (changes) => {
         writes.push(changes)
         current = { ...current, assignments: current.assignments.map((item) => changes.find((change) => change.positionId === item.positionId && change.layer === item.layer) ?? item) }
-      },
-      save: async () => undefined,
-      reload: async () => undefined,
-      restoreFactory: async () => undefined,
+      } },
+      configuration: { save: async () => undefined, reload: async () => undefined },
+      factoryReset: { restoreFactory: async () => undefined },
       close: () => undefined,
     }
-    const session = new DeviceSession(protocol)
+    const session = new DeviceSession(device)
     await session.load()
     session.update('0-1', 0, 6, 'basic')
     await session.save()

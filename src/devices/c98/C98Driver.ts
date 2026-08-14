@@ -7,8 +7,19 @@ import type { DeviceDriver } from '../DeviceDriver'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
 export class C98Driver implements DeviceDriver {
-  readonly id = 'rk-c98-xsyd-webhid'
-  readonly displayName = 'RK-C98'
+  readonly manifest = {
+    id: 'rk-c98-xsyd-webhid',
+    displayName: 'RK-C98',
+    protocolId: 'xsyd-keyboard-v1',
+    transportId: 'webhid',
+    capabilities: ['device-profile', 'keymap', 'configuration', 'factory-reset'],
+    hid: {
+      vendorId: C98_DEVICE.vendorId,
+      productIds: [C98_DEVICE.productId],
+      usagePage: C98_DEVICE.usagePage,
+      usage: C98_DEVICE.usage,
+    },
+  } as const
 
   async connect(onDisconnect: () => void) {
     const transport = this.createTransport(onDisconnect)

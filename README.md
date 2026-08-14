@@ -36,7 +36,9 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 - `composition/root.ts`：唯一组合根，集中注册所有键盘驱动。
 - `stores/`、`components/`：Vue UI 适配器，只通过 `KeyboardDriverService` 使用核心能力。
 
-新增键盘时实现 `DeviceDriver` 并在组合根注册；新增协议时实现 `KeyboardProtocol`；新增传输方式时实现 `DeviceTransport`。替换 Vue UI 时可直接复用 `KeyboardDriverService` 和全部核心层。
+新增键盘时实现 `DeviceDriver` 并在组合根注册；新增协议时按需组合 `KeyboardDevice` 能力；新增传输方式时实现 `DeviceTransport`。替换 Vue UI 时可直接复用 `KeyboardDriverService` 和全部核心层。
+
+协议能力采用可选组合，而不是要求所有键盘实现同一个巨型接口：`DeviceProfileCapability`、`KeymapCapability`、`ConfigurationCapability` 和 `FactoryResetCapability` 可独立提供。设备的静态身份、协议、传输和能力列表由 `DeviceManifest` 声明；只读设备可以只实现 profile 能力。
 
 ## 协议依据
 

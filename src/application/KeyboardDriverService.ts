@@ -14,7 +14,7 @@ export class KeyboardDriverService {
   constructor(private readonly registry: DeviceDriverRegistry) {}
 
   get availableDrivers() {
-    return this.registry.list().map(({ id, displayName }) => ({ id, displayName }))
+    return this.registry.list().map(({ manifest }) => manifest)
   }
 
   get session() { return this.active }
