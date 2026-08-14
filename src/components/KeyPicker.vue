@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { KEYCODES } from '@/domain/keycodes'
-import type { KeyCategory } from '@/domain/keyboard'
+import type { KeyCategory, KeyDefinition } from '@/domain/keyboard'
 
-defineProps<{ current?: number }>()
+const props = defineProps<{ current?: number; keys: readonly KeyDefinition[] }>()
 const emit = defineEmits<{ select: [code: number] }>()
 const search = ref('')
 const category = ref<KeyCategory | 'all'>('all')
 const categories: Array<{ id: KeyCategory | 'all'; label: string }> = [{ id: 'all', label: '全部' }, { id: 'basic', label: '基础键' }, { id: 'modifier', label: '修饰键' }, { id: 'navigation', label: '导航' }, { id: 'function', label: '功能键' }, { id: 'media', label: '媒体' }, { id: 'special', label: '特殊' }]
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase()
-  return KEYCODES.filter((key) => {
+  return props.keys.filter((key) => {
     const matchesCategory = category.value === 'all' || key.category === category.value
     const hex = key.code.toString(16).padStart(4, '0').toLowerCase()
     return matchesCategory && (key.label.toLowerCase().includes(query) || String(key.code).includes(query) || hex.includes(query.replace(/^0x/, '')))

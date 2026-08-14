@@ -6,7 +6,7 @@ import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
 
 const store = useDriverStore()
-const { status, profile, layer, selectedPositionId, error, message, dirty, assignments, selectedAssignment, demo } = storeToRefs(store)
+const { status, profile, layer, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, demo } = storeToRefs(store)
 const labels: Record<string, string> = { idle: '待连接', connecting: '连接中', reading: '读取中', ready: '已就绪', writing: '写入中', disconnected: '已断开', error: '发生错误', unsupported: '不支持' }
 const busy = () => ['connecting', 'reading', 'writing'].includes(status.value)
 const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }
@@ -48,10 +48,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <section class="editor panel">
           <div class="panel-heading"><div><span class="eyebrow">KEYMAP EDITOR</span><h2>键位映射</h2></div><div class="layer-tabs"><button v-for="index in profile.capabilities.layers" :key="index" :class="{ active: layer === index - 1 }" @click="layer = index - 1">FN {{ index }}</button></div></div>
           <p class="hint">选择一个按键，再从右侧键库分配新功能。小字显示物理键位，青色标记表示已修改。</p>
-          <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :selected="selectedPositionId" @select="selectedPositionId = $event" />
+          <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" @select="selectedPositionId = $event" />
           <div class="editor-footer"><div><i :class="{ dirty }"></i><span>{{ dirty ? '存在未保存的修改' : '配置与设备一致' }}</span></div><button class="primary save" :disabled="!dirty || busy()" @click="store.save"><span v-if="status === 'writing'" class="spinner"></span>{{ status === 'writing' ? '正在写入并验证…' : '写入键盘' }}</button></div>
         </section>
-        <KeyPicker :current="selectedAssignment?.keyCode" @select="store.assignKey" />
+        <KeyPicker :current="selectedAssignment?.keyCode" :keys="keyOptions" @select="store.assignKey" />
       </div>
     </section>
     <footer><span>ANXIU STUDIO · v0.1.0</span><span>配置仅在本地与设备间传输</span></footer>

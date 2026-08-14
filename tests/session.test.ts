@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DeviceSession } from '@/application/DeviceSession'
 import type { KeyboardDevice } from '@/application/ports'
 import type { KeyboardProfile, KeyAssignment } from '@/domain/keyboard'
+import { HID_KEY_CATALOG } from '@/domain/keycodes'
 
 const assignments: KeyAssignment[] = [
   { positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' },
@@ -31,7 +32,7 @@ describe('DeviceSession', () => {
       factoryReset: { restoreFactory: async () => undefined },
       close: () => undefined,
     }
-    const session = new DeviceSession(device)
+    const session = new DeviceSession(device, HID_KEY_CATALOG)
     await session.load()
     session.update('0-1', 0, 6, 'basic')
     await session.save()

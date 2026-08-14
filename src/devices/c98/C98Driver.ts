@@ -4,6 +4,7 @@ import { DemoKeyboardProtocol } from '@/protocol/DemoKeyboardProtocol'
 import { XsydKeyboardProtocol } from '@/protocol/KeyboardProtocol'
 import { WebHidTransport } from '@/transport/HidTransport'
 import type { DeviceDriver } from '../DeviceDriver'
+import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
 export class C98Driver implements DeviceDriver {
@@ -36,7 +37,7 @@ export class C98Driver implements DeviceDriver {
   }
 
   createDemoSession() {
-    return new DeviceSession(new DemoKeyboardProtocol())
+    return new DeviceSession(new DemoKeyboardProtocol(XSYD_KEY_CATALOG), XSYD_KEY_CATALOG)
   }
 
   private createTransport(onDisconnect: () => void) {
@@ -47,6 +48,6 @@ export class C98Driver implements DeviceDriver {
   }
 
   private createSession(transport: WebHidTransport) {
-    return new DeviceSession(new XsydKeyboardProtocol(transport), transport)
+    return new DeviceSession(new XsydKeyboardProtocol(transport, XSYD_KEY_CATALOG), XSYD_KEY_CATALOG, transport)
   }
 }

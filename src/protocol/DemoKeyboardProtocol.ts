@@ -1,7 +1,7 @@
 import type { KeyboardDevice } from '@/application/ports'
 import type { KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import { cloneAssignments } from '@/domain/keyboard'
-import { keyDefinition } from '@/domain/keycodes'
+import type { KeyCatalog } from '@/domain/KeyCatalog'
 
 const rows: Array<Array<[string, number, number?]>> = [
   [['Esc',0x29],['F1',0x3a],['F2',0x3b],['F3',0x3c],['F4',0x3d],['F5',0x3e],['F6',0x3f],['F7',0x40],['F8',0x41],['F9',0x42],['F10',0x43],['F11',0x44],['F12',0x45],['Del',0x4c]],
@@ -13,16 +13,20 @@ const rows: Array<Array<[string, number, number?]>> = [
 ]
 
 const positions: KeyPosition[] = rows.flatMap((row, rowIndex) => row.map(([label, sourceCode, width], column) => ({ id: `${rowIndex}-${column}`, sourceCode, label, row: rowIndex, column, width })))
-const initial = Array.from({ length: 4 }, (_, layer) => positions.map((position) => ({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode: layer === 0 ? position.sourceCode : 0, category: keyDefinition(position.sourceCode).category }))).flat()
-
 export class DemoKeyboardProtocol implements KeyboardDevice {
-  private stored = cloneAssignments(initial)
-  private working = cloneAssignments(initial)
+  private readonly initial: KeyAssignment[]
+  private stored: KeyAssignment[]
+  private working: KeyAssignment[]
   private wait = () => new Promise((resolve) => setTimeout(resolve, 260))
   readonly profile = { getProfile: () => this.getProfile() }
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
+  constructor(private readonly keyCatalog: KeyCatalog) {
+    this.initial = Array.from({ length: 4 }, (_, layer) => positions.map((position) => ({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode: layer === 0 ? position.sourceCode : 0, category: this.keyCatalog.get(position.sourceCode).category }))).flat()
+    this.stored = cloneAssignments(this.initial)
+    this.working = cloneAssignments(this.initial)
+  }
   async getProfile(): Promise<KeyboardProfile> {
     await this.wait()
     return { device: { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app', boardId: 'DEMO98' }, capabilities: { layers: 4, remap: true, restoreFactory: true, layoutRows: 6, layoutColumns: 21 }, positions, assignments: cloneAssignments(this.working) }
@@ -30,6 +34,6 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async writeAssignments(assignments: KeyAssignment[]) { await this.wait(); this.working = cloneAssignments(assignments) }
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
-  async restoreFactory() { await this.wait(); this.working = cloneAssignments(initial); this.stored = cloneAssignments(initial) }
+  async restoreFactory() { await this.wait(); this.working = cloneAssignments(this.initial); this.stored = cloneAssignments(this.initial) }
   close() {}
 }

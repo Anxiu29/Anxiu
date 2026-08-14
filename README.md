@@ -40,6 +40,8 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 
 协议能力采用可选组合，而不是要求所有键盘实现同一个巨型接口：`DeviceProfileCapability`、`KeymapCapability`、`ConfigurationCapability` 和 `FactoryResetCapability` 可独立提供。设备的静态身份、协议、传输和能力列表由 `DeviceManifest` 声明；只读设备可以只实现 profile 能力。
 
+键码通过 `KeyCatalog` 注入会话：领域层的 `HID_KEY_CATALOG` 只包含公共 HID 定义，星闪扩展位于 `protocol/xsyd/keyCatalog.ts`，C98 驱动使用 `CompositeKeyCatalog` 组合两者。UI 从当前会话获取目录，因此增加其他编码体系不会修改 Vue 组件或污染公共键码。
+
 ## 协议依据
 
 - 星闪悦动键盘 SDK 文档：https://sparklinkplayjoy.github.io/keyboard-docs/keyboard/

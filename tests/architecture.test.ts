@@ -3,6 +3,7 @@ import { DeviceSession } from '@/application/DeviceSession'
 import { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardDevice } from '@/application/ports'
 import { DeviceDriverRegistry, type DeviceDriver } from '@/devices/DeviceDriver'
+import { HID_KEY_CATALOG } from '@/domain/keycodes'
 
 const device = (): KeyboardDevice => ({
   profile: { getProfile: async () => ({
@@ -18,9 +19,9 @@ const device = (): KeyboardDevice => ({
 
 const fakeDriver = (id: string): DeviceDriver => ({
   manifest: { id, displayName: id, protocolId: 'fake', transportId: 'fake', capabilities: ['device-profile'] },
-  connect: async () => new DeviceSession(device()),
-  reconnectAuthorized: async () => new DeviceSession(device()),
-  createDemoSession: () => new DeviceSession(device()),
+  connect: async () => new DeviceSession(device(), HID_KEY_CATALOG),
+  reconnectAuthorized: async () => new DeviceSession(device(), HID_KEY_CATALOG),
+  createDemoSession: () => new DeviceSession(device(), HID_KEY_CATALOG),
 })
 
 describe('replaceable architecture', () => {
@@ -39,7 +40,7 @@ describe('replaceable architecture', () => {
   })
 
   it('allows a read-only device to omit unsupported capabilities', async () => {
-    const readOnly = new DeviceSession({ profile: device().profile, close: () => undefined })
+    const readOnly = new DeviceSession({ profile: device().profile, close: () => undefined }, HID_KEY_CATALOG)
     await readOnly.load()
     await expect(readOnly.reload()).rejects.toThrow('不支持重新加载配置')
     await expect(readOnly.restoreFactory()).rejects.toThrow('不支持恢复出厂设置')

@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import { DeviceSession } from '@/application/DeviceSession'
 import { keyboardDriverService } from '@/composition/root'
 import type { KeyboardProfile, SessionStatus } from '@/domain/keyboard'
-import { keyDefinition } from '@/domain/keycodes'
 
 export const useDriverStore = defineStore('driver', () => {
   const status = ref<SessionStatus>('idle')
@@ -20,6 +19,8 @@ export const useDriverStore = defineStore('driver', () => {
   const dirty = computed(() => { revision.value; return session?.dirty ?? false })
   const assignments = computed(() => { revision.value; return session?.draft.filter((item) => item.layer === layer.value) ?? [] })
   const selectedAssignment = computed(() => assignments.value.find((item) => item.positionId === selectedPositionId.value))
+  const keyOptions = computed(() => session?.keyCatalog.list() ?? [])
+  const keyLabels = computed(() => Object.fromEntries(keyOptions.value.map(({ code, label }) => [code, label])))
 
   async function connect(useDemo = false) {
     clearFeedback(); status.value = 'connecting'; demo.value = useDemo
@@ -52,7 +53,7 @@ export const useDriverStore = defineStore('driver', () => {
 
   function assignKey(keyCode: number) {
     if (!session || !selectedPositionId.value) return
-    const key = keyDefinition(keyCode)
+    const key = session.keyCatalog.get(keyCode)
     session.update(selectedPositionId.value, layer.value, key.code, key.category); revision.value++
   }
 
@@ -88,5 +89,5 @@ export const useDriverStore = defineStore('driver', () => {
   function clearFeedback() { error.value = ''; message.value = '' }
   function fail(cause: unknown) { status.value = 'error'; error.value = cause instanceof Error ? cause.message : String(cause) }
 
-  return { status, profile, layer, selectedPositionId, error, message, demo, connected, dirty, assignments, selectedAssignment, connect, reconnectAuthorized, assignKey, save, reload, restoreFactory }
+  return { status, profile, layer, selectedPositionId, error, message, demo, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, save, reload, restoreFactory }
 })

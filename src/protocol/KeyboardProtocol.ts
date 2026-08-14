@@ -1,5 +1,5 @@
 import type { DeviceInfo, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
-import { keyDefinition } from '@/domain/keycodes'
+import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceTransport, KeyboardDevice } from '@/application/ports'
 import { decodePacket, encodePacket, readUint16le, uint16le, type CrcStrategy } from './codec'
 
@@ -22,7 +22,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
 
-  constructor(private readonly transport: DeviceTransport, private readonly crc?: CrcStrategy) {
+  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly crc?: CrcStrategy) {
     this.removeReportListener = transport.onReport((report) => this.handleReport(report))
   }
 
@@ -96,7 +96,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
         for (let column = 0; column < 21; column++) {
           const sourceCode = data[block.start + column] ?? 0xff
           if (sourceCode === 0xff || sourceCode === 0) continue
-          positions.push({ id: `${block.row}-${column}`, sourceCode, label: keyDefinition(sourceCode).label, row: block.row, column })
+          positions.push({ id: `${block.row}-${column}`, sourceCode, label: this.keyCatalog.get(sourceCode).label, row: block.row, column })
         }
       }
     }
@@ -114,7 +114,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
         const position = batch[index]!
         const base = 1 + index * 4
         const keyCode = readUint16le(data, base + 2)
-        assignments.push({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode, category: keyDefinition(keyCode).category })
+        assignments.push({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode, category: this.keyCatalog.get(keyCode).category })
       }
     }
     return assignments
