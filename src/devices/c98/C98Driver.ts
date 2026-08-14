@@ -3,7 +3,7 @@ import { C98_DEVICE } from '@/config/devices'
 import { DemoKeyboardProtocol } from '@/protocol/DemoKeyboardProtocol'
 import { XsydKeyboardProtocol } from '@/protocol/KeyboardProtocol'
 import { WebHidTransport } from '@/transport/HidTransport'
-import type { DeviceDriver } from '../DeviceDriver'
+import type { DeviceDriver } from '@/application/DeviceDriverRegistry'
 import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
 import { DriverError } from '@/application/DriverError'
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DeviceSession } from '@/application/DeviceSession'
 import { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardDevice } from '@/application/ports'
-import { DeviceDriverRegistry, type DeviceDriver } from '@/devices/DeviceDriver'
+import { DeviceDriverRegistry, type DeviceDriver } from '@/application/DeviceDriverRegistry'
 import { HID_KEY_CATALOG } from '@/domain/keycodes'
 import { DriverError, toDriverError } from '@/application/DriverError'
 

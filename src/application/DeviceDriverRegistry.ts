@@ -1,6 +1,7 @@
-import type { DeviceSession } from '@/application/DeviceSession'
+import type { DeviceSession } from './DeviceSession'
 import type { DeviceManifest } from '@/domain/deviceManifest'
 
+/** 外层设备插件必须实现的应用端口。 */
 export interface DeviceDriver {
   readonly manifest: DeviceManifest
   connect(onDisconnect: () => void): Promise<DeviceSession>

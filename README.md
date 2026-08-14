@@ -30,6 +30,7 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 
 - `domain/`：纯键盘模型、校验规则和键码表，不依赖 Vue、WebHID 或具体协议。
 - `application/ports.ts`：定义设备传输和键盘协议端口。
+- `application/DeviceDriverRegistry.ts`：定义设备插件端口与注册表，应用层不依赖具体键盘。
 - `application/`：设备会话与应用门面，只依赖领域模型和端口。
 - `protocol/`、`transport/`：星闪协议与 WebHID 的基础设施适配器。
 - `devices/`：每种键盘的驱动插件，负责装配设备参数、协议和传输。
@@ -43,6 +44,8 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 键码通过 `KeyCatalog` 注入会话：领域层的 `HID_KEY_CATALOG` 只包含公共 HID 定义，星闪扩展位于 `protocol/xsyd/keyCatalog.ts`，C98 驱动使用 `CompositeKeyCatalog` 组合两者。UI 从当前会话获取目录，因此增加其他编码体系不会修改 Vue 组件或污染公共键码。
 
 跨层错误统一为带稳定 `DriverErrorCode` 的 `DriverError`。应用和 UI 可根据 `UNSUPPORTED_BROWSER`、`DEVICE_NOT_CONNECTED`、`PROTOCOL_TIMEOUT`、`PROTOCOL_CRC_ERROR`、`PROTOCOL_REJECTED`、`VERIFY_FAILED` 等错误码决定恢复动作，同时继续展示本地化消息。
+
+`tests/dependency-boundaries.test.ts` 自动检查依赖方向：领域层不得导入应用或适配器，应用层不得导入 Vue、Pinia、具体协议、具体传输或具体键盘，协议和传输不得依赖 UI。
 
 ## 协议依据
 

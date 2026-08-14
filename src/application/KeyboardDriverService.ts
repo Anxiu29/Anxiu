@@ -1,5 +1,5 @@
 import type { DeviceSession } from './DeviceSession'
-import type { DeviceDriverRegistry } from '@/devices/DeviceDriver'
+import type { DeviceDriverRegistry } from './DeviceDriverRegistry'
 
 export interface ConnectOptions {
   driverId?: string
