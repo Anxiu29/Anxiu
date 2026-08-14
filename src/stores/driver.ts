@@ -1,10 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { C98_DEVICE } from '@/config/devices'
 import { DeviceSession } from '@/application/DeviceSession'
-import { DemoKeyboardProtocol } from '@/protocol/DemoKeyboardProtocol'
-import { XsydKeyboardProtocol } from '@/protocol/KeyboardProtocol'
-import { WebHidTransport } from '@/transport/HidTransport'
+import { keyboardDriverService } from '@/composition/root'
 import type { KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import { keyDefinition } from '@/domain/keycodes'
 
@@ -27,15 +24,10 @@ export const useDriverStore = defineStore('driver', () => {
   async function connect(useDemo = false) {
     clearFeedback(); status.value = 'connecting'; demo.value = useDemo
     try {
-      await session?.close()
-      if (useDemo) session = new DeviceSession(new DemoKeyboardProtocol())
-      else {
-        if (!('hid' in navigator)) throw new Error('当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge')
-        const transport = new WebHidTransport(C98_DEVICE)
-        await transport.requestDevice(); await transport.open()
-        transport.onDisconnect(() => { status.value = 'disconnected'; error.value = '键盘已断开连接，未保存的草稿仍保留在页面中' })
-        session = new DeviceSession(new XsydKeyboardProtocol(transport), transport)
-      }
+      session = await keyboardDriverService.connect({
+        demo: useDemo,
+        onDisconnect: () => { status.value = 'disconnected'; error.value = '键盘已断开连接，未保存的草稿仍保留在页面中' },
+      })
       await readProfile()
       message.value = useDemo ? '已进入演示模式' : '键盘连接成功'
     } catch (cause) { fail(cause) }
@@ -44,11 +36,10 @@ export const useDriverStore = defineStore('driver', () => {
   async function reconnectAuthorized() {
     clearFeedback(); status.value = 'connecting'
     try {
-      if (!('hid' in navigator)) throw new Error('当前浏览器不支持 WebHID')
-      const transport = new WebHidTransport(C98_DEVICE)
-      if (!await transport.reconnectAuthorized()) { status.value = 'idle'; return }
-      await transport.open()
-      session = new DeviceSession(new XsydKeyboardProtocol(transport), transport)
+      session = await keyboardDriverService.reconnectAuthorized({
+        onDisconnect: () => { status.value = 'disconnected'; error.value = '键盘已断开连接，未保存的草稿仍保留在页面中' },
+      })
+      if (!session) { status.value = 'idle'; return }
       await readProfile()
     } catch (cause) { fail(cause) }
   }

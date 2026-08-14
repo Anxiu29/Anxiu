@@ -1,19 +1,10 @@
 import type { DeviceInfo, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import { keyDefinition } from '@/domain/keycodes'
-import type { HidTransport } from '@/transport/HidTransport'
+import type { DeviceTransport, KeyboardProtocol } from '@/application/ports'
 import { decodePacket, encodePacket, readUint16le, uint16le, type CrcStrategy } from './codec'
 
 const COMMAND = { SYNC: 0x01, ACTION: 0x00, KEY: 0x23, DEFAULT_KEY: 0x2b, FAIL: 0xff } as const
 const ORDER = { PROTOCOL_VERSION: 0x01, SAVE: 0x02, RELOAD: 0x03, RESTORE_FACTORY: 0x11 } as const
-
-export interface KeyboardProtocol {
-  getProfile(): Promise<KeyboardProfile>
-  writeAssignments(assignments: KeyAssignment[]): Promise<void>
-  save(): Promise<void>
-  reload(): Promise<void>
-  restoreFactory(): Promise<void>
-  close(): void
-}
 
 interface PendingRequest {
   command: number
@@ -27,7 +18,7 @@ export class XsydKeyboardProtocol implements KeyboardProtocol {
   private queue: Promise<unknown> = Promise.resolve()
   private readonly removeReportListener: () => void
 
-  constructor(private readonly transport: HidTransport, private readonly crc?: CrcStrategy) {
+  constructor(private readonly transport: DeviceTransport, private readonly crc?: CrcStrategy) {
     this.removeReportListener = transport.onReport((report) => this.handleReport(report))
   }
 

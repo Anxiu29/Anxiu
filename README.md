@@ -24,6 +24,20 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 
 协议的 1 字节包头校验为 `uint8(0x35 + head + len + cmd + data[len - 1])`；当数据为空时不累加数据字节。HID 报告尾部的 `0x00` 填充不参与计算。实现位于 `src/protocol/codec.ts`，并使用真机抓包建立了测试向量。
 
+## 可替换架构
+
+项目采用端口与适配器架构：
+
+- `domain/`：纯键盘模型、校验规则和键码表，不依赖 Vue、WebHID 或具体协议。
+- `application/ports.ts`：定义设备传输和键盘协议端口。
+- `application/`：设备会话与应用门面，只依赖领域模型和端口。
+- `protocol/`、`transport/`：星闪协议与 WebHID 的基础设施适配器。
+- `devices/`：每种键盘的驱动插件，负责装配设备参数、协议和传输。
+- `composition/root.ts`：唯一组合根，集中注册所有键盘驱动。
+- `stores/`、`components/`：Vue UI 适配器，只通过 `KeyboardDriverService` 使用核心能力。
+
+新增键盘时实现 `DeviceDriver` 并在组合根注册；新增协议时实现 `KeyboardProtocol`；新增传输方式时实现 `DeviceTransport`。替换 Vue UI 时可直接复用 `KeyboardDriverService` 和全部核心层。
+
 ## 协议依据
 
 - 星闪悦动键盘 SDK 文档：https://sparklinkplayjoy.github.io/keyboard-docs/keyboard/

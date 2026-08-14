@@ -1,16 +1,4 @@
-export interface HidTransport {
-  readonly connected: boolean
-  readonly productName: string
-  readonly vendorId: number
-  readonly productId: number
-  requestDevice(): Promise<void>
-  reconnectAuthorized(): Promise<boolean>
-  open(): Promise<void>
-  close(): Promise<void>
-  send(report: Uint8Array): Promise<void>
-  onReport(listener: (data: Uint8Array) => void): () => void
-  onDisconnect(listener: () => void): () => void
-}
+import type { DeviceTransport } from '@/application/ports'
 
 export interface HidDeviceFilterConfig {
   vendorId: number
@@ -21,7 +9,7 @@ export interface HidDeviceFilterConfig {
   reportSize: number
 }
 
-export class WebHidTransport implements HidTransport {
+export class WebHidTransport implements DeviceTransport {
   private device?: HIDDevice
   private reportListeners = new Set<(data: Uint8Array) => void>()
   private disconnectListeners = new Set<() => void>()

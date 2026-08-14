@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DeviceSession } from '@/application/DeviceSession'
-import type { KeyboardProtocol } from '@/protocol/KeyboardProtocol'
+import type { KeyboardProtocol } from '@/application/ports'
 import type { KeyboardProfile, KeyAssignment } from '@/domain/keyboard'
 
 const assignments: KeyAssignment[] = [

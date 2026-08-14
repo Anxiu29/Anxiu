@@ -1,4 +1,4 @@
-import type { KeyboardProtocol } from './KeyboardProtocol'
+import type { KeyboardProtocol } from '@/application/ports'
 import type { KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import { cloneAssignments } from '@/domain/keyboard'
 import { keyDefinition } from '@/domain/keycodes'

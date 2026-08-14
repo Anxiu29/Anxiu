@@ -1,5 +1,4 @@
-import type { KeyboardProtocol } from '@/protocol/KeyboardProtocol'
-import type { HidTransport } from '@/transport/HidTransport'
+import type { DeviceTransport, KeyboardProtocol } from './ports'
 import type { KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import { assignmentsEqual, cloneAssignments, validateAssignments } from '@/domain/keyboard'
 
@@ -8,7 +7,7 @@ export class DeviceSession {
   original: KeyAssignment[] = []
   draft: KeyAssignment[] = []
 
-  constructor(private readonly protocol: KeyboardProtocol, private readonly transport?: HidTransport) {}
+  constructor(private readonly protocol: KeyboardProtocol, private readonly transport?: DeviceTransport) {}
 
   get dirty() { return !assignmentsEqual(this.original, this.draft) }
 
