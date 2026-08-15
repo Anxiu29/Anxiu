@@ -31,9 +31,9 @@ class C98LayoutDescriptor implements LayoutDescriptor<MatrixKeyInput> {
 }
 
 export const C98_LAYOUT: LayoutDescriptor<MatrixKeyInput> = new C98LayoutDescriptor()
-export const C98_DEMO_KEYS: MatrixKeyInput[] = rows.flatMap((row, rowIndex) => row.map(([sourceCode], column) => ({
-  id: `demo-${rowIndex}-${column}`,
-  sourceCode,
-  label: '',
-  address: { kind: 'matrix', row: rowIndex, column },
-})))
+export const C98_DEMO_KEYS: MatrixKeyInput[] = Array.from({ length: 6 }, (_, rowIndex) =>
+  Array.from({ length: 21 }, (_, column) => {
+    const sourceCode = rows[rowIndex]?.[column]?.[0] ?? 0
+    return { id: `demo-${rowIndex}-${column}`, sourceCode, present: sourceCode !== 0, label: '', address: { kind: 'matrix' as const, row: rowIndex, column } }
+  }),
+).flat()

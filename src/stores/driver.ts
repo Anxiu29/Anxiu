@@ -50,7 +50,7 @@ export const useDriverStore = defineStore('driver', () => {
     profile.value = await session.load()
     revision.value++
     status.value = 'ready'
-    selectedPositionId.value = profile.value.positions[0]?.id
+    selectedPositionId.value = profile.value.positions.find((position) => position.present)?.id
   }
 
   function assignKey(keyCode: number) {

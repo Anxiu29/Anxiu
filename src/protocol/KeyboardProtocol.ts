@@ -6,6 +6,7 @@ import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
+import { parseMatrixRowPair } from './xsyd/matrix'
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
@@ -22,8 +23,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const [device, protocolVersion] = await Promise.all([this.sync(), this.queryProtocolVersion()])
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
+    const presentPositions = positions.filter((position) => position.present)
     const assignments: KeyAssignment[] = []
-    for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
+    for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, presentPositions))
     return {
       device: { ...device, protocolVersion },
       capabilities,
@@ -76,13 +78,8 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const matrixKeys: MatrixKeyInput[] = []
     for (let row = 0; row < rows; row += 2) {
       const data = await this.commands.request(XSYD_COMMANDS.defaultKeymap, new Uint8Array([0, row, row + 1]))
-      const blocks = [{ row: data[1] ?? row, start: 2 }, { row: data[2 + columns] ?? row + 1, start: 3 + columns }]
-      for (const block of blocks) {
-        for (let column = 0; column < columns; column++) {
-          const sourceCode = data[block.start + column] ?? 0xff
-          if (sourceCode === 0xff || sourceCode === 0) continue
-          matrixKeys.push({ id: `${block.row}-${column}`, sourceCode, label: this.keyCatalog.get(sourceCode).label, address: { kind: 'matrix', row: block.row, column } })
-        }
+      for (const slot of parseMatrixRowPair(data, row, columns)) {
+        matrixKeys.push({ id: `${slot.row}-${slot.column}`, sourceCode: slot.sourceCode, present: slot.present, label: slot.present ? this.keyCatalog.get(slot.sourceCode).label : '', address: { kind: 'matrix', row: slot.row, column: slot.column } })
       }
     }
     return this.layout.describe(matrixKeys)

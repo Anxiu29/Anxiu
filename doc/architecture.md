@@ -110,3 +110,7 @@ commands.ts                 XsydCommandClient             KeyboardProtocol
 ## 领域模型不假设所有控件都是矩阵键
 
 `PhysicalAddress` 是可辨识联合：普通键盘协议可以使用 `MatrixAddress`，旋钮、触控条或独立控制器可以使用 `IndexedAddress`。`LayoutDescriptor` 通过泛型约束输入地址；XSYD 和 C98 仍在编译期明确要求矩阵键，但公共 `KeyPosition` 不再把未来设备限制为行列矩阵。
+
+## 矩阵槽位与实际按键
+
+C98 配置声明的是 6 行、每行 21 列，因此协议读取必须保留 126 个矩阵槽位。空槽使用 `sourceCode = 0` 和 `present = false`，不会产生层级 assignment，也不会由 UI 渲染。完整字段含义、响应偏移以及键码 0 的上下文区别见 `doc/matrix-key-values.md`。

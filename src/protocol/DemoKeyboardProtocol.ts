@@ -16,10 +16,10 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
   private readonly capabilities: DeviceCapabilities
   constructor(private readonly keyCatalog: KeyCatalog, layout: LayoutDescriptor<MatrixKeyInput>, demoKeys: readonly MatrixKeyInput[], capabilityDescriptor: CapabilityDescriptor) {
-    this.positions = layout.describe(demoKeys.map((key) => ({ ...key, label: this.keyCatalog.get(key.sourceCode).label })))
+    this.positions = layout.describe(demoKeys.map((key) => ({ ...key, label: key.present ? this.keyCatalog.get(key.sourceCode).label : '' })))
     const device = { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app' as const, boardId: 'DEMO98' }
     this.capabilities = capabilityDescriptor.resolve({ device, protocolVersion: device.protocolVersion })
-    this.initial = Array.from({ length: this.capabilities.layers }, (_, layer) => this.positions.map((position) => ({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode: layer === 0 ? position.sourceCode : 0, category: this.keyCatalog.get(position.sourceCode).category }))).flat()
+    this.initial = Array.from({ length: this.capabilities.layers }, (_, layer) => this.positions.filter((position) => position.present).map((position) => ({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode: layer === 0 ? position.sourceCode : 0, category: this.keyCatalog.get(position.sourceCode).category }))).flat()
     this.stored = cloneAssignments(this.initial)
     this.working = cloneAssignments(this.initial)
   }

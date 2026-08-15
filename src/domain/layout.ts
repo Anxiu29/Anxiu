@@ -25,6 +25,7 @@ export interface PhysicalControlInput {
   id: string
   sourceCode: number
   label: string
+  present: boolean
   address: PhysicalAddress
 }
 
