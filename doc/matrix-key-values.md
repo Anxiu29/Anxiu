@@ -64,3 +64,27 @@ data[24..44]  第二行 21 个键值
 - C98 演示矩阵：[layout.ts](../src/devices/c98/layout.ts)
 - UI 空槽过滤：[KeyboardCanvas.vue](../src/components/KeyboardCanvas.vue)
 - 相关测试：[layout.test.ts](../tests/layout.test.ts)
+
+## UI 第一阶段严格显示读取顺序
+
+当前 `C98MatrixLayoutDescriptor` 不再通过键码推测键帽所在行，也不对键位重新排序。视觉坐标直接使用协议矩阵坐标：
+
+```text
+geometry.x = address.column
+geometry.y = address.row
+geometry.width = 1
+geometry.height = 1
+```
+
+这意味着设备返回的空槽会在页面中形成间隔，但不会显示键帽。比如抓包的第 1 行（矩阵 row 1）后半段是：
+
+```text
+... 2D 2E 2A 4C 00 00 53 54 55 56
+            │  │
+            │  └─ Del（0x4C）
+            └──── Backspace（0x2A）
+```
+
+所以页面上 Del 必须紧跟在 Backspace 后面。此前布局按照键码维护另一份视觉顺序，错误地把 `0x4C` 放到了上一行；该逻辑已经删除。
+
+目前页面展示的是“协议矩阵视图”，目的是优先保证读取结果完全可核对。以后如果需要真实键帽宽度和错位排列，必须根据权威的矩阵地址到物理几何表新增布局描述器；不能再根据默认键值猜测，因为默认键值会变化，也可能重复。

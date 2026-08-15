@@ -13,13 +13,17 @@ describe('layout descriptors', () => {
     const a = C98_LAYOUT.describe(C98_DEMO_KEYS).find((key) => key.sourceCode === 0x04)
 
     expect(a?.address).toEqual({ kind: 'matrix', row: 3, column: 1 })
-    expect(a?.geometry).toMatchObject({ x: 1.8, y: 3 })
+    expect(a?.geometry).toMatchObject({ x: 1, y: 3 })
   })
 
-  it('describes non-uniform physical key widths', () => {
-    const space = C98_LAYOUT.describe(C98_DEMO_KEYS).find((key) => key.sourceCode === 0x2c)
+  it('keeps Del immediately after Backspace exactly as read from the device', () => {
+    const positions = C98_LAYOUT.describe(C98_DEMO_KEYS)
+    const backspace = positions.find((key) => key.address.kind === 'matrix' && key.address.row === 1 && key.address.column === 13)
+    const del = positions.find((key) => key.address.kind === 'matrix' && key.address.row === 1 && key.address.column === 14)
 
-    expect(space?.geometry.width).toBe(6)
+    expect(backspace?.sourceCode).toBe(0x2a)
+    expect(del?.sourceCode).toBe(0x4c)
+    expect(del?.geometry.x).toBe((backspace?.geometry.x ?? 0) + 1)
   })
 
   it('offers a generic matrix layout without device-specific UI code', () => {
