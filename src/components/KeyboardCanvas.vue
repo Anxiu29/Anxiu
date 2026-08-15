@@ -6,7 +6,7 @@ const props = defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment
 const emit = defineEmits<{ select: [id: string] }>()
 const assignment = (id: string) => props.assignments.find((item) => item.positionId === id)
 const labelFor = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
-const unit = 46
+const unit = 58
 const gap = 6
 const canvasStyle = computed(() => ({
   width: `${Math.max(...props.positions.map((key) => key.geometry.x + key.geometry.width), 1) * unit + gap}px`,

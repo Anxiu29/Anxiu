@@ -50,7 +50,7 @@
 }
 
 .picker-keyboard {
-  --picker-unit: 38px;
+  --picker-unit: 42px;
   --picker-gap: 6px;
   padding: 18px;
   overflow-x: auto;
@@ -64,6 +64,7 @@
   justify-content: flex-start;
   gap: var(--picker-gap);
   width: max-content;
+  height: var(--picker-unit);
   min-width: 1120px;
   margin-right: auto;
   margin-bottom: var(--picker-gap);
@@ -81,7 +82,7 @@
 }
 
 .picker-key {
-  height: 42px;
+  height: calc((var(--picker-unit) + var(--picker-gap)) * var(--picker-height, 1) - var(--picker-gap));
   padding: 4px;
   display: flex;
   align-items: center;
@@ -94,6 +95,7 @@
   background: linear-gradient(#232a34, #171c24);
   font-size: 9px;
   transition: border-color .15s, color .15s, opacity .15s;
+  z-index: 1;
 }
 
 .picker-key small {
@@ -209,6 +211,6 @@
 
 @media (max-width: 1200px) {
   .picker-keyboard {
-    --picker-unit: 34px;
+    --picker-unit: 38px;
   }
 }
