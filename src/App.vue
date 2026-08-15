@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useDriverStore } from '@/stores/driver'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
-import keyboardImageUrl from '@/assets/c98-keyboard.webp'
+import keyboardImageUrl from '@/assets/c98-keyboard-transparent.png'
 
 const store = useDriverStore()
 const { status, profile, layer, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, demo } = storeToRefs(store)

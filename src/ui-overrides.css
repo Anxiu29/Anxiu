@@ -52,6 +52,10 @@
 .picker-keyboard {
   --picker-unit: 42px;
   --picker-gap: 6px;
+  position: relative;
+  box-sizing: border-box;
+  min-width: calc(23.2 * (var(--picker-unit) + var(--picker-gap)) + 36px);
+  height: calc(6 * (var(--picker-unit) + var(--picker-gap)) - var(--picker-gap) + 36px);
   padding: 18px;
   overflow-x: auto;
   border: 1px solid #232a35;
@@ -82,6 +86,9 @@
 }
 
 .picker-key {
+  position: absolute;
+  left: calc(18px + var(--picker-x) * (var(--picker-unit) + var(--picker-gap)));
+  top: calc(18px + var(--picker-y) * (var(--picker-unit) + var(--picker-gap)));
   height: calc((var(--picker-unit) + var(--picker-gap)) * var(--picker-height, 1) - var(--picker-gap));
   padding: 4px;
   display: flex;
@@ -156,7 +163,7 @@
   overflow: hidden;
   border: 1px solid #2d3743;
   border-radius: 8px;
-  background: #f4f6f6;
+  background: transparent;
   transition: border-color .15s, transform .15s;
 }
 
@@ -193,7 +200,7 @@
   max-width: min(1400px, 94vw);
   max-height: 88vh;
   border-radius: 12px;
-  background: white;
+  background: transparent;
   box-shadow: 0 30px 90px rgba(0,0,0,.55);
 }
 
