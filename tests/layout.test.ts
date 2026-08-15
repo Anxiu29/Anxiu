@@ -13,7 +13,7 @@ describe('layout descriptors', () => {
     const a = C98_LAYOUT.describe(C98_DEMO_KEYS).find((key) => key.sourceCode === 0x04)
 
     expect(a?.address).toEqual({ kind: 'matrix', row: 3, column: 1 })
-    expect(a?.geometry).toMatchObject({ x: 1.8, y: 3.5 })
+    expect(a?.geometry).toMatchObject({ x: 1.8, y: 3 })
   })
 
   it('keeps Del immediately after Backspace exactly as read from the device', () => {
@@ -24,8 +24,9 @@ describe('layout descriptors', () => {
     expect(backspace?.sourceCode).toBe(0x2a)
     expect(del?.sourceCode).toBe(0x4c)
     expect(C98_DEMO_KEYS.findIndex((key) => key.id === del?.id)).toBe(C98_DEMO_KEYS.findIndex((key) => key.id === backspace?.id) + 1)
-    expect(backspace?.geometry).toMatchObject({ x: 13, y: 1.5, width: 2 })
-    expect(del?.geometry).toMatchObject({ x: 15.5, y: 0 })
+    expect(backspace?.geometry).toMatchObject({ x: 13, y: 1, width: 2 })
+    expect(del?.geometry).toMatchObject({ x: 15, y: 1 })
+    expect(del?.geometry.x).toBe((backspace?.geometry.x ?? 0) + (backspace?.geometry.width ?? 0))
   })
 
   it('uses the key sizes shown in the C98 product image', () => {

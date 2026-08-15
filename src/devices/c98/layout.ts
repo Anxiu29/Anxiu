@@ -14,70 +14,46 @@ export const C98_CAPTURED_DEFAULT_MATRIX: readonly (readonly number[])[] = [
   [0xe0, 0xe3, 0xe2, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0xe6, 0x01, 0x00, 0xe4, 0x50, 0x51, 0x4f, 0x62, 0x00, 0x63, 0x00],
 ]
 
-type GeometryEntry = readonly [row: number, column: number, x: number, y: number, width?: number, height?: number]
+/**
+ * 产品图只用于确认少数键帽的宽高，不用于改变矩阵行列或猜测键位。
+ * Map 的键是稳定的矩阵地址 row-column，不是会变化或重复的 sourceCode。
+ */
+const sizeByAddress = new Map<string, Pick<ControlGeometry, 'width' | 'height'>>([
+  ['1-13', { width: 2, height: 1 }],   // Backspace
+  ['2-0', { width: 1.5, height: 1 }],  // Tab
+  ['2-20', { width: 1, height: 2 }],   // 数字区 +
+  ['3-0', { width: 1.8, height: 1 }],  // CapsLock
+  ['3-13', { width: 2.2, height: 1 }], // Enter
+  ['4-0', { width: 2.2, height: 1 }],  // 左 Shift
+  ['4-13', { width: 2.8, height: 1 }], // 右 Shift
+  ['4-20', { width: 1, height: 2 }],   // 数字区 Enter
+  ['5-6', { width: 6, height: 1 }],    // Space
+  ['5-17', { width: 2, height: 1 }],   // 数字区 0
+])
 
 /**
- * 根据 C98(739) 单模 US 带旋钮图片整理的物理几何表。
- *
- * 表的身份只能使用矩阵 row/column，绝不能使用 sourceCode：
- * sourceCode 是该位置读取到的默认功能，将来可能变化；row/column 才是物理位置。
- * 坐标单位约等于一个标准 1U 键帽，组间空隙通过非整数 x/y 表示。
+ * 严格矩阵顺序布局：
+ * 1. y 永远等于设备读取的 row，不允许跨行移动；
+ * 2. 同一行按 column 递增显示，空槽仍占据原始列；
+ * 3. 宽键只把本行后续槽位向右推，不改变任何键的先后关系；
+ * 4. 当前矩阵没有旋钮数据，顶部对应区域保持空白。
  */
-const geometryEntries: readonly GeometryEntry[] = [
-  // 顶部功能区：Esc、F1-F12、导航键。Del 来自矩阵 row 1 column 14。
-  [0,0,0,0], [0,1,2,0], [0,2,3,0], [0,3,4,0], [0,4,5,0],
-  [0,5,6.5,0], [0,6,7.5,0], [0,7,8.5,0], [0,8,9.5,0],
-  [0,9,11,0], [0,10,12,0], [0,11,13,0], [0,12,14,0],
-  [1,14,15.5,0], [0,14,17,0], [0,15,18,0], [0,16,19,0], [0,17,20,0],
-
-  // 主键区数字行、独立 Del 下方导航键和数字键盘首行。
-  [1,0,0,1.5], [1,1,1,1.5], [1,2,2,1.5], [1,3,3,1.5], [1,4,4,1.5], [1,5,5,1.5],
-  [1,6,6,1.5], [1,7,7,1.5], [1,8,8,1.5], [1,9,9,1.5], [1,10,10,1.5], [1,11,11,1.5],
-  [1,12,12,1.5], [1,13,13,1.5,2], [2,14,15.5,1.5],
-  [1,17,17,1.5], [1,18,18,1.5], [1,19,19,1.5], [1,20,20,1.5],
-
-  // QWERTY 行。
-  [2,0,0,2.5,1.5], [2,1,1.5,2.5], [2,2,2.5,2.5], [2,3,3.5,2.5], [2,4,4.5,2.5],
-  [2,5,5.5,2.5], [2,6,6.5,2.5], [2,7,7.5,2.5], [2,8,8.5,2.5], [2,9,9.5,2.5],
-  [2,10,10.5,2.5], [2,11,11.5,2.5], [2,12,12.5,2.5], [2,13,13.5,2.5,1.5],
-  [2,17,17,2.5], [2,18,18,2.5], [2,19,19,2.5], [2,20,20,2.5,1,2],
-
-  // ASDF 行。
-  [3,0,0,3.5,1.8], [3,1,1.8,3.5], [3,2,2.8,3.5], [3,3,3.8,3.5], [3,4,4.8,3.5],
-  [3,5,5.8,3.5], [3,6,6.8,3.5], [3,7,7.8,3.5], [3,8,8.8,3.5], [3,9,9.8,3.5],
-  [3,10,10.8,3.5], [3,11,11.8,3.5], [3,13,12.8,3.5,2.2], [3,14,15.5,2.5],
-  [3,17,17,3.5], [3,18,18,3.5], [3,19,19,3.5],
-
-  // ZXCV 行、右 Shift、上方向键和数字区。
-  [4,0,0,4.5,2.2], [4,2,2.2,4.5], [4,3,3.2,4.5], [4,4,4.2,4.5], [4,5,5.2,4.5],
-  [4,6,6.2,4.5], [4,7,7.2,4.5], [4,8,8.2,4.5], [4,9,9.2,4.5], [4,10,10.2,4.5],
-  [4,11,11.2,4.5], [4,13,12.2,4.5,2.8], [4,15,15.5,4.5],
-  [4,17,17,4.5], [4,18,18,4.5], [4,19,19,4.5], [4,20,20,4.5,1,2],
-
-  // 底行、方向键和数字区 0/小数点。
-  [5,0,0,5.5,1.3], [5,1,1.3,5.5,1.3], [5,2,2.6,5.5,1.3], [5,6,3.9,5.5,6],
-  [5,10,9.9,5.5,1.3], [5,11,11.2,5.5,1.3], [5,13,12.5,5.5,1.3],
-  [5,14,14.5,5.5], [5,15,15.5,5.5], [5,16,16.5,5.5],
-  [5,17,17,5.5,2], [5,19,19,5.5],
-]
-
-const geometryByAddress = new Map<string, ControlGeometry>(
-  geometryEntries.map(([row, column, x, y, width = 1, height = 1]) => [`${row}-${column}`, { x, y, width, height }]),
-)
-
-class C98PhysicalLayoutDescriptor implements LayoutDescriptor<MatrixKeyInput> {
-  readonly id = 'rk-c98-739-us-knob'
+class C98OrderedMatrixLayoutDescriptor implements LayoutDescriptor<MatrixKeyInput> {
+  readonly id = 'rk-c98-ordered-matrix'
 
   describe(keys: readonly MatrixKeyInput[]): KeyPosition[] {
-    return keys.map((key) => ({
-      ...key,
-      geometry: geometryByAddress.get(`${key.address.row}-${key.address.column}`)
-        ?? { x: key.address.column, y: key.address.row, width: 1, height: 1 },
-    }))
+    const extraWidthByRow = new Map<number, number>()
+    return keys.map((key) => {
+      const row = key.address.row
+      const size = sizeByAddress.get(`${row}-${key.address.column}`) ?? { width: 1, height: 1 }
+      const x = key.address.column + (extraWidthByRow.get(row) ?? 0)
+      extraWidthByRow.set(row, (extraWidthByRow.get(row) ?? 0) + size.width - 1)
+      return { ...key, geometry: { x, y: row, ...size } }
+    })
   }
 }
 
-export const C98_LAYOUT: LayoutDescriptor<MatrixKeyInput> = new C98PhysicalLayoutDescriptor()
+export const C98_LAYOUT: LayoutDescriptor<MatrixKeyInput> = new C98OrderedMatrixLayoutDescriptor()
 
 export const C98_DEMO_KEYS: MatrixKeyInput[] = C98_CAPTURED_DEFAULT_MATRIX.flatMap((row, rowIndex) =>
   row.map((sourceCode, column) => ({

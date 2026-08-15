@@ -65,13 +65,13 @@ data[24..44]  第二行 21 个键值
 - UI 空槽过滤：[KeyboardCanvas.vue](../src/components/KeyboardCanvas.vue)
 - 相关测试：[layout.test.ts](../tests/layout.test.ts)
 
-## UI 如何同时保证读取正确和外观接近实物
+## UI 如何保证读取顺序不被视觉布局修改
 
-读取层始终保留设备返回的原始 `row/column/sourceCode`，不会修改键值，也不会删除空槽。随后 `C98PhysicalLayoutDescriptor` 根据产品图片，把稳定的矩阵地址投影成页面坐标和键帽尺寸：
+读取层始终保留设备返回的原始 `row/column/sourceCode`，不会修改键值，也不会删除空槽。`C98OrderedMatrixLayoutDescriptor` 只根据产品图片调整少数键帽宽高，不允许把键移动到其他行：
 
 ```text
 设备事实：row + column + sourceCode
-视觉描述：row + column -> x + y + width + height
+视觉描述：y 永远等于 row，同一行始终按 column 递增
 ```
 
 映射键必须是 `row + column`，不能是 `sourceCode`。原因是 sourceCode 表示该位置当前读取到的默认功能，将来可能改变或重复；矩阵地址才代表不变的物理位置。
@@ -85,6 +85,6 @@ data[24..44]  第二行 21 个键值
             └──── Backspace（0x2A）
 ```
 
-所以数据模型中 Del 必须紧跟在 Backspace 后面。根据产品图片，物理布局再把 Backspace 显示为数字行末尾的 2U 键，把 Del 显示在上方独立导航区；这只是视觉位置变化，读取顺序和矩阵地址没有变化。
+所以数据模型和 UI 中 Del 都必须紧跟在 Backspace 后面，并保持在同一行。Backspace 变宽后，只能把后续 Del 向右推，不能把 Del 移到顶部或其他区域。
 
-当前物理几何表依据 `doc/C98(739)_单模_us(带旋钮）.png` 调整了功能键分组、导航区、方向键区，以及 Backspace、Tab、CapsLock、Enter、Shift、Space、数字区 0、数字区 + 和数字区 Enter 的尺寸。旋钮没有出现在当前 6×21 可配置矩阵中，因此只作为产品外观参考，不伪造成可改键位置。
+当前尺寸表依据 `doc/C98(739)_单模_us(带旋钮）.png` 调整 Backspace、Tab、CapsLock、Enter、Shift、Space、数字区 0、数字区 + 和数字区 Enter。旋钮没有出现在当前 6×21 可配置矩阵中，因此对应位置保持空白，不创建旋钮控件，也不使用 Del 或其他键补位。
