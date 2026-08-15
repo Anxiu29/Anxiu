@@ -22,8 +22,6 @@ export interface KeyPosition {
   id: string
   sourceCode: number
   label: string
-  /** 该矩阵槽位是否安装了可配置按键；空槽仍保留地址，但 UI 不渲染。 */
-  present: boolean
   address: PhysicalAddress
   geometry: ControlGeometry
 }
@@ -83,7 +81,7 @@ export function validateAssignments(profile: KeyboardProfile, assignments: KeyAs
     if (seen.has(identity)) errors.push(`重复键位：${identity}`)
     seen.add(identity)
   }
-  const expected = profile.positions.filter((position) => position.present).length * profile.capabilities.layers
+  const expected = profile.positions.length * profile.capabilities.layers
   if (assignments.length !== expected) errors.push(`配置不完整：应有 ${expected} 个键位，实际为 ${assignments.length} 个`)
   return errors
 }

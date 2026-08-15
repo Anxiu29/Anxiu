@@ -1,27 +1,65 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { KeyCategory, KeyDefinition } from '@/domain/keyboard'
+import type { KeyDefinition } from '@/domain/keyboard'
 
 const props = defineProps<{ current?: number; keys: readonly KeyDefinition[] }>()
 const emit = defineEmits<{ select: [code: number] }>()
+
+type PickerItem = { code?: number; width?: number; label?: string }
+const spacer = (width = 0.5): PickerItem => ({ width })
+const key = (code: number, width = 1, label?: string): PickerItem => ({ code, width, label })
+
+/** 参考目标界面排列的标准键盘矩阵；这里只决定选择器外观，不参与设备矩阵读写。 */
+const keyboardRows: PickerItem[][] = [
+  [key(41), spacer(), key(58),key(59),key(60),key(61),spacer(),key(62),key(63),key(64),key(65),spacer(),key(66),key(67),key(68),key(69),spacer(),key(70),key(71),key(72)],
+  [key(53),key(30),key(31),key(32),key(33),key(34),key(35),key(36),key(37),key(38),key(39),key(45),key(46),key(42,2),spacer(),key(73),key(74),key(75),spacer(),key(83),key(84),key(85),key(86)],
+  [key(43,1.5),key(20),key(26),key(8),key(21),key(23),key(28),key(24),key(12),key(18),key(19),key(47),key(48),key(49,1.5),spacer(),key(76),key(77),key(78),spacer(),key(95),key(96),key(97),key(87)],
+  [key(57,1.8),key(4),key(22),key(7),key(9),key(10),key(11),key(13),key(14),key(15),key(51),key(52),key(40,2.2),spacer(4),key(92),key(93),key(94)],
+  [key(225,2.2),key(29),key(27),key(6),key(25),key(5),key(17),key(16),key(54),key(55),key(56),key(229,2.5),spacer(1.5),key(82),spacer(1.5),key(89),key(90),key(91),key(88)],
+  [key(224,1.4),key(227,1.4),key(226,1.4),key(44,6),key(230,1.4),key(1,1.4,'Fn'),key(228,1.4),spacer(),key(80),key(81),key(79),spacer(),key(98,2),key(99)],
+]
+
+const mode = ref<'keyboard' | 'extended'>('keyboard')
 const search = ref('')
-const category = ref<KeyCategory | 'all'>('all')
-const categories: Array<{ id: KeyCategory | 'all'; label: string }> = [{ id: 'all', label: '全部' }, { id: 'basic', label: '基础键' }, { id: 'modifier', label: '修饰键' }, { id: 'navigation', label: '导航' }, { id: 'function', label: '功能键' }, { id: 'media', label: '媒体' }, { id: 'special', label: '特殊' }]
-const filtered = computed(() => {
-  const query = search.value.trim().toLowerCase()
-  return props.keys.filter((key) => {
-    const matchesCategory = category.value === 'all' || key.category === category.value
-    const hex = key.code.toString(16).padStart(4, '0').toLowerCase()
-    return matchesCategory && (key.label.toLowerCase().includes(query) || String(key.code).includes(query) || hex.includes(query.replace(/^0x/, '')))
-  })
-})
+const byCode = computed(() => new Map(props.keys.map((item) => [item.code, item])))
+const visualCodes = new Set(keyboardRows.flatMap((row) => row.flatMap((item) => item.code === undefined ? [] : [item.code])))
+const query = computed(() => search.value.trim().toLowerCase())
+const matches = (code: number) => {
+  if (!query.value) return true
+  const definition = byCode.value.get(code)
+  return definition?.label.toLowerCase().includes(query.value) || String(code).includes(query.value) || code.toString(16).includes(query.value.replace(/^0x/, ''))
+}
+const extendedKeys = computed(() => props.keys.filter((item) => !visualCodes.has(item.code) && matches(item.code)))
+const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? '' : byCode.value.get(item.code)?.label ?? `0x${item.code.toString(16).toUpperCase()}`)
 </script>
 
 <template>
-  <aside class="picker panel">
-    <div class="panel-heading"><div><span class="eyebrow">KEY LIBRARY</span><h2>分配按键</h2></div><span v-if="current !== undefined" class="hex">0x{{ current.toString(16).padStart(4, '0').toUpperCase() }}</span></div>
-    <input v-model="search" class="search" placeholder="搜索按键…" />
-    <div class="category-tabs"><button v-for="item in categories" :key="item.id" :class="{ active: category === item.id }" @click="category = item.id">{{ item.label }}</button></div>
-    <div class="key-list"><button v-for="key in filtered" :key="key.code" :class="{ active: current === key.code }" @click="emit('select', key.code)"><span>{{ key.label }}</span><small>{{ key.code.toString(16).padStart(2, '0').toUpperCase() }}</small></button></div>
-  </aside>
+  <section class="picker panel picker-wide">
+    <div class="picker-toolbar">
+      <div class="picker-modes">
+        <button :class="{ active: mode === 'keyboard' }" @click="mode = 'keyboard'">键盘按键</button>
+        <button :class="{ active: mode === 'extended' }" @click="mode = 'extended'">扩展按键</button>
+      </div>
+      <div class="picker-current" v-if="current !== undefined">当前键码：0x{{ current.toString(16).padStart(4, '0').toUpperCase() }}</div>
+      <input v-model="search" class="search picker-search" placeholder="搜索按键或键码" />
+    </div>
+
+    <div v-if="mode === 'keyboard'" class="picker-keyboard">
+      <div v-for="(row, rowIndex) in keyboardRows" :key="rowIndex" class="picker-key-row">
+        <template v-for="(item, itemIndex) in row" :key="itemIndex">
+          <span v-if="item.code === undefined" class="picker-spacer" :style="{ '--picker-width': item.width ?? 1 }"></span>
+          <button v-else class="picker-key" :class="{ active: current === item.code, muted: !matches(item.code) }" :style="{ '--picker-width': item.width ?? 1 }" :title="`${labelFor(item)} · 0x${item.code.toString(16).padStart(4, '0').toUpperCase()}`" @click="emit('select', item.code)">
+            <span>{{ labelFor(item) }}</span>
+            <small>{{ item.code.toString(16).padStart(2, '0').toUpperCase() }}</small>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <div v-else class="extended-key-list">
+      <button v-for="item in extendedKeys" :key="item.code" :class="{ active: current === item.code }" @click="emit('select', item.code)">
+        <span>{{ item.label }}</span><small>0x{{ item.code.toString(16).padStart(4, '0').toUpperCase() }}</small>
+      </button>
+    </div>
+  </section>
 </template>

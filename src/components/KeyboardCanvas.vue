@@ -8,10 +8,9 @@ const assignment = (id: string) => props.assignments.find((item) => item.positio
 const labelFor = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
 const unit = 46
 const gap = 6
-const visiblePositions = computed(() => props.positions.filter((key) => key.present))
 const canvasStyle = computed(() => ({
-  width: `${Math.max(...visiblePositions.value.map((key) => key.geometry.x + key.geometry.width), 1) * unit + gap}px`,
-  height: `${Math.max(...visiblePositions.value.map((key) => key.geometry.y + key.geometry.height), 1) * unit + gap}px`,
+  width: `${Math.max(...props.positions.map((key) => key.geometry.x + key.geometry.width), 1) * unit + gap}px`,
+  height: `${Math.max(...props.positions.map((key) => key.geometry.y + key.geometry.height), 1) * unit + gap}px`,
 }))
 const keyStyle = (key: KeyPosition) => ({
   left: `${key.geometry.x * unit + gap}px`,
@@ -25,7 +24,7 @@ const keyStyle = (key: KeyPosition) => ({
 <template>
   <div class="keyboard-shell">
     <div class="keyboard-layout" :style="canvasStyle">
-      <button v-for="key in visiblePositions" :key="key.id" class="keycap" :class="{ selected: selected === key.id, changed: assignment(key.id)?.keyCode !== key.sourceCode }" :style="keyStyle(key)" @click="emit('select', key.id)">
+      <button v-for="key in positions" :key="key.id" class="keycap" :class="{ selected: selected === key.id, changed: assignment(key.id)?.keyCode !== key.sourceCode }" :style="keyStyle(key)" @click="emit('select', key.id)">
         <span>{{ labelFor(assignment(key.id)?.keyCode ?? key.sourceCode) }}</span>
         <small>{{ key.label }}</small>
       </button>
