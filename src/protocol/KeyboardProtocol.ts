@@ -5,6 +5,7 @@ import type { LayoutDescriptor, MatrixKeyInput } from '@/domain/layout'
 import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
+import type { CapabilityDescriptor } from '@/domain/capabilities'
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
@@ -13,17 +14,19 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
 
-  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor, crc?: CrcStrategy) {
+  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
     this.commands = new XsydCommandClient(transport, crc)
   }
 
   async getProfile(): Promise<KeyboardProfile> {
-    const [device, protocolVersion, positions] = await Promise.all([this.sync(), this.queryProtocolVersion(), this.readDefaultLayout()])
+    const [device, protocolVersion] = await Promise.all([this.sync(), this.queryProtocolVersion()])
+    const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
+    const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
     const assignments: KeyAssignment[] = []
-    for (let layer = 0; layer < 4; layer++) assignments.push(...await this.readLayer(layer, positions))
+    for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
     return {
       device: { ...device, protocolVersion },
-      capabilities: { layers: 4, remap: true, restoreFactory: true, layoutRows: 6, layoutColumns: 21 },
+      capabilities,
       positions,
       assignments,
     }
@@ -69,13 +72,13 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order]), timeoutMs)
   }
 
-  private async readDefaultLayout(): Promise<KeyPosition[]> {
+  private async readDefaultLayout(rows: number, columns: number): Promise<KeyPosition[]> {
     const matrixKeys: MatrixKeyInput[] = []
-    for (let row = 0; row < 6; row += 2) {
+    for (let row = 0; row < rows; row += 2) {
       const data = await this.commands.request(XSYD_COMMANDS.defaultKeymap, new Uint8Array([0, row, row + 1]))
-      const blocks = [{ row: data[1] ?? row, start: 2 }, { row: data[23] ?? row + 1, start: 24 }]
+      const blocks = [{ row: data[1] ?? row, start: 2 }, { row: data[2 + columns] ?? row + 1, start: 3 + columns }]
       for (const block of blocks) {
-        for (let column = 0; column < 21; column++) {
+        for (let column = 0; column < columns; column++) {
           const sourceCode = data[block.start + column] ?? 0xff
           if (sourceCode === 0xff || sourceCode === 0) continue
           matrixKeys.push({ id: `${block.row}-${column}`, sourceCode, label: this.keyCatalog.get(sourceCode).label, address: { kind: 'matrix', row: block.row, column } })

@@ -7,6 +7,7 @@ import type { DeviceDriver } from '@/application/DeviceDriverRegistry'
 import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
 import { DriverError } from '@/application/DriverError'
 import { C98_DEMO_KEYS, C98_LAYOUT } from './layout'
+import { C98_CAPABILITIES } from './capabilities'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
 export class C98Driver implements DeviceDriver {
@@ -39,7 +40,7 @@ export class C98Driver implements DeviceDriver {
   }
 
   createDemoSession() {
-    return new DeviceSession(new DemoKeyboardProtocol(XSYD_KEY_CATALOG, C98_LAYOUT, C98_DEMO_KEYS), XSYD_KEY_CATALOG)
+    return new DeviceSession(new DemoKeyboardProtocol(XSYD_KEY_CATALOG, C98_LAYOUT, C98_DEMO_KEYS, C98_CAPABILITIES), XSYD_KEY_CATALOG)
   }
 
   private createTransport(onDisconnect: () => void) {
@@ -50,6 +51,6 @@ export class C98Driver implements DeviceDriver {
   }
 
   private createSession(transport: WebHidTransport) {
-    return new DeviceSession(new XsydKeyboardProtocol(transport, XSYD_KEY_CATALOG, C98_LAYOUT), XSYD_KEY_CATALOG, transport)
+    return new DeviceSession(new XsydKeyboardProtocol(transport, XSYD_KEY_CATALOG, C98_LAYOUT, C98_CAPABILITIES), XSYD_KEY_CATALOG, transport)
   }
 }

@@ -88,3 +88,11 @@ commands.ts                 XsydCommandClient             KeyboardProtocol
 `KeyboardProtocol` 不再自己保存 pending 请求或监听 HID 报告。新增普通命令时，先在 `protocol/xsyd/commands.ts` 登记命令规格，再在协议业务适配器中组织请求数据。这样通信机制只有一份，命令知识也不再散落成魔法数字。
 
 这里没有过度设计成通用协议框架：命令表和命令客户端仍明确属于 XSYD。等真正出现第二套协议后，再提取两种协议都证明需要的共同抽象。
+
+## 能力为什么由设备描述，而不是协议决定
+
+协议回答“怎样通信”，设备能力回答“这台设备允许做什么”。使用同一协议的两个型号，可能具有不同层数、矩阵大小，甚至一个允许改键、另一个只读。
+
+`domain/capabilities.ts` 定义能力描述器，`devices/c98/capabilities.ts` 声明 C98 能力，设备驱动负责将它注入协议适配器。协议读取到设备和固件版本后，才解析最终能力并据此读取矩阵和层级。
+
+静态型号可以使用 `StaticCapabilityDescriptor`；同一型号的旧固件若能力不同，可以使用 `VariantCapabilityDescriptor` 按设备或协议版本选择。这样版本分支停留在设备描述中，不会散落到 UI、会话和协议读写流程。
