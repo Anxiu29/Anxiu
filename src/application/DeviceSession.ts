@@ -27,6 +27,29 @@ export class DeviceSession {
     Object.assign(item, { keyCode, category })
   }
 
+  /** 单次改键用例：更新草稿后立即走统一保存与回读验证事务。 */
+  async updateAndSave(positionId: string, layer: number, keyCode: number, category: KeyAssignment['category'], onProgress?: SaveProgressObserver) {
+    this.update(positionId, layer, keyCode, category)
+    return this.save(onProgress)
+  }
+
+  /** 只修改草稿，供后续右键“单键恢复默认”复用。 */
+  restoreKeyToDefault(positionId: string, layer: number) {
+    this.applyKeyDefaults((item) => item.positionId === positionId && item.layer === layer)
+  }
+
+  /** 右键单键恢复用例：只替换目标键位，并立即执行写入、保存与回读验证。 */
+  async restoreKeyDefaultAndSave(positionId: string, layer: number, onProgress?: SaveProgressObserver) {
+    this.restoreKeyToDefault(positionId, layer)
+    return this.save(onProgress)
+  }
+
+  /** 恢复所有层的键位映射，然后复用正常保存与回读验证事务。 */
+  async restoreAllKeyDefaults(onProgress?: SaveProgressObserver) {
+    this.applyKeyDefaults(() => true)
+    return this.save(onProgress)
+  }
+
   async save(onProgress?: SaveProgressObserver) {
     if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
     const result = await saveConfiguration(this.device, this.profile, this.original, this.draft, onProgress)
@@ -46,6 +69,20 @@ export class DeviceSession {
     if (!this.profile?.capabilities.restoreFactory) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备配置不允许恢复出厂设置', false, { details: { capability: 'factory-reset' } })
     if (!this.device.factoryReset) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持恢复出厂设置', false, { details: { capability: 'factory-reset' } })
     await this.device.factoryReset.restoreFactory()
+  }
+
+  private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {
+    if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
+    const defaults = new Map(this.profile.defaultAssignments.map((item) => [`${item.layer}:${item.positionId}`, item]))
+    let matched = false
+    this.draft = this.draft.map((item) => {
+      if (!matches(item)) return item
+      matched = true
+      const defaultAssignment = defaults.get(`${item.layer}:${item.positionId}`)
+      if (!defaultAssignment) throw new DriverError('INVALID_CONFIGURATION', '设备没有提供该键位的默认映射', false, { details: { positionId: item.positionId, layer: item.layer } })
+      return { ...defaultAssignment }
+    })
+    if (!matched) throw new DriverError('INVALID_CONFIGURATION', '找不到要恢复的键位')
   }
 
   async close() {

@@ -53,22 +53,21 @@ export const useDriverStore = defineStore('driver', () => {
     selectedPositionId.value = profile.value.positions[0]?.id
   }
 
-  function assignKey(keyCode: number) {
-    if (!session || !selectedPositionId.value) return
+  async function assignKey(keyCode: number) {
+    if (!session || !selectedPositionId.value || !['ready', 'error'].includes(status.value)) return
+    const positionId = selectedPositionId.value
+    const targetLayer = layer.value
     const key = session.keyCatalog.get(keyCode)
-    session.update(selectedPositionId.value, layer.value, key.code, key.category)
-    revision.value++
-  }
-
-  async function save() {
-    if (!session || !dirty.value) return
     clearFeedback(); status.value = 'writing'; saveProgress.value = undefined
     try {
-      await session.save((progress) => { saveProgress.value = progress })
+      const pending = session.updateAndSave(positionId, targetLayer, key.code, key.category, (progress) => { saveProgress.value = progress })
+      revision.value++
+      const result = await pending
+      profile.value = result.profile
       revision.value++
       status.value = 'ready'
-      message.value = '配置已写入并通过回读验证'
-    } catch (cause) { fail(cause) }
+      message.value = result.changedAssignments === 0 ? `当前按键已经是“${key.label}”` : `已改为“${key.label}”并通过回读验证`
+    } catch (cause) { revision.value++; fail(cause) }
   }
 
   async function reload() {
@@ -78,18 +77,26 @@ export const useDriverStore = defineStore('driver', () => {
     catch (cause) { fail(cause) }
   }
 
-  async function restoreFactory() {
+  async function restoreAllKeyDefaults() {
     if (!session) return
-    clearFeedback(); status.value = 'writing'
+    clearFeedback(); status.value = 'writing'; saveProgress.value = undefined
     try {
-      await session.restoreFactory(); revision.value++
-      if (demo.value) {
-        profile.value = await session.load(); status.value = 'ready'; message.value = '已恢复出厂配置'
-      } else {
-        profile.value = undefined; selectedPositionId.value = undefined; status.value = 'disconnected'
-        message.value = '已恢复出厂配置，设备将重新枚举，请稍后重新连接'
-      }
+      const result = await session.restoreAllKeyDefaults((progress) => { saveProgress.value = progress })
+      profile.value = result.profile; revision.value++; status.value = 'ready'
+      message.value = result.changedAssignments === 0 ? '全部按键已经是默认映射' : `已恢复 ${result.changedAssignments} 个按键映射并通过回读验证`
     } catch (cause) { fail(cause) }
+  }
+
+  async function restoreKeyDefault(positionId: string, targetLayer: number) {
+    if (!session || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'; saveProgress.value = undefined
+    try {
+      const pending = session.restoreKeyDefaultAndSave(positionId, targetLayer, (progress) => { saveProgress.value = progress })
+      revision.value++
+      const result = await pending
+      profile.value = result.profile; revision.value++; status.value = 'ready'
+      message.value = result.changedAssignments === 0 ? '该按键已经是默认映射' : '已恢复当前按键默认映射并通过回读验证'
+    } catch (cause) { revision.value++; fail(cause) }
   }
 
   function handleDisconnect() {
@@ -102,5 +109,5 @@ export const useDriverStore = defineStore('driver', () => {
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, save, reload, restoreFactory }
+  return { status, profile, layer, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, reload, restoreAllKeyDefaults, restoreKeyDefault }
 })

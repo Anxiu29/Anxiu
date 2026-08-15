@@ -14,6 +14,10 @@ const profile = (): KeyboardProfile => ({
     { positionId: 'a', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' },
     { positionId: 'b', sourceCode: 5, layer: 0, keyCode: 5, category: 'basic' },
   ],
+  defaultAssignments: [
+    { positionId: 'a', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' },
+    { positionId: 'b', sourceCode: 5, layer: 0, keyCode: 5, category: 'basic' },
+  ],
 })
 
 describe('save configuration transaction', () => {

@@ -1,6 +1,6 @@
 .keyboard-shell {
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-direction: row;
   gap: 0;
 }
@@ -8,6 +8,8 @@
 .keyboard-layout {
   position: relative;
   flex: none;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .keyboard-layout .keycap {

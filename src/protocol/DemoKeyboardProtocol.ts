@@ -25,9 +25,13 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async getProfile(): Promise<KeyboardProfile> {
     await this.wait()
-    return { device: { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app', boardId: 'DEMO98' }, capabilities: this.capabilities, positions: this.positions, assignments: cloneAssignments(this.working) }
+    return { device: { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app', boardId: 'DEMO98' }, capabilities: this.capabilities, positions: this.positions, defaultAssignments: cloneAssignments(this.initial), assignments: cloneAssignments(this.working) }
   }
-  async writeAssignments(assignments: KeyAssignment[]) { await this.wait(); this.working = cloneAssignments(assignments) }
+  async writeAssignments(assignments: KeyAssignment[]) {
+    await this.wait()
+    const changes = new Map(assignments.map((item) => [`${item.layer}:${item.positionId}`, item]))
+    this.working = this.working.map((item) => ({ ...(changes.get(`${item.layer}:${item.positionId}`) ?? item) }))
+  }
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
   async restoreFactory() { await this.wait(); this.working = cloneAssignments(this.initial); this.stored = cloneAssignments(this.initial) }

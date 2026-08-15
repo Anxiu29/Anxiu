@@ -3,7 +3,7 @@ import { assignmentsEqual, validateAssignments, type KeyboardProfile } from '@/d
 import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
 import { CompositeKeyCatalog, StaticKeyCatalog } from '@/domain/KeyCatalog'
 
-const profile: KeyboardProfile = { device: { productName: 'test', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' }, capabilities: { layers: 1, remap: true, restoreFactory: true, layoutRows: 1, layoutColumns: 1 }, positions: [{ id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 }, geometry: { x: 0, y: 0, width: 1, height: 1 } }], assignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }] }
+const profile: KeyboardProfile = { device: { productName: 'test', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' }, capabilities: { layers: 1, remap: true, restoreFactory: true, layoutRows: 1, layoutColumns: 1 }, positions: [{ id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 }, geometry: { x: 0, y: 0, width: 1, height: 1 } }], defaultAssignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }], assignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }] }
 
 describe('keyboard domain', () => {
   it('detects assignment changes', () => {
@@ -25,6 +25,7 @@ describe('keyboard domain', () => {
     expect(XSYD_KEY_CATALOG.get(4329)).toMatchObject({ label: '声音+', category: 'media' })
     expect(XSYD_KEY_CATALOG.get(29441).label).toBe('鼠标左键')
     expect(XSYD_KEY_CATALOG.get(62231).label).toBe('主灯开关')
+    expect(XSYD_KEY_CATALOG.get(61696).label).toBe('恢复出厂设置')
   })
   it('composes replaceable key catalogs with vendor overrides', () => {
     const base = new StaticKeyCatalog([{ code: 1, label: 'Base', category: 'basic' }])

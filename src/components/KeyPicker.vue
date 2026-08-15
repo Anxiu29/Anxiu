@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import type { KeyDefinition } from '@/domain/keyboard'
 
-const props = defineProps<{ current?: number; keys: readonly KeyDefinition[] }>()
+const props = defineProps<{ current?: number; keys: readonly KeyDefinition[]; disabled?: boolean }>()
 const emit = defineEmits<{ select: [code: number] }>()
 
 type PickerItem = { code?: number; width?: number; height?: number; label?: string }
@@ -72,14 +72,14 @@ const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? 
     </div>
 
     <div v-if="mode === 'keyboard'" class="picker-keyboard">
-      <button v-for="item in keyboardKeys" :key="item.code" class="picker-key" :class="{ active: current === item.code, muted: !matches(item.code) }" :style="{ '--picker-x': item.x, '--picker-y': item.y, '--picker-width': item.width ?? 1, '--picker-height': item.height ?? 1 }" :title="`${labelFor(item)} · 0x${item.code.toString(16).padStart(4, '0').toUpperCase()}`" @click="emit('select', item.code)">
+      <button v-for="item in keyboardKeys" :key="item.code" class="picker-key" :class="{ active: current === item.code, muted: !matches(item.code) }" :style="{ '--picker-x': item.x, '--picker-y': item.y, '--picker-width': item.width ?? 1, '--picker-height': item.height ?? 1 }" :title="`${labelFor(item)} · 0x${item.code.toString(16).padStart(4, '0').toUpperCase()}`" :disabled="disabled" @click="emit('select', item.code)">
         <span>{{ labelFor(item) }}</span>
         <small>{{ item.code.toString(16).padStart(2, '0').toUpperCase() }}</small>
       </button>
     </div>
 
     <div v-else class="extended-key-list">
-      <button v-for="item in extendedKeys" :key="item.code" :class="{ active: current === item.code }" @click="emit('select', item.code)">
+      <button v-for="item in extendedKeys" :key="item.code" :class="{ active: current === item.code }" :disabled="disabled" @click="emit('select', item.code)">
         <span>{{ item.label }}</span><small>0x{{ item.code.toString(16).padStart(4, '0').toUpperCase() }}</small>
       </button>
     </div>

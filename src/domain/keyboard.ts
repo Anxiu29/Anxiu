@@ -57,6 +57,8 @@ export interface KeyboardProfile {
   device: DeviceInfo
   capabilities: DeviceCapabilities
   positions: KeyPosition[]
+  /** 由具体设备协议提供，不能由 UI 根据键帽文字猜测。 */
+  defaultAssignments: KeyAssignment[]
   assignments: KeyAssignment[]
 }
 

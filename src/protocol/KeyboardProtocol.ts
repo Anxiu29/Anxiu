@@ -22,12 +22,17 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const [device, protocolVersion] = await Promise.all([this.sync(), this.queryProtocolVersion()])
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
+    const defaultAssignments = Array.from({ length: capabilities.layers }, (_, layer) => positions.map((position) => {
+      const keyCode = layer === 0 ? position.sourceCode : 0
+      return { positionId: position.id, sourceCode: position.sourceCode, layer, keyCode, category: this.keyCatalog.get(keyCode).category }
+    })).flat()
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
     return {
       device: { ...device, protocolVersion },
       capabilities,
       positions,
+      defaultAssignments,
       assignments,
     }
   }

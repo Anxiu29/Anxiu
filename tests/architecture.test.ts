@@ -10,7 +10,7 @@ const device = (): KeyboardDevice => ({
   profile: { getProfile: async () => ({
     device: { productName: 'Fake', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' },
     capabilities: { layers: 1, remap: true, restoreFactory: true, layoutRows: 0, layoutColumns: 0 },
-    positions: [], assignments: [],
+    positions: [], defaultAssignments: [], assignments: [],
   }) },
   keymap: { writeAssignments: async () => undefined },
   configuration: { save: async () => undefined, reload: async () => undefined },
