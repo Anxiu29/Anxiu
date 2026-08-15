@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest'
+import type { DeviceTransport } from '@/application/ports'
+import { encodePacket } from '@/protocol/codec'
+import { XSYD_COMMANDS } from '@/protocol/xsyd/commands'
+import { XsydCommandClient } from '@/protocol/xsyd/XsydCommandClient'
+
+class FakeTransport implements DeviceTransport {
+  readonly connected = true
+  readonly productName = 'fake'
+  readonly vendorId = 1
+  readonly productId = 2
+  readonly sent: Uint8Array[] = []
+  private listener?: (data: Uint8Array) => void
+
+  requestDevice = async () => undefined
+  reconnectAuthorized = async () => true
+  open = async () => undefined
+  close = async () => undefined
+  onDisconnect = () => () => undefined
+  onReport(listener: (data: Uint8Array) => void) { this.listener = listener; return () => { this.listener = undefined } }
+  async send(report: Uint8Array) { this.sent.push(report) }
+  respond(command: number, data: number[]) { this.listener?.(encodePacket(command, new Uint8Array(data))) }
+}
+
+describe('XsydCommandClient', () => {
+  it('uses declarative command metadata to correlate responses', async () => {
+    const transport = new FakeTransport()
+    const client = new XsydCommandClient(transport)
+    const pending = client.request(XSYD_COMMANDS.keymap, new Uint8Array([0]))
+
+    await Promise.resolve()
+    transport.respond(XSYD_COMMANDS.keymap.responseCode, [0, 4, 0, 5])
+
+    await expect(pending).resolves.toEqual(new Uint8Array([0, 4, 0, 5]))
+    expect(transport.sent[0]?.[2]).toBe(XSYD_COMMANDS.keymap.code)
+    client.close()
+  })
+
+  it('maps non-zero status responses to a stable driver error', async () => {
+    const transport = new FakeTransport()
+    const client = new XsydCommandClient(transport)
+    const pending = client.request(XSYD_COMMANDS.action, new Uint8Array([2]))
+
+    await Promise.resolve()
+    transport.respond(XSYD_COMMANDS.action.responseCode, [7])
+
+    await expect(pending).rejects.toMatchObject({ code: 'PROTOCOL_REJECTED', details: { errorCode: 7, commandName: 'action' } })
+    client.close()
+  })
+})

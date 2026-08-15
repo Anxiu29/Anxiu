@@ -75,3 +75,16 @@ MatrixAddress                  ControlGeometry
 - 具体设备、协议和传输只应在装配位置相遇。
 
 `tests/dependency-boundaries.test.ts` 检查静态依赖方向，`tests/layout.test.ts` 检查协议地址与视觉布局没有重新耦合。
+
+## 协议命令为什么也要声明化
+
+协议适配器现在拆成三个角色：
+
+```text
+commands.ts                 XsydCommandClient             KeyboardProtocol
+命令字、响应字、默认超时    排队、收发、响应匹配、错误     设备信息和键位业务语义
+```
+
+`KeyboardProtocol` 不再自己保存 pending 请求或监听 HID 报告。新增普通命令时，先在 `protocol/xsyd/commands.ts` 登记命令规格，再在协议业务适配器中组织请求数据。这样通信机制只有一份，命令知识也不再散落成魔法数字。
+
+这里没有过度设计成通用协议框架：命令表和命令客户端仍明确属于 XSYD。等真正出现第二套协议后，再提取两种协议都证明需要的共同抽象。
