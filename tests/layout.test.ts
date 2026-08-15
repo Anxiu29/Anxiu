@@ -13,7 +13,7 @@ describe('layout descriptors', () => {
     const a = C98_LAYOUT.describe(C98_DEMO_KEYS).find((key) => key.sourceCode === 0x04)
 
     expect(a?.address).toEqual({ kind: 'matrix', row: 3, column: 1 })
-    expect(a?.geometry).toMatchObject({ x: 1, y: 3 })
+    expect(a?.geometry).toMatchObject({ x: 1.8, y: 3.5 })
   })
 
   it('keeps Del immediately after Backspace exactly as read from the device', () => {
@@ -23,7 +23,21 @@ describe('layout descriptors', () => {
 
     expect(backspace?.sourceCode).toBe(0x2a)
     expect(del?.sourceCode).toBe(0x4c)
-    expect(del?.geometry.x).toBe((backspace?.geometry.x ?? 0) + 1)
+    expect(C98_DEMO_KEYS.findIndex((key) => key.id === del?.id)).toBe(C98_DEMO_KEYS.findIndex((key) => key.id === backspace?.id) + 1)
+    expect(backspace?.geometry).toMatchObject({ x: 13, y: 1.5, width: 2 })
+    expect(del?.geometry).toMatchObject({ x: 15.5, y: 0 })
+  })
+
+  it('uses the key sizes shown in the C98 product image', () => {
+    const positions = C98_LAYOUT.describe(C98_DEMO_KEYS)
+    const at = (row: number, column: number) => positions.find((key) => key.address.kind === 'matrix' && key.address.row === row && key.address.column === column)
+
+    expect(at(2, 0)?.geometry.width).toBe(1.5) // Tab
+    expect(at(3, 13)?.geometry.width).toBe(2.2) // Enter
+    expect(at(5, 6)?.geometry.width).toBe(6) // Space
+    expect(at(2, 20)?.geometry.height).toBe(2) // 数字区 +
+    expect(at(4, 20)?.geometry.height).toBe(2) // 数字区 Enter
+    expect(at(5, 17)?.geometry.width).toBe(2) // 数字区 0
   })
 
   it('offers a generic matrix layout without device-specific UI code', () => {

@@ -65,16 +65,16 @@ data[24..44]  第二行 21 个键值
 - UI 空槽过滤：[KeyboardCanvas.vue](../src/components/KeyboardCanvas.vue)
 - 相关测试：[layout.test.ts](../tests/layout.test.ts)
 
-## UI 第一阶段严格显示读取顺序
+## UI 如何同时保证读取正确和外观接近实物
 
-当前 `C98MatrixLayoutDescriptor` 不再通过键码推测键帽所在行，也不对键位重新排序。视觉坐标直接使用协议矩阵坐标：
+读取层始终保留设备返回的原始 `row/column/sourceCode`，不会修改键值，也不会删除空槽。随后 `C98PhysicalLayoutDescriptor` 根据产品图片，把稳定的矩阵地址投影成页面坐标和键帽尺寸：
 
 ```text
-geometry.x = address.column
-geometry.y = address.row
-geometry.width = 1
-geometry.height = 1
+设备事实：row + column + sourceCode
+视觉描述：row + column -> x + y + width + height
 ```
+
+映射键必须是 `row + column`，不能是 `sourceCode`。原因是 sourceCode 表示该位置当前读取到的默认功能，将来可能改变或重复；矩阵地址才代表不变的物理位置。
 
 这意味着设备返回的空槽会在页面中形成间隔，但不会显示键帽。比如抓包的第 1 行（矩阵 row 1）后半段是：
 
@@ -85,6 +85,6 @@ geometry.height = 1
             └──── Backspace（0x2A）
 ```
 
-所以页面上 Del 必须紧跟在 Backspace 后面。此前布局按照键码维护另一份视觉顺序，错误地把 `0x4C` 放到了上一行；该逻辑已经删除。
+所以数据模型中 Del 必须紧跟在 Backspace 后面。根据产品图片，物理布局再把 Backspace 显示为数字行末尾的 2U 键，把 Del 显示在上方独立导航区；这只是视觉位置变化，读取顺序和矩阵地址没有变化。
 
-目前页面展示的是“协议矩阵视图”，目的是优先保证读取结果完全可核对。以后如果需要真实键帽宽度和错位排列，必须根据权威的矩阵地址到物理几何表新增布局描述器；不能再根据默认键值猜测，因为默认键值会变化，也可能重复。
+当前物理几何表依据 `doc/C98(739)_单模_us(带旋钮）.png` 调整了功能键分组、导航区、方向键区，以及 Backspace、Tab、CapsLock、Enter、Shift、Space、数字区 0、数字区 + 和数字区 Enter 的尺寸。旋钮没有出现在当前 6×21 可配置矩阵中，因此只作为产品外观参考，不伪造成可改键位置。
