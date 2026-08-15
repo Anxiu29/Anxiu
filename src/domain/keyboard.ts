@@ -1,4 +1,4 @@
-import type { ControlGeometry, MatrixAddress } from './layout'
+import type { ControlGeometry, PhysicalAddress } from './layout'
 
 export type SessionStatus =
   | 'unsupported'
@@ -22,7 +22,7 @@ export interface KeyPosition {
   id: string
   sourceCode: number
   label: string
-  address: MatrixAddress
+  address: PhysicalAddress
   geometry: ControlGeometry
 }
 
@@ -65,10 +65,8 @@ export const cloneAssignments = (items: KeyAssignment[]): KeyAssignment[] =>
 
 export function assignmentsEqual(a: KeyAssignment[], b: KeyAssignment[]): boolean {
   if (a.length !== b.length) return false
-  return a.every((item, index) => {
-    const other = b[index]
-    return other !== undefined && item.positionId === other.positionId && item.layer === other.layer && item.keyCode === other.keyCode
-  })
+  const byIdentity = new Map(b.map((item) => [`${item.layer}:${item.positionId}`, item]))
+  return a.every((item) => byIdentity.get(`${item.layer}:${item.positionId}`)?.keyCode === item.keyCode)
 }
 
 export function validateAssignments(profile: KeyboardProfile, assignments: KeyAssignment[]): string[] {
@@ -83,5 +81,7 @@ export function validateAssignments(profile: KeyboardProfile, assignments: KeyAs
     if (seen.has(identity)) errors.push(`重复键位：${identity}`)
     seen.add(identity)
   }
+  const expected = profile.positions.length * profile.capabilities.layers
+  if (assignments.length !== expected) errors.push(`配置不完整：应有 ${expected} 个键位，实际为 ${assignments.length} 个`)
   return errors
 }

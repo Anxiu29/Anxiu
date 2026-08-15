@@ -47,4 +47,18 @@ describe('XsydCommandClient', () => {
     await expect(pending).rejects.toMatchObject({ code: 'PROTOCOL_REJECTED', details: { errorCode: 7, commandName: 'action' } })
     client.close()
   })
+
+  it('rejects queued work when the session closes', async () => {
+    const transport = new FakeTransport()
+    const client = new XsydCommandClient(transport)
+    const active = client.request(XSYD_COMMANDS.sync, new Uint8Array())
+    const queued = client.request(XSYD_COMMANDS.action, new Uint8Array([1]))
+
+    await Promise.resolve()
+    client.close()
+
+    await expect(active).rejects.toMatchObject({ code: 'DEVICE_NOT_CONNECTED' })
+    await expect(queued).rejects.toMatchObject({ code: 'DEVICE_NOT_CONNECTED' })
+    expect(transport.sent).toHaveLength(1)
+  })
 })

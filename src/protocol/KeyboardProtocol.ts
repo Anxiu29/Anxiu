@@ -14,7 +14,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
 
-  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
+  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor<MatrixKeyInput>, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
     this.commands = new XsydCommandClient(transport, crc)
   }
 

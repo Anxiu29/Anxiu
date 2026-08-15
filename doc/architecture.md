@@ -96,3 +96,17 @@ commands.ts                 XsydCommandClient             KeyboardProtocol
 `domain/capabilities.ts` 定义能力描述器，`devices/c98/capabilities.ts` 声明 C98 能力，设备驱动负责将它注入协议适配器。协议读取到设备和固件版本后，才解析最终能力并据此读取矩阵和层级。
 
 静态型号可以使用 `StaticCapabilityDescriptor`；同一型号的旧固件若能力不同，可以使用 `VariantCapabilityDescriptor` 按设备或协议版本选择。这样版本分支停留在设备描述中，不会散落到 UI、会话和协议读写流程。
+
+## 保存是应用事务，不是协议方法
+
+`application/SaveConfiguration.ts` 将保存定义成可观察事务：校验、差异写入、设备提交、回读验证、完成。协议端口只提供原子能力，应用用例决定调用顺序。
+
+事务比较使用 `layer + positionId` 作为稳定身份，不依赖设备回读数组顺序；保存前还会检查配置是否包含所有层和物理键位。任何阶段失败都不会替换 `DeviceSession` 中的编辑草稿，UI 可通过 `SaveProgress` 展示当前阶段。
+
+## 关闭也是会话状态
+
+协议命令客户端关闭后会同时拒绝当前请求和尚未执行的排队请求，禁止继续向已经释放的传输发送数据。WebHID 传输关闭时会移除设备报告监听、浏览器全局断连监听并清空订阅者，避免反复连接后累积回调。
+
+## 领域模型不假设所有控件都是矩阵键
+
+`PhysicalAddress` 是可辨识联合：普通键盘协议可以使用 `MatrixAddress`，旋钮、触控条或独立控制器可以使用 `IndexedAddress`。`LayoutDescriptor` 通过泛型约束输入地址；XSYD 和 C98 仍在编译期明确要求矩阵键，但公共 `KeyPosition` 不再把未来设备限制为行列矩阵。

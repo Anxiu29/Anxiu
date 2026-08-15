@@ -20,7 +20,7 @@ rows.forEach((row, y) => {
   })
 })
 
-class C98LayoutDescriptor implements LayoutDescriptor {
+class C98LayoutDescriptor implements LayoutDescriptor<MatrixKeyInput> {
   readonly id = 'rk-c98-ansi-us'
   describe(keys: readonly MatrixKeyInput[]): KeyPosition[] {
     return keys.map((key) => ({
@@ -30,7 +30,7 @@ class C98LayoutDescriptor implements LayoutDescriptor {
   }
 }
 
-export const C98_LAYOUT: LayoutDescriptor = new C98LayoutDescriptor()
+export const C98_LAYOUT: LayoutDescriptor<MatrixKeyInput> = new C98LayoutDescriptor()
 export const C98_DEMO_KEYS: MatrixKeyInput[] = rows.flatMap((row, rowIndex) => row.map(([sourceCode], column) => ({
   id: `demo-${rowIndex}-${column}`,
   sourceCode,

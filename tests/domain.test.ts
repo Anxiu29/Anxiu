@@ -9,6 +9,7 @@ describe('keyboard domain', () => {
   it('detects assignment changes', () => {
     expect(assignmentsEqual(profile.assignments, profile.assignments.map((x) => ({ ...x })))).toBe(true)
     expect(assignmentsEqual(profile.assignments, [{ ...profile.assignments[0]!, keyCode: 5 }])).toBe(false)
+    expect(assignmentsEqual(profile.assignments, [...profile.assignments].reverse())).toBe(true)
   })
   it('validates layer and key position', () => {
     expect(validateAssignments(profile, profile.assignments)).toEqual([])

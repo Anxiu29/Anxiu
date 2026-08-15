@@ -54,6 +54,11 @@ export class WebHidTransport implements DeviceTransport {
 
   async close() {
     if (this.device?.opened) await this.device.close()
+    this.device?.removeEventListener('inputreport', this.reportHandler)
+    navigator.hid?.removeEventListener('disconnect', this.disconnectHandler)
+    this.reportListeners.clear()
+    this.disconnectListeners.clear()
+    this.device = undefined
   }
 
   async send(report: Uint8Array) {

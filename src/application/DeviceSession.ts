@@ -1,8 +1,9 @@
 import type { DeviceTransport, KeyboardDevice } from './ports'
 import type { KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
-import { assignmentsEqual, cloneAssignments, validateAssignments } from '@/domain/keyboard'
+import { assignmentsEqual, cloneAssignments } from '@/domain/keyboard'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import { DriverError } from './DriverError'
+import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguration'
 
 export class DeviceSession {
   profile?: KeyboardProfile
@@ -26,24 +27,13 @@ export class DeviceSession {
     Object.assign(item, { keyCode, category })
   }
 
-  async save() {
+  async save(onProgress?: SaveProgressObserver) {
     if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
-    const errors = validateAssignments(this.profile, this.draft)
-    if (errors.length) throw new DriverError('INVALID_CONFIGURATION', errors[0]!, false, { details: { errors } })
-    const changes = this.draft.filter((draft) => {
-      const original = this.original.find((item) => item.positionId === draft.positionId && item.layer === draft.layer)
-      return !original || original.keyCode !== draft.keyCode
-    })
-    if (!changes.length) return
-    if (!this.device.keymap) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持改键', false, { details: { capability: 'keymap' } })
-    if (!this.device.configuration) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持保存配置', false, { details: { capability: 'configuration' } })
-    await this.device.keymap.writeAssignments(changes)
-    await this.device.configuration.save()
-    const verified = await this.device.profile.getProfile()
-    if (!assignmentsEqual(verified.assignments, this.draft)) throw new DriverError('VERIFY_FAILED', '写入后的回读配置不一致，草稿已保留', true)
-    this.profile = verified
-    this.original = cloneAssignments(verified.assignments)
-    this.draft = cloneAssignments(verified.assignments)
+    const result = await saveConfiguration(this.device, this.profile, this.original, this.draft, onProgress)
+    this.profile = result.profile
+    this.original = cloneAssignments(result.profile.assignments)
+    this.draft = cloneAssignments(result.profile.assignments)
+    return result
   }
 
   async reload() {
@@ -51,9 +41,15 @@ export class DeviceSession {
     await this.device.configuration.reload()
     return this.load()
   }
+
   async restoreFactory() {
+    if (!this.profile?.capabilities.restoreFactory) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备配置不允许恢复出厂设置', false, { details: { capability: 'factory-reset' } })
     if (!this.device.factoryReset) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持恢复出厂设置', false, { details: { capability: 'factory-reset' } })
     await this.device.factoryReset.restoreFactory()
   }
-  async close() { this.device.close(); await this.transport?.close() }
+
+  async close() {
+    this.device.close()
+    await this.transport?.close()
+  }
 }

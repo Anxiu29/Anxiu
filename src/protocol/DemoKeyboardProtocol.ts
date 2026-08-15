@@ -15,7 +15,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
   private readonly capabilities: DeviceCapabilities
-  constructor(private readonly keyCatalog: KeyCatalog, layout: LayoutDescriptor, demoKeys: readonly MatrixKeyInput[], capabilityDescriptor: CapabilityDescriptor) {
+  constructor(private readonly keyCatalog: KeyCatalog, layout: LayoutDescriptor<MatrixKeyInput>, demoKeys: readonly MatrixKeyInput[], capabilityDescriptor: CapabilityDescriptor) {
     this.positions = layout.describe(demoKeys.map((key) => ({ ...key, label: this.keyCatalog.get(key.sourceCode).label })))
     const device = { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app' as const, boardId: 'DEMO98' }
     this.capabilities = capabilityDescriptor.resolve({ device, protocolVersion: device.protocolVersion })
