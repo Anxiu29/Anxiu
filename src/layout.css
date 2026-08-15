@@ -1,0 +1,16 @@
+.keyboard-shell {
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 0;
+}
+
+.keyboard-layout {
+  position: relative;
+  flex: none;
+}
+
+.keyboard-layout .keycap {
+  position: absolute;
+  min-width: 0;
+}

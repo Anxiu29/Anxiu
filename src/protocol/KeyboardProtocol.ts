@@ -3,6 +3,7 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceTransport, KeyboardDevice } from '@/application/ports'
 import { decodePacket, encodePacket, readUint16le, uint16le, type CrcStrategy } from './codec'
 import { DriverError } from '@/application/DriverError'
+import type { LayoutDescriptor, MatrixKeyInput } from '@/domain/layout'
 
 const COMMAND = { SYNC: 0x01, ACTION: 0x00, KEY: 0x23, DEFAULT_KEY: 0x2b, FAIL: 0xff } as const
 const ORDER = { PROTOCOL_VERSION: 0x01, SAVE: 0x02, RELOAD: 0x03, RESTORE_FACTORY: 0x11 } as const
@@ -23,7 +24,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
 
-  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly crc?: CrcStrategy) {
+  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor, private readonly crc?: CrcStrategy) {
     this.removeReportListener = transport.onReport((report) => this.handleReport(report))
   }
 
@@ -89,7 +90,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   private async readDefaultLayout(): Promise<KeyPosition[]> {
-    const positions: KeyPosition[] = []
+    const matrixKeys: MatrixKeyInput[] = []
     for (let row = 0; row < 6; row += 2) {
       const data = await this.request(COMMAND.DEFAULT_KEY, new Uint8Array([0, row, row + 1]))
       const blocks = [{ row: data[1] ?? row, start: 2 }, { row: data[23] ?? row + 1, start: 24 }]
@@ -97,11 +98,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
         for (let column = 0; column < 21; column++) {
           const sourceCode = data[block.start + column] ?? 0xff
           if (sourceCode === 0xff || sourceCode === 0) continue
-          positions.push({ id: `${block.row}-${column}`, sourceCode, label: this.keyCatalog.get(sourceCode).label, row: block.row, column })
+          matrixKeys.push({ id: `${block.row}-${column}`, sourceCode, label: this.keyCatalog.get(sourceCode).label, address: { kind: 'matrix', row: block.row, column } })
         }
       }
     }
-    return positions
+    return this.layout.describe(matrixKeys)
   }
 
   private async readLayer(layer: number, positions: KeyPosition[]): Promise<KeyAssignment[]> {

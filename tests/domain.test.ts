@@ -3,7 +3,7 @@ import { assignmentsEqual, validateAssignments, type KeyboardProfile } from '@/d
 import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
 import { CompositeKeyCatalog, StaticKeyCatalog } from '@/domain/KeyCatalog'
 
-const profile: KeyboardProfile = { device: { productName: 'test', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' }, capabilities: { layers: 1, remap: true, restoreFactory: true, layoutRows: 1, layoutColumns: 1 }, positions: [{ id: '0-0', sourceCode: 4, label: 'A', row: 0, column: 0 }], assignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }] }
+const profile: KeyboardProfile = { device: { productName: 'test', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' }, capabilities: { layers: 1, remap: true, restoreFactory: true, layoutRows: 1, layoutColumns: 1 }, positions: [{ id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 }, geometry: { x: 0, y: 0, width: 1, height: 1 } }], assignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }] }
 
 describe('keyboard domain', () => {
   it('detects assignment changes', () => {

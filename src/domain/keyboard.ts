@@ -1,3 +1,5 @@
+import type { ControlGeometry, MatrixAddress } from './layout'
+
 export type SessionStatus =
   | 'unsupported'
   | 'idle'
@@ -20,9 +22,8 @@ export interface KeyPosition {
   id: string
   sourceCode: number
   label: string
-  row: number
-  column: number
-  width?: number
+  address: MatrixAddress
+  geometry: ControlGeometry
 }
 
 export interface KeyAssignment {
