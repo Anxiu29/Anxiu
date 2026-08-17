@@ -35,5 +35,8 @@ export async function saveConfiguration(device: KeyboardDevice, profile: Keyboar
   const verified = await device.profile.getProfile()
   if (!assignmentsEqual(verified.assignments, [...draft])) throw new DriverError('VERIFY_FAILED', '写入后的回读配置不一致，编辑草稿已保留', true, { details: { changedAssignments: changes.length } })
   onProgress({ phase: 'completed', completed: 1, total: 1 })
-  return { changedAssignments: changes.length, profile: verified }
+  return {
+    changedAssignments: changes.length,
+    profile: { ...verified, defaultAssignments: profile.defaultAssignments.map((item) => ({ ...item })) },
+  }
 }

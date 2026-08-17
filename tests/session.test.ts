@@ -43,6 +43,29 @@ describe('DeviceSession', () => {
     expect(session.dirty).toBe(false)
   })
 
+  it('keeps the connection-time restore baseline after write verification', async () => {
+    let current = profile()
+    const writes: KeyAssignment[][] = []
+    const device: KeyboardDevice = {
+      profile: { getProfile: async () => ({ ...current, defaultAssignments: current.assignments.map((item) => ({ ...item })) }) },
+      keymap: { writeAssignments: async (changes) => {
+        writes.push(changes)
+        current = { ...current, assignments: current.assignments.map((item) => changes.find((change) => change.positionId === item.positionId && change.layer === item.layer) ?? item) }
+      } },
+      configuration: { save: async () => undefined, reload: async () => undefined },
+      close: () => undefined,
+    }
+    const session = new DeviceSession(device, HID_KEY_CATALOG)
+    await session.load()
+
+    await session.updateAndSave('0-1', 0, 6, 'basic')
+    expect(session.profile?.defaultAssignments.find((item) => item.positionId === '0-1' && item.layer === 0)?.keyCode).toBe(5)
+
+    await session.restoreKeyDefaultAndSave('0-1', 0)
+    expect(current.assignments.find((item) => item.positionId === '0-1' && item.layer === 0)?.keyCode).toBe(5)
+    expect(writes).toHaveLength(2)
+  })
+
   it('restores every key layer through normal write, save and readback', async () => {
     let current = profile()
     current.assignments = current.assignments.map((item) => ({ ...item, keyCode: item.keyCode + 10 }))

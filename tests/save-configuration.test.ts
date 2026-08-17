@@ -27,7 +27,7 @@ describe('save configuration transaction', () => {
     const phases: SavePhase[] = []
     const writes: unknown[] = []
     const device: KeyboardDevice = {
-      profile: { getProfile: async () => ({ ...original, assignments: [...draft].reverse() }) },
+      profile: { getProfile: async () => ({ ...original, assignments: [...draft].reverse(), defaultAssignments: draft.map((item) => ({ ...item })) }) },
       keymap: { writeAssignments: async (changes) => { writes.push(changes) } },
       configuration: { save: async () => undefined, reload: async () => undefined },
       close: () => undefined,
@@ -35,6 +35,7 @@ describe('save configuration transaction', () => {
     const result = await saveConfiguration(device, original, original.assignments, draft, ({ phase }) => phases.push(phase))
     expect(result.changedAssignments).toBe(1)
     expect(writes).toEqual([[draft[1]]])
+    expect(result.profile.defaultAssignments).toEqual(original.defaultAssignments)
     expect(phases).toEqual(['validating', 'writing', 'writing', 'committing', 'committing', 'verifying', 'completed'])
   })
 
