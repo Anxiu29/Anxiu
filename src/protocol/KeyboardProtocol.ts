@@ -6,9 +6,11 @@ import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
+import { c98FactoryAssignments } from '@/devices/c98/factoryKeymap'
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
+  private currentMode: KeyboardMode = 'win'
   readonly profile = { getProfile: () => this.getProfile() }
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
@@ -26,10 +28,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
-    // 0x2B 只提供物理原始布局，不提供各 Fn 层的出厂映射。
-    // 以进入当前系统模式时的完整四层回读作为本次会话的恢复基线，
-    // 避免把 Fn2 等层中固件已有的键值误判为全部未映射。
-    const defaultAssignments = assignments.map((item) => ({ ...item }))
+    const defaultAssignments = c98FactoryAssignments(this.currentMode, positions, capabilities.layers, this.keyCatalog)
     return {
       device: { ...device, protocolVersion },
       capabilities,
@@ -51,8 +50,15 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   save() { return this.action(XSYD_ACTIONS.save, 1600) }
   reload() { return this.action(XSYD_ACTIONS.reload, 1600) }
   restoreFactory() { return this.action(XSYD_ACTIONS.restoreFactory, 2500) }
-  switchMode(mode: KeyboardMode) { return this.action(mode === 'mac' ? XSYD_ACTIONS.switchToMac : XSYD_ACTIONS.switchToWin, 1600) }
-  switchConfiguration(configuration: KeyboardConfiguration) { return this.action(XSYD_ACTIONS.switchConfiguration, 1600, [configuration - 1]) }
+  async switchMode(mode: KeyboardMode) {
+    await this.action(mode === 'mac' ? XSYD_ACTIONS.switchToMac : XSYD_ACTIONS.switchToWin, 1600)
+    this.currentMode = mode
+    await this.waitForModeReports()
+  }
+  async switchConfiguration(configuration: KeyboardConfiguration) {
+    await this.action(XSYD_ACTIONS.switchConfiguration, 1600, [configuration - 1])
+    await this.waitForModeReports()
+  }
   close() { this.commands.close() }
 
   private async sync(): Promise<DeviceInfo> {
@@ -80,6 +86,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   private async action(order: number, timeoutMs: number, args: number[] = []) {
     await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order, ...args]), timeoutMs)
   }
+
+  /** 模式/配置切换后固件会连续主动上报 0xA3 通知；等待其结束再开始查询。 */
+  private waitForModeReports() { return new Promise<void>((resolve) => setTimeout(resolve, 2000)) }
 
   private async readDefaultLayout(rows: number, columns: number): Promise<KeyPosition[]> {
     const matrixKeys: MatrixKeyInput[] = []
