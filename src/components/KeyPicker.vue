@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import type { KeyDefinition } from '@/domain/keyboard'
 
-const props = defineProps<{ current?: number; keys: readonly KeyDefinition[]; disabled?: boolean }>()
+const props = defineProps<{ current?: number; hint?: string; keys: readonly KeyDefinition[]; disabled?: boolean }>()
 const emit = defineEmits<{ select: [code: number] }>()
 
 type PickerItem = { code?: number; width?: number; height?: number; label?: string }
@@ -68,6 +68,7 @@ const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? 
         <button :class="{ active: mode === 'extended' }" @click="mode = 'extended'">扩展按键</button>
       </div>
       <div class="picker-current" v-if="current !== undefined">当前键码：0x{{ current.toString(16).padStart(4, '0').toUpperCase() }}</div>
+      <div v-if="hint" class="picker-hint">{{ hint }}</div>
       <input v-model="search" class="search picker-search" placeholder="搜索按键或键码" />
     </div>
 

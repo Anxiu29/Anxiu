@@ -136,8 +136,26 @@ describe('connected workspace navigation', () => {
     await wrapper.find('.keycap').trigger('contextmenu', { clientX: 120, clientY: 160 })
     expect(wrapper.find('.key-context-menu').exists()).toBe(false)
 
-    expect(wrapper.find('.keymap-tip').text()).toContain('先选上方物理键')
-    expect(wrapper.find('.keymap-tip button').exists()).toBe(false)
+    expect(wrapper.find('.picker-current').text()).toContain('当前键码')
+    expect(wrapper.find('.picker-hint').text()).toContain('先选上方物理键')
+    expect(wrapper.find('.keymap-tip').exists()).toBe(false)
+  })
+
+  it('compares key changes with the layer baseline instead of the physical source code', async () => {
+    const fnAssignment = { positionId: '0-0', sourceCode: 1, layer: 0, keyCode: 0xf001, category: 'function' as const }
+    const fnProfile: KeyboardProfile = {
+      ...profile,
+      positions: [{ ...profile.positions[0]!, sourceCode: 1, label: 'Fn' }],
+      assignments: [fnAssignment],
+      defaultAssignments: [{ ...fnAssignment }],
+    }
+    const wrapper = mount(KeymapWorkspace, { props: { profile: fnProfile, status: 'ready', layer: 0, mode: 'win', dirty: false, assignments: [fnAssignment], keyOptions: [], keyLabels: { 0xf001: 'Fn1' } } })
+
+    expect(wrapper.find('.keycap').text()).toContain('Fn1')
+    expect(wrapper.find('.keycap').classes()).not.toContain('changed')
+
+    await wrapper.setProps({ assignments: [{ ...fnAssignment, keyCode: 4 }] })
+    expect(wrapper.find('.keycap').classes()).toContain('changed')
   })
 
   it('keeps four Fn layers in both system modes and emits a Mac mode switch', async () => {

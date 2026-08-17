@@ -2,12 +2,17 @@
 import { computed } from 'vue'
 import type { KeyAssignment, KeyPosition } from '@/domain/keyboard'
 
-const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; unit?: number }>(), { unit: 58 })
+const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; unit?: number }>(), { unit: 58, defaultAssignments: () => [] })
 const emit = defineEmits<{
   select: [id: string]
   contextmenu: [payload: { positionId: string; clientX: number; clientY: number }]
 }>()
 const assignment = (id: string) => props.assignments.find((item) => item.positionId === id)
+const defaultAssignment = (id: string) => props.defaultAssignments.find((item) => item.positionId === id)
+const isChanged = (id: string) => {
+  const baseline = defaultAssignment(id)
+  return baseline !== undefined && assignment(id)?.keyCode !== baseline.keyCode
+}
 const labelFor = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
 const gap = 6
 const canvasStyle = computed(() => ({
@@ -26,7 +31,7 @@ const keyStyle = (key: KeyPosition) => ({
 <template>
   <div class="keyboard-shell">
     <div class="keyboard-layout" :style="canvasStyle">
-      <button v-for="key in positions" :key="key.id" class="keycap" :class="{ selected: selected === key.id, changed: assignment(key.id)?.keyCode !== key.sourceCode }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
+      <button v-for="key in positions" :key="key.id" class="keycap" :class="{ selected: selected === key.id, changed: isChanged(key.id) }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
         <span>{{ labelFor(assignment(key.id)?.keyCode ?? key.sourceCode) }}</span>
         <small>{{ key.label }}</small>
       </button>

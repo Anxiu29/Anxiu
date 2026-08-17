@@ -29,6 +29,7 @@ const emit = defineEmits<{
 const viewportWidth = ref(window.innerWidth)
 const keyContextMenu = ref<{ positionId: string; layer: number; x: number; y: number }>()
 const keyboardUnit = computed(() => viewportWidth.value <= 1200 ? 38 : viewportWidth.value <= 1500 ? 53 : 58)
+const layerDefaults = computed(() => props.profile.defaultAssignments.filter((item) => item.layer === props.layer))
 const busy = () => ['connecting', 'reading', 'writing'].includes(props.status)
 const remapDisabled = () => busy() || props.status === 'disconnected' || props.status === 'unsupported'
 const updateViewportWidth = () => { viewportWidth.value = window.innerWidth }
@@ -77,7 +78,7 @@ onBeforeUnmount(() => {
   <div class="keymap-workspace">
     <section class="editor panel compact-keymap-editor">
       <div class="current-keyboard-pane">
-        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" @select="emit('select-position', $event)" @contextmenu="openKeyContextMenu" />
+        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :default-assignments="layerDefaults" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" @select="emit('select-position', $event)" @contextmenu="openKeyContextMenu" />
       </div>
 
       <aside class="keymap-side-controls">
@@ -86,11 +87,10 @@ onBeforeUnmount(() => {
         <div class="side-control-group"><small>{{ mode === 'mac' ? 'Mac 键盘层级' : '键盘层级' }}</small><div class="layer-tabs side-layer-tabs"><button v-for="index in profile.capabilities.layers" :key="index" :class="{ active: layer === index - 1 }" :disabled="busy()" @click="selectLayer(index - 1)">FN {{ index }}</button></div></div>
         <button v-if="profile.capabilities.remap" class="ghost danger side-restore" :disabled="remapDisabled()" title="恢复全部层的按键映射，不改变灯光等其他设置" @click="confirmRestoreAllKeys">恢复默认</button>
         <div class="side-write-status" :class="{ dirty }"><span v-if="status === 'writing'" class="spinner"></span><i v-else></i><span>{{ status === 'writing' ? '正在写入…' : dirty ? '写入失败' : '即时写入' }}</span></div>
-        <div class="keymap-tip"><span>先选上方物理键，再选下方的新键值。</span></div>
       </aside>
     </section>
 
-    <KeyPicker :current="selectedAssignment?.keyCode" :keys="keyOptions" :disabled="remapDisabled()" @select="emit('assign-key', $event)" />
+    <KeyPicker :current="selectedAssignment?.keyCode" hint="先选上方物理键，再选下方的新键值。" :keys="keyOptions" :disabled="remapDisabled()" @select="emit('assign-key', $event)" />
 
     <div v-if="keyContextMenu" class="key-context-menu" :style="{ left: `${keyContextMenu.x}px`, top: `${keyContextMenu.y}px` }" role="menu" @click.stop>
       <button type="button" role="menuitem" @click="restoreContextKey">恢复此键默认</button>
