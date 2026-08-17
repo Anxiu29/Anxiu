@@ -89,6 +89,21 @@ export const useDriverStore = defineStore('driver', () => {
     } catch (cause) { fail(cause) }
   }
 
+  async function restoreFactory() {
+    if (!session || !profile.value || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try {
+      await session.restoreFactory()
+      await keyboardDriverService.disconnect()
+      session = undefined
+      profile.value = undefined
+      selectedPositionId.value = undefined
+      revision.value++
+      status.value = 'idle'
+      message.value = '已恢复出厂设置，请重新连接键盘'
+    } catch (cause) { fail(cause) }
+  }
+
   function selectLayer(targetLayer: number) {
     if (!session || !profile.value || targetLayer < 0 || targetLayer >= profile.value.capabilities.layers || ['connecting', 'reading', 'writing'].includes(status.value)) return
     layer.value = targetLayer
@@ -145,5 +160,5 @@ export const useDriverStore = defineStore('driver', () => {
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, reload, restoreAllKeyDefaults, restoreKeyDefault }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

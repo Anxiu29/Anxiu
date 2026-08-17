@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
@@ -68,12 +68,27 @@ describe('connected workspace navigation', () => {
     expect(wrapper.classes()).not.toContain('sidebar-collapsed')
   })
 
+  it('opens settings from the lower-left corner and confirms factory reset', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mount(AppShell, { props: { profile }, slots: { device: '<div />' } })
+
+    await wrapper.find('.sidebar-settings').trigger('click')
+    expect(wrapper.find('.settings-panel').text()).toContain('恢复出厂设置')
+
+    await wrapper.find('.factory-reset-button').trigger('click')
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('restore-factory')).toEqual([[]])
+    expect(wrapper.find('.settings-panel').exists()).toBe(false)
+    confirm.mockRestore()
+  })
+
   it('locks navigation while a device operation is running', async () => {
     const wrapper = mount(AppShell, { props: { profile, navigationDisabled: true }, slots: { device: '<div data-view="device" />', keymap: '<div data-view="keymap" />' } })
     const keymapButton = wrapper.findAll('.sidebar-nav button')[1]!
 
     expect(keymapButton.attributes('disabled')).toBeDefined()
     expect(wrapper.findAll('.sidebar-configurations button').every((button) => button.attributes('disabled') !== undefined)).toBe(true)
+    expect(wrapper.find('.sidebar-settings').attributes('disabled')).toBeDefined()
     await keymapButton.trigger('click')
     expect(wrapper.find('[data-view="device"]').exists()).toBe(true)
   })

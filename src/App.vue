@@ -38,7 +38,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div v-if="error || message" class="notice" :class="{ error }">{{ error || message }}</div>
     </section>
 
-    <AppShell v-else :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" @select-configuration="store.selectConfiguration">
+    <AppShell v-else :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" @select-configuration="store.selectConfiguration" @restore-factory="store.restoreFactory">
       <template #device><DeviceOverview :profile="profile" :busy="busy()" @reload="store.reload" /></template>
       <template #keymap>
         <KeymapWorkspace :profile="profile" :status="status" :layer="layer" :mode="mode" :selected-position-id="selectedPositionId" :dirty="dirty" :assignments="assignments" :selected-assignment="selectedAssignment" :key-options="keyOptions" :key-labels="keyLabels" @select-layer="store.selectLayer" @select-mode="store.selectMode" @select-position="selectedPositionId = $event" @assign-key="store.assignKey" @restore-defaults="store.restoreAllKeyDefaults" @restore-key="store.restoreKeyDefault" />
