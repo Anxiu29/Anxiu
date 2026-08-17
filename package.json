@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vue-tsc -b && vite build",
+    "sync:keymap": "node scripts/sync-official-key-map.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "vue-tsc -b"

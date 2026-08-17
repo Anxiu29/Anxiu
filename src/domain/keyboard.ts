@@ -1,4 +1,4 @@
-import type { ControlGeometry, PhysicalAddress } from './layout'
+import type { PhysicalAddress } from './layout'
 
 export type SessionStatus =
   | 'unsupported'
@@ -25,7 +25,6 @@ export interface KeyPosition {
   sourceCode: number
   label: string
   address: PhysicalAddress
-  geometry: ControlGeometry
 }
 
 export interface KeyAssignment {

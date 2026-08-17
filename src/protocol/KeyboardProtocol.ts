@@ -1,7 +1,7 @@
 import type { DeviceTransport, KeyboardDevice } from '@/application/ports'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceInfo, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
-import type { LayoutDescriptor, MatrixKeyInput } from '@/domain/layout'
+import type { MatrixKeyInput } from '@/domain/layout'
 import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
@@ -18,7 +18,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
 
-  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor<MatrixKeyInput>, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
+  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
     this.commands = new XsydCommandClient(transport, crc)
   }
 
@@ -103,7 +103,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
         }
       }
     }
-    return this.layout.describe(matrixKeys)
+    return matrixKeys
   }
 
   private async readLayer(layer: number, positions: KeyPosition[]): Promise<KeyAssignment[]> {

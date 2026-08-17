@@ -8,7 +8,7 @@ import type { KeyboardProfile } from '@/domain/keyboard'
 const profile: KeyboardProfile = {
   device: { productName: 'RK-C98 Test', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1', protocolVersion: '1.0.7', runMode: 'app' },
   capabilities: { layers: 1, remap: true, restoreFactory: true, layoutRows: 1, layoutColumns: 1 },
-  positions: [{ id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 }, geometry: { x: 0, y: 0, width: 1, height: 1 } }],
+  positions: [{ id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 } }],
   defaultAssignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }],
   assignments: [{ positionId: '0-0', sourceCode: 4, layer: 0, keyCode: 4, category: 'basic' }],
 }

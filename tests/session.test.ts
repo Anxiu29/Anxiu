@@ -14,8 +14,8 @@ const profile = (): KeyboardProfile => ({
   device: { productName: 'test', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' },
   capabilities: { layers: 2, remap: true, restoreFactory: true, layoutRows: 1, layoutColumns: 2 },
   positions: [
-    { id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 }, geometry: { x: 0, y: 0, width: 1, height: 1 } },
-    { id: '0-1', sourceCode: 5, label: 'B', address: { kind: 'matrix', row: 0, column: 1 }, geometry: { x: 1, y: 0, width: 1, height: 1 } },
+    { id: '0-0', sourceCode: 4, label: 'A', address: { kind: 'matrix', row: 0, column: 0 } },
+    { id: '0-1', sourceCode: 5, label: 'B', address: { kind: 'matrix', row: 0, column: 1 } },
   ],
   defaultAssignments: assignments.map((item) => ({ ...item })),
   assignments: assignments.map((item) => ({ ...item })),
