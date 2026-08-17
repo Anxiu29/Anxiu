@@ -41,7 +41,7 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 
 协议能力采用可选组合，而不是要求所有键盘实现同一个巨型接口：`DeviceProfileCapability`、`KeymapCapability`、`ConfigurationCapability` 和 `FactoryResetCapability` 可独立提供。设备的静态身份、协议、传输和能力列表由 `DeviceManifest` 声明；只读设备可以只实现 profile 能力。
 
-键码通过 `KeyCatalog` 注入会话：领域层的 `HID_KEY_CATALOG` 只包含公共 HID 定义，星闪扩展位于 `protocol/xsyd/keyCatalog.ts`，C98 驱动使用 `CompositeKeyCatalog` 组合两者。UI 从当前会话获取目录，因此增加其他编码体系不会修改 Vue 组件或污染公共键码。
+键码通过 `KeyCatalog` 注入会话。星闪悦动官方 288 项键值表完整镜像在 `protocol/xsyd/officialKeyMap.ts`，可按十进制键码或名称全文搜索；运行 `npm run sync:keymap` 可从官方 Markdown 重新同步。`protocol/xsyd/keyCatalog.ts` 把它组合进会话，UI 从当前会话获取目录。
 
 跨层错误统一为带稳定 `DriverErrorCode` 的 `DriverError`。应用和 UI 可根据 `UNSUPPORTED_BROWSER`、`DEVICE_NOT_CONNECTED`、`PROTOCOL_TIMEOUT`、`PROTOCOL_CRC_ERROR`、`PROTOCOL_REJECTED`、`VERIFY_FAILED` 等错误码决定恢复动作，同时继续展示本地化消息。
 

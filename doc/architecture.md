@@ -51,27 +51,27 @@ App.vue
 一个键有两套完全不同的信息：
 
 ```text
-MatrixAddress                  ControlGeometry
-固件矩阵：row=3,column=1       页面位置：x=1.8,y=3,width=1
-协议用它读写键位               UI 用它绘制键帽
+MatrixAddress                  UI KeyGeometry
+固件矩阵：row=3,column=1       页面位置：x=1.8,y=3.5,width=1
+协议和领域模型保留             仅渲染时临时附加
 ```
 
 以前把 `row`、`column` 同时当协议地址和页面坐标，会导致页面外观绑死协议矩阵。现在：
 
-- `domain/layout.ts` 定义 `MatrixAddress`、`ControlGeometry` 和 `LayoutDescriptor`。
-- `protocol/KeyboardProtocol.ts` 只解析矩阵地址，然后交给布局描述器投影。
-- `devices/c98/layout.ts` 保存 C98 的物理外观。
-- `components/KeyboardCanvas.vue` 只读取 `geometry`，不知道协议矩阵。
+- `domain/layout.ts` 只定义物理地址；`KeyPosition` 不再携带视觉宽高。
+- `protocol/KeyboardProtocol.ts` 只返回 `0x2B` 实读的键值和矩阵行列。
+- `devices/c98/layout.ts` 只保存恢复出厂后读取到的 101 个物理矩阵键，供演示和校验使用。
+- `ui/c98KeyboardGeometry.ts` 保存 C98 的页面坐标和键帽大小，`KeyboardCanvas` 在渲染时附加。
 
-因此，同一协议增加新配列时，只需添加新的 `LayoutDescriptor` 并在设备驱动中注入；UI 和协议均无需修改。
+因此，修改键帽间距、宽高或分区只会改动 UI；不会污染协议读取结果或出厂层数据。
 
 ## 如何扩展
 
 ### 新增同协议、不同配列
 
-1. 在 `devices/<model>/layout.ts` 定义布局描述器。
+1. 在 `devices/<model>/layout.ts` 定义设备返回的物理矩阵键。
 2. 复用现有协议和传输实现。
-3. 在新设备驱动中注入布局、键码目录和设备参数。
+3. 在 UI 层提供该型号的视觉几何映射，并在设备驱动中注入键码目录和设备参数。
 4. 在组合根注册驱动。
 
 ### 新增另一套协议
@@ -145,7 +145,7 @@ App.vue 用户确认
   -> WebHID transport
 ```
 
-本地协议表 `doc/星闪悦动通信协议-V1.0.7.xlsx` 规定：`KB2_CMD_DEFKEY (0x2B)` 上传物理原始布局，每次读取两行；`KB2_CMD_KEY (0x23)` 读写四个 Fn 层的键位映射；`KB2_CMD` 的 `0x02` 保存参数。`0x2B` 不包含各 Fn 层的出厂键值，因此已在真机恢复出厂后捕获 4 个配置槽、WIN/MAC 各四层的 `0x23` 数据，并压缩保存于 `devices/c98/factoryKeymap.ts`。四个配置槽结果一致；恢复默认使用该本地表，不再把进入会话时的当前映射误当成出厂值。2026-08-17 的原始捕获包含 3232 条映射，压缩表经逐项还原验证；快照 SHA-256 为 `9D0B6DA9899676D328877E4E0FB42F2FB1D3B6F2B4A69996C4439130EAEDD309`。
+本地协议表 `doc/星闪悦动通信协议-V1.0.7.xlsx` 规定：`KB2_CMD_DEFKEY (0x2B)` 上传物理原始布局，每次读取两行；`KB2_CMD_KEY (0x23)` 读写四个 Fn 层的键位映射；`KB2_CMD` 的 `0x02` 保存参数。`0x2B` 不包含各 Fn 层的出厂键值，因此已在真机恢复出厂后捕获 4 个配置槽、WIN/MAC 各四层的 `0x23` 数据。四个配置槽结果一致；`devices/c98/factoryKeymap.ts` 显式列出 WIN/MAC 共 808 条记录，每条包含位置、物理键名称、默认功能名称和真实键码，FN3/FN4 排在文件末尾且空值显示为 `null`。恢复默认使用该本地表，不再把进入会话时的当前映射误当成出厂值。2026-08-17 的原始捕获包含 3232 条映射，逐项还原验证通过；快照 SHA-256 为 `9D0B6DA9899676D328877E4E0FB42F2FB1D3B6F2B4A69996C4439130EAEDD309`。
 
 Windows/Mac 是两套独立的系统模式，每套都有 Fn1–Fn4 四层。UI 切换模式时通过 `KB2_CMD` 的 `0x30` / `0x31` 进入 Windows / Mac，然后重新读取物理布局和四层键值，避免沿用上一模式的映射。
 
@@ -155,4 +155,4 @@ Windows/Mac 是两套独立的系统模式，每套都有 Fn1–Fn4 四层。UI 
 
 ## 领域模型不假设所有控件都是矩阵键
 
-`PhysicalAddress` 是可辨识联合：普通键盘协议可以使用 `MatrixAddress`，旋钮、触控条或独立控制器可以使用 `IndexedAddress`。`LayoutDescriptor` 通过泛型约束输入地址；XSYD 和 C98 仍在编译期明确要求矩阵键，但公共 `KeyPosition` 不再把未来设备限制为行列矩阵。
+`PhysicalAddress` 是可辨识联合：普通键盘协议可以使用 `MatrixAddress`，旋钮、触控条或独立控制器可以使用 `IndexedAddress`。XSYD 和 C98 在编译期明确要求矩阵键，但公共 `KeyPosition` 不把未来设备限制为行列矩阵，也不携带 UI 几何。

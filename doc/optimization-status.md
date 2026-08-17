@@ -10,7 +10,7 @@ UI（Vue / Pinia）
   -> KeyboardDevice 能力端口
   -> C98Driver 组合适配器
        -> CapabilityDescriptor
-       -> LayoutDescriptor
+       -> 设备物理矩阵数据
        -> KeyCatalog
        -> XsydKeyboardProtocol
             -> XsydCommandClient
@@ -24,12 +24,12 @@ UI（Vue / Pinia）
 | 变化 | 应新增或替换 | 不应修改 |
 | --- | --- | --- |
 | 更换 Vue | 新 UI 适配器 | domain、application、protocol |
-| 增加键盘型号 | `devices/<model>` 驱动、布局、能力 | UI、保存用例 |
+| 增加键盘型号 | `devices/<model>` 驱动、矩阵、能力和对应 UI 几何 | 保存用例、协议命令 |
 | 同型号不同固件能力 | `CapabilityDescriptor` 变体 | 协议流程、UI |
 | 增加协议命令 | XSYD 命令定义和业务翻译 | 传输、UI |
 | 更换协议 | 新协议适配器 | 会话、领域、UI |
 | 更换 WebHID | 新 `DeviceTransport` | 协议业务、应用用例 |
-| 增加旋钮等控件 | 新地址类型或现有 `IndexedAddress`、布局描述 | 公共键位模型 |
+| 增加旋钮等控件 | 新地址类型或现有 `IndexedAddress`、UI 几何 | 公共键位模型 |
 
 ## 已消除的主要风险
 
