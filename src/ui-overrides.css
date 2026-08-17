@@ -7,8 +7,13 @@
 
 .app-shell {
   display: grid;
-  grid-template-columns: 176px minmax(0, 1fr);
+  grid-template-columns: 192px minmax(0, 1fr);
   min-height: calc(100vh - 126px);
+  transition: grid-template-columns .2s ease;
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .app-sidebar {
@@ -21,6 +26,38 @@
   border-right: 1px solid #202630;
   background: rgba(11, 14, 20, .96);
   z-index: 4;
+}
+
+.sidebar-collapse-toggle {
+  position: absolute;
+  top: 14px;
+  right: -12px;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2b3541;
+  border-radius: 6px;
+  color: #8c98a7;
+  background: #111720;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, .28);
+  z-index: 2;
+}
+
+.sidebar-collapse-toggle:hover {
+  color: var(--cyan);
+  border-color: rgba(69, 230, 208, .45);
+}
+
+.sidebar-collapse-toggle svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .sidebar-device {
@@ -48,16 +85,61 @@
 .sidebar-device small,
 .sidebar-meta small {
   color: #596472;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .sidebar-device strong {
   margin-top: 4px;
   overflow: hidden;
   color: #dce2e8;
-  font-size: 10px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-configurations {
+  padding: 12px 8px 14px;
+  border-bottom: 1px solid #202630;
+}
+
+.sidebar-configurations > small {
+  display: block;
+  margin-bottom: 8px;
+  color: #596472;
+  font-size: 12px;
+}
+
+.sidebar-configurations > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.sidebar-configurations button {
+  height: 34px;
+  min-width: 0;
+  border: 1px solid #252c37;
+  border-radius: 4px;
+  color: #788391;
+  background: #0d1118;
+  font-size: 12px;
+}
+
+.sidebar-configurations button:hover:not(:disabled) {
+  color: #cbd2db;
+  border-color: #546070;
+}
+
+.sidebar-configurations button.active {
+  color: #071412;
+  border-color: var(--cyan);
+  background: var(--cyan);
+  font-weight: 700;
+}
+
+.sidebar-configurations button:disabled {
+  cursor: wait;
+  opacity: .5;
 }
 
 .sidebar-nav {
@@ -78,7 +160,30 @@
   color: #788391;
   background: transparent;
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
+}
+
+.app-shell.sidebar-collapsed .app-sidebar {
+  padding-right: 9px;
+  padding-left: 9px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-device {
+  justify-content: center;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.app-shell.sidebar-collapsed .sidebar-device div,
+.app-shell.sidebar-collapsed .sidebar-configurations,
+.app-shell.sidebar-collapsed .sidebar-nav span,
+.app-shell.sidebar-collapsed .sidebar-meta {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-nav button {
+  padding: 0;
+  justify-content: center;
 }
 
 .sidebar-nav button:hover:not(:disabled) {
@@ -532,7 +637,7 @@
   align-items: center;
   gap: 7px;
   color: #798491;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .side-write-status i {
@@ -554,26 +659,14 @@
 }
 
 .keymap-tip {
-  position: relative;
   margin-top: auto;
-  padding: 24px 9px 9px;
+  padding: 11px 10px;
   border: 1px solid rgba(69,230,208,.18);
   border-radius: 7px;
   color: #71808d;
   background: rgba(69,230,208,.04);
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1.6;
-}
-
-.keymap-tip button {
-  position: absolute;
-  top: 3px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  color: #74808d;
-  background: transparent;
-  font-size: 15px;
 }
 
 @media (max-width: 1200px) {
@@ -598,32 +691,6 @@
 }
 
 @media (max-width: 1500px) {
-  .app-shell {
-    grid-template-columns: 72px minmax(0, 1fr);
-  }
-
-  .app-sidebar {
-    padding-right: 9px;
-    padding-left: 9px;
-  }
-
-  .sidebar-device {
-    justify-content: center;
-    padding-right: 0;
-    padding-left: 0;
-  }
-
-  .sidebar-device div,
-  .sidebar-nav span,
-  .sidebar-meta {
-    display: none;
-  }
-
-  .sidebar-nav button {
-    padding: 0;
-    justify-content: center;
-  }
-
   .app-content {
     padding-right: 20px;
     padding-left: 20px;

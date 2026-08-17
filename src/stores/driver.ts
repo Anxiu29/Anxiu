@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { DeviceSession } from '@/application/DeviceSession'
 import { keyboardDriverService } from '@/composition/root'
-import type { KeyboardProfile, SessionStatus } from '@/domain/keyboard'
+import type { KeyboardConfiguration, KeyboardMode, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import { toDriverError, type DriverErrorCode } from '@/application/DriverError'
 import type { SaveProgress } from '@/application/SaveConfiguration'
 
@@ -10,6 +10,8 @@ export const useDriverStore = defineStore('driver', () => {
   const status = ref<SessionStatus>('idle')
   const profile = ref<KeyboardProfile>()
   const layer = ref(0)
+  const mode = ref<KeyboardMode>('win')
+  const activeConfiguration = ref<KeyboardConfiguration>(1)
   const selectedPositionId = ref<string>()
   const error = ref('')
   const errorCode = ref<DriverErrorCode>()
@@ -27,7 +29,7 @@ export const useDriverStore = defineStore('driver', () => {
   const keyLabels = computed(() => Object.fromEntries(keyOptions.value.map(({ code, label }) => [code, label])))
 
   async function connect(useDemo = false) {
-    clearFeedback(); status.value = 'connecting'; demo.value = useDemo
+    clearFeedback(); status.value = 'connecting'; demo.value = useDemo; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       session = await keyboardDriverService.connect({ demo: useDemo, onDisconnect: handleDisconnect })
       await readProfile()
@@ -36,7 +38,7 @@ export const useDriverStore = defineStore('driver', () => {
   }
 
   async function reconnectAuthorized() {
-    clearFeedback(); status.value = 'connecting'
+    clearFeedback(); status.value = 'connecting'; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       session = await keyboardDriverService.reconnectAuthorized({ onDisconnect: handleDisconnect })
       if (!session) { status.value = 'idle'; return }
@@ -87,6 +89,40 @@ export const useDriverStore = defineStore('driver', () => {
     } catch (cause) { fail(cause) }
   }
 
+  function selectLayer(targetLayer: number) {
+    if (!session || !profile.value || targetLayer < 0 || targetLayer >= profile.value.capabilities.layers || ['connecting', 'reading', 'writing'].includes(status.value)) return
+    layer.value = targetLayer
+  }
+
+  async function selectMode(targetMode: KeyboardMode) {
+    if (!session || !profile.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
+    if (mode.value === targetMode) { layer.value = 0; return }
+    clearFeedback(); status.value = 'reading'
+    try {
+      profile.value = await session.switchMode(targetMode)
+      revision.value++
+      mode.value = targetMode
+      layer.value = 0
+      selectedPositionId.value = profile.value.positions[0]?.id
+      status.value = 'ready'
+      message.value = targetMode === 'mac' ? '已切换至 Mac 模式并读取 Mac 四层映射' : '已切换至 Windows 模式并重新读取四层映射'
+    } catch (cause) { fail(cause) }
+  }
+
+  async function selectConfiguration(configuration: KeyboardConfiguration) {
+    if (!session || !profile.value || activeConfiguration.value === configuration || ['connecting', 'reading', 'writing'].includes(status.value)) return
+    clearFeedback(); status.value = 'reading'
+    try {
+      profile.value = await session.switchConfiguration(configuration)
+      revision.value++
+      activeConfiguration.value = configuration
+      layer.value = 0
+      selectedPositionId.value = profile.value.positions[0]?.id
+      status.value = 'ready'
+      message.value = `已切换到配置 ${configuration} 并重新读取键位映射`
+    } catch (cause) { fail(cause) }
+  }
+
   async function restoreKeyDefault(positionId: string, targetLayer: number) {
     if (!session || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'; saveProgress.value = undefined
@@ -109,5 +145,5 @@ export const useDriverStore = defineStore('driver', () => {
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, reload, restoreAllKeyDefaults, restoreKeyDefault }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, reload, restoreAllKeyDefaults, restoreKeyDefault }
 })

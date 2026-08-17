@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
+import type { KeyboardMode, KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
 
@@ -8,6 +8,7 @@ const props = defineProps<{
   profile: KeyboardProfile
   status: SessionStatus
   layer: number
+  mode: KeyboardMode
   selectedPositionId?: string
   dirty: boolean
   assignments: KeyAssignment[]
@@ -17,22 +18,20 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:layer': [layer: number]
+  'select-layer': [layer: number]
+  'select-mode': [mode: KeyboardMode]
   'select-position': [positionId: string]
   'assign-key': [keyCode: number]
   'restore-defaults': []
   'restore-key': [positionId: string, layer: number]
 }>()
 
-const tipStorageKey = 'anxiu:keymap-tip-dismissed'
 const viewportWidth = ref(window.innerWidth)
-const tipVisible = ref(sessionStorage.getItem(tipStorageKey) !== '1')
 const keyContextMenu = ref<{ positionId: string; layer: number; x: number; y: number }>()
 const keyboardUnit = computed(() => viewportWidth.value <= 1200 ? 38 : viewportWidth.value <= 1500 ? 53 : 58)
 const busy = () => ['connecting', 'reading', 'writing'].includes(props.status)
 const remapDisabled = () => busy() || props.status === 'disconnected' || props.status === 'unsupported'
 const updateViewportWidth = () => { viewportWidth.value = window.innerWidth }
-const dismissTip = () => { tipVisible.value = false; sessionStorage.setItem(tipStorageKey, '1') }
 const closeKeyContextMenu = () => { keyContextMenu.value = undefined }
 const openKeyContextMenu = (payload: { positionId: string; clientX: number; clientY: number }) => {
   if (remapDisabled()) return
@@ -51,7 +50,7 @@ const restoreContextKey = () => {
 }
 const selectLayer = (targetLayer: number) => {
   closeKeyContextMenu()
-  emit('update:layer', targetLayer)
+  emit('select-layer', targetLayer)
 }
 const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeKeyContextMenu() }
 const confirmRestoreAllKeys = () => {
@@ -83,10 +82,11 @@ onBeforeUnmount(() => {
 
       <aside class="keymap-side-controls">
         <div><span class="eyebrow">KEYMAP</span><h2>改键设置</h2></div>
-        <div class="side-control-group"><small>键盘层级</small><div class="layer-tabs side-layer-tabs"><button v-for="index in profile.capabilities.layers" :key="index" :class="{ active: layer === index - 1 }" :disabled="busy()" @click="selectLayer(index - 1)">FN {{ index }}</button></div></div>
+        <div class="side-control-group"><small>系统模式</small><div class="layer-tabs side-layer-tabs"><button :class="{ active: mode === 'win' }" :disabled="busy()" @click="emit('select-mode', 'win')">WIN</button><button :class="{ active: mode === 'mac' }" :disabled="busy()" @click="emit('select-mode', 'mac')">MAC</button></div></div>
+        <div class="side-control-group"><small>{{ mode === 'mac' ? 'Mac 键盘层级' : '键盘层级' }}</small><div class="layer-tabs side-layer-tabs"><button v-for="index in profile.capabilities.layers" :key="index" :class="{ active: layer === index - 1 }" :disabled="busy()" @click="selectLayer(index - 1)">FN {{ index }}</button></div></div>
         <button v-if="profile.capabilities.remap" class="ghost danger side-restore" :disabled="remapDisabled()" title="恢复全部层的按键映射，不改变灯光等其他设置" @click="confirmRestoreAllKeys">恢复默认</button>
         <div class="side-write-status" :class="{ dirty }"><span v-if="status === 'writing'" class="spinner"></span><i v-else></i><span>{{ status === 'writing' ? '正在写入…' : dirty ? '写入失败' : '即时写入' }}</span></div>
-        <div v-if="tipVisible" class="keymap-tip"><button aria-label="关闭操作提示" @click="dismissTip">×</button><span>先选上方物理键，再选下方的新键值。</span></div>
+        <div class="keymap-tip"><span>先选上方物理键，再选下方的新键值。</span></div>
       </aside>
     </section>
 

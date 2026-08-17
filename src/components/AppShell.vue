@@ -1,31 +1,47 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { KeyboardProfile } from '@/domain/keyboard'
+import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 import keyboardImageUrl from '@/assets/c98-keyboard-transparent.png'
 
 type WorkspaceView = 'device' | 'keymap'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   profile: KeyboardProfile
+  activeConfiguration?: KeyboardConfiguration
   navigationDisabled?: boolean
   error?: string
   message?: string
+}>(), { activeConfiguration: 1 })
+
+const emit = defineEmits<{
+  'select-configuration': [configuration: KeyboardConfiguration]
 }>()
 
 const activeView = ref<WorkspaceView>('device')
 const feedbackVisible = ref(true)
+const sidebarCollapsed = ref(false)
+const configurations: KeyboardConfiguration[] = [1, 2, 3, 4]
 const navigate = (view: WorkspaceView) => { activeView.value = view }
+const toggleSidebar = () => { sidebarCollapsed.value = !sidebarCollapsed.value }
 watch(() => [props.error, props.message], ([error, message], [previousError, previousMessage]) => {
   if ((error || message) && (error !== previousError || message !== previousMessage)) feedbackVisible.value = true
 })
 </script>
 
 <template>
-  <section class="app-shell">
+  <section class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="app-sidebar" aria-label="设备功能导航">
+      <button class="sidebar-collapse-toggle" type="button" :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" :aria-expanded="!sidebarCollapsed" @click="toggleSidebar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="sidebarCollapsed ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'" /></svg>
+      </button>
       <div class="sidebar-device">
         <img :src="keyboardImageUrl" alt="" />
         <div><small>当前设备</small><strong>{{ profile.device.productName }}</strong></div>
+      </div>
+
+      <div class="sidebar-configurations">
+        <small>当前配置</small>
+        <div><button v-for="configuration in configurations" :key="configuration" :class="{ active: activeConfiguration === configuration }" :disabled="navigationDisabled" :title="`切换到配置 ${configuration}`" @click="emit('select-configuration', configuration)">{{ configuration }}</button></div>
       </div>
 
       <nav class="sidebar-nav">

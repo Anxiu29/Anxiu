@@ -40,11 +40,40 @@ describe('connected workspace navigation', () => {
     expect(wrapper.find('[data-view="keymap"]').exists()).toBe(true)
   })
 
+  it('shows configuration switching below the current device', async () => {
+    const wrapper = mount(AppShell, { props: { profile, activeConfiguration: 2 }, slots: { device: '<div />' } })
+    const configurationButtons = wrapper.findAll('.sidebar-configurations button')
+
+    expect(wrapper.find('.sidebar-device').element.compareDocumentPosition(wrapper.find('.sidebar-configurations').element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(configurationButtons.map((button) => button.text())).toEqual(['1', '2', '3', '4'])
+    expect(configurationButtons[1]?.classes()).toContain('active')
+
+    await configurationButtons[3]!.trigger('click')
+    expect(wrapper.emitted('select-configuration')).toEqual([[4]])
+  })
+
+  it('collapses the sidebar to icon-only navigation and expands it again', async () => {
+    const wrapper = mount(AppShell, { props: { profile }, slots: { device: '<div />' } })
+    const toggle = wrapper.find('.sidebar-collapse-toggle')
+
+    expect(wrapper.classes()).not.toContain('sidebar-collapsed')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+
+    await toggle.trigger('click')
+    expect(wrapper.classes()).toContain('sidebar-collapsed')
+    expect(toggle.attributes('aria-label')).toBe('展开侧边栏')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+
+    await toggle.trigger('click')
+    expect(wrapper.classes()).not.toContain('sidebar-collapsed')
+  })
+
   it('locks navigation while a device operation is running', async () => {
     const wrapper = mount(AppShell, { props: { profile, navigationDisabled: true }, slots: { device: '<div data-view="device" />', keymap: '<div data-view="keymap" />' } })
     const keymapButton = wrapper.findAll('.sidebar-nav button')[1]!
 
     expect(keymapButton.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('.sidebar-configurations button').every((button) => button.attributes('disabled') !== undefined)).toBe(true)
     await keymapButton.trigger('click')
     expect(wrapper.find('[data-view="device"]').exists()).toBe(true)
   })
@@ -64,6 +93,7 @@ describe('connected workspace navigation', () => {
         profile,
         status: 'ready',
         layer: 0,
+        mode: 'win',
         selectedPositionId: '0-0',
         dirty: false,
         assignments: profile.assignments,
@@ -91,12 +121,20 @@ describe('connected workspace navigation', () => {
     await wrapper.find('.keycap').trigger('contextmenu', { clientX: 120, clientY: 160 })
     expect(wrapper.find('.key-context-menu').exists()).toBe(false)
 
-    expect(wrapper.find('.keymap-tip').exists()).toBe(true)
-    await wrapper.find('.keymap-tip button').trigger('click')
-    expect(wrapper.find('.keymap-tip').exists()).toBe(false)
+    expect(wrapper.find('.keymap-tip').text()).toContain('先选上方物理键')
+    expect(wrapper.find('.keymap-tip button').exists()).toBe(false)
+  })
 
-    wrapper.unmount()
-    const reopened = mount(KeymapWorkspace, { props: { profile, status: 'ready', layer: 0, dirty: false, assignments: profile.assignments, keyOptions: [{ code: 4, label: 'A', category: 'basic' }], keyLabels: { 4: 'A' } } })
-    expect(reopened.find('.keymap-tip').exists()).toBe(false)
+  it('keeps four Fn layers in both system modes and emits a Mac mode switch', async () => {
+    const fourLayerProfile: KeyboardProfile = { ...profile, capabilities: { ...profile.capabilities, layers: 4 } }
+    const wrapper = mount(KeymapWorkspace, { props: { profile: fourLayerProfile, status: 'ready', layer: 0, mode: 'win', dirty: false, assignments: profile.assignments, keyOptions: [], keyLabels: {} } })
+
+    const groups = wrapper.findAll('.side-control-group')
+    expect(groups[0]?.text()).toContain('WIN')
+    expect(groups[0]?.text()).toContain('MAC')
+    expect(groups[1]?.findAll('button').map((button) => button.text())).toEqual(['FN 1', 'FN 2', 'FN 3', 'FN 4'])
+
+    await groups[0]!.findAll('button')[1]!.trigger('click')
+    expect(wrapper.emitted('select-mode')).toEqual([['mac']])
   })
 })
