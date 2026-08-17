@@ -3,6 +3,8 @@ export type DeviceCapabilityId =
   | 'keymap'
   | 'configuration'
   | 'factory-reset'
+  | 'system-mode'
+  | 'configuration-switch'
   | 'lighting'
   | 'performance'
   | 'macro'

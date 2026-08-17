@@ -1,5 +1,5 @@
 import type { DeviceTransport, KeyboardDevice } from './ports'
-import type { KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
+import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import { assignmentsEqual, cloneAssignments } from '@/domain/keyboard'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import { DriverError } from './DriverError'
@@ -69,6 +69,18 @@ export class DeviceSession {
     if (!this.profile?.capabilities.restoreFactory) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备配置不允许恢复出厂设置', false, { details: { capability: 'factory-reset' } })
     if (!this.device.factoryReset) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持恢复出厂设置', false, { details: { capability: 'factory-reset' } })
     await this.device.factoryReset.restoreFactory()
+  }
+
+  async switchMode(mode: KeyboardMode) {
+    if (!this.device.systemMode) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持切换系统模式', false, { details: { capability: 'system-mode', mode } })
+    await this.device.systemMode.switchMode(mode)
+    return this.load()
+  }
+
+  async switchConfiguration(configuration: KeyboardConfiguration) {
+    if (!this.device.configurationSwitch) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持切换配置', false, { details: { capability: 'configuration-switch', configuration } })
+    await this.device.configurationSwitch.switchConfiguration(configuration)
+    return this.load()
   }
 
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {

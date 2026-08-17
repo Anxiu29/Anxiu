@@ -16,7 +16,7 @@ export class C98Driver implements DeviceDriver {
     displayName: 'RK-C98',
     protocolId: 'xsyd-keyboard-v1',
     transportId: 'webhid',
-    capabilities: ['device-profile', 'keymap', 'configuration', 'factory-reset'],
+    capabilities: ['device-profile', 'keymap', 'configuration', 'factory-reset', 'system-mode', 'configuration-switch'],
     hid: {
       vendorId: C98_DEVICE.vendorId,
       productIds: [C98_DEVICE.productId],

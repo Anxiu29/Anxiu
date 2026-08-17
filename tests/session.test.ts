@@ -115,4 +115,46 @@ describe('DeviceSession', () => {
     expect(current.assignments.find((item) => item.positionId === '0-0' && item.layer === 1)?.keyCode).toBe(7)
     expect(session.dirty).toBe(false)
   })
+
+  it('switches system mode and reloads all layer mappings for that mode', async () => {
+    let current = profile()
+    let switchedTo: string | undefined
+    const device: KeyboardDevice = {
+      profile: { getProfile: async () => current },
+      systemMode: { switchMode: async (mode) => {
+        switchedTo = mode
+        current = { ...current, assignments: current.assignments.map((item) => item.layer === 1 ? { ...item, keyCode: 58, category: 'function' } : item) }
+      } },
+      close: () => undefined,
+    }
+    const session = new DeviceSession(device, HID_KEY_CATALOG)
+    await session.load()
+
+    const macProfile = await session.switchMode('mac')
+
+    expect(switchedTo).toBe('mac')
+    expect(macProfile.assignments.filter((item) => item.layer === 1).every((item) => item.keyCode === 58)).toBe(true)
+    expect(session.draft.filter((item) => item.layer === 1).every((item) => item.keyCode === 58)).toBe(true)
+  })
+
+  it('switches configuration and reloads its key mappings', async () => {
+    let current = profile()
+    let switchedTo: number | undefined
+    const device: KeyboardDevice = {
+      profile: { getProfile: async () => current },
+      configurationSwitch: { switchConfiguration: async (configuration) => {
+        switchedTo = configuration
+        current = { ...current, assignments: current.assignments.map((item) => ({ ...item, keyCode: configuration + item.layer })) }
+      } },
+      close: () => undefined,
+    }
+    const session = new DeviceSession(device, HID_KEY_CATALOG)
+    await session.load()
+
+    const configuration = await session.switchConfiguration(3)
+
+    expect(switchedTo).toBe(3)
+    expect(configuration.assignments[0]?.keyCode).toBe(3)
+    expect(session.draft[2]?.keyCode).toBe(4)
+  })
 })

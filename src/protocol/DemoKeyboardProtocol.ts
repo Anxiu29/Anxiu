@@ -1,5 +1,5 @@
 import type { KeyboardDevice } from '@/application/ports'
-import type { DeviceCapabilities, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
+import type { DeviceCapabilities, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import { cloneAssignments } from '@/domain/keyboard'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { LayoutDescriptor, MatrixKeyInput } from '@/domain/layout'
@@ -14,6 +14,8 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
+  readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
+  readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
   private readonly capabilities: DeviceCapabilities
   constructor(private readonly keyCatalog: KeyCatalog, layout: LayoutDescriptor<MatrixKeyInput>, demoKeys: readonly MatrixKeyInput[], capabilityDescriptor: CapabilityDescriptor) {
     this.positions = layout.describe(demoKeys.map((key) => ({ ...key, label: this.keyCatalog.get(key.sourceCode).label })))
@@ -35,5 +37,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
   async restoreFactory() { await this.wait(); this.working = cloneAssignments(this.initial); this.stored = cloneAssignments(this.initial) }
+  async switchMode(_mode: KeyboardMode) { await this.wait() }
+  async switchConfiguration(_configuration: KeyboardConfiguration) { await this.wait() }
   close() {}
 }

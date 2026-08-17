@@ -1,6 +1,6 @@
 import type { DeviceTransport, KeyboardDevice } from '@/application/ports'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
-import type { DeviceInfo, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
+import type { DeviceInfo, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import type { LayoutDescriptor, MatrixKeyInput } from '@/domain/layout'
 import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
@@ -13,6 +13,8 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
+  readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
+  readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
 
   constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly layout: LayoutDescriptor<MatrixKeyInput>, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
     this.commands = new XsydCommandClient(transport, crc)
@@ -22,12 +24,12 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const [device, protocolVersion] = await Promise.all([this.sync(), this.queryProtocolVersion()])
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
-    const defaultAssignments = Array.from({ length: capabilities.layers }, (_, layer) => positions.map((position) => {
-      const keyCode = layer === 0 ? position.sourceCode : 0
-      return { positionId: position.id, sourceCode: position.sourceCode, layer, keyCode, category: this.keyCatalog.get(keyCode).category }
-    })).flat()
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
+    // 0x2B 只提供物理原始布局，不提供各 Fn 层的出厂映射。
+    // 以进入当前系统模式时的完整四层回读作为本次会话的恢复基线，
+    // 避免把 Fn2 等层中固件已有的键值误判为全部未映射。
+    const defaultAssignments = assignments.map((item) => ({ ...item }))
     return {
       device: { ...device, protocolVersion },
       capabilities,
@@ -49,6 +51,8 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   save() { return this.action(XSYD_ACTIONS.save, 1600) }
   reload() { return this.action(XSYD_ACTIONS.reload, 1600) }
   restoreFactory() { return this.action(XSYD_ACTIONS.restoreFactory, 2500) }
+  switchMode(mode: KeyboardMode) { return this.action(mode === 'mac' ? XSYD_ACTIONS.switchToMac : XSYD_ACTIONS.switchToWin, 1600) }
+  switchConfiguration(configuration: KeyboardConfiguration) { return this.action(XSYD_ACTIONS.switchConfiguration, 1600, [configuration - 1]) }
   close() { this.commands.close() }
 
   private async sync(): Promise<DeviceInfo> {
@@ -73,8 +77,8 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     return new TextDecoder().decode(data.slice(2)).replace(/\0/g, '').trim() || '1.0.x'
   }
 
-  private async action(order: number, timeoutMs: number) {
-    await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order]), timeoutMs)
+  private async action(order: number, timeoutMs: number, args: number[] = []) {
+    await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order, ...args]), timeoutMs)
   }
 
   private async readDefaultLayout(rows: number, columns: number): Promise<KeyPosition[]> {

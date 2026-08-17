@@ -18,7 +18,7 @@ export const XSYD_COMMANDS = {
 } as const
 
 export const XSYD_ACTIONS = {
-  protocolVersion: 0x01, save: 0x02, reload: 0x03, restoreFactory: 0x11,
+  protocolVersion: 0x01, save: 0x02, reload: 0x03, restoreFactory: 0x11, switchToWin: 0x30, switchToMac: 0x31, switchConfiguration: 0x70,
 } as const
 
 export const XSYD_FAILURE_RESPONSE = 0xff

@@ -1,4 +1,4 @@
-import type { KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
+import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -32,11 +32,21 @@ export interface FactoryResetCapability {
   restoreFactory(): Promise<void>
 }
 
+export interface SystemModeCapability {
+  switchMode(mode: KeyboardMode): Promise<void>
+}
+
+export interface ConfigurationSwitchCapability {
+  switchConfiguration(configuration: KeyboardConfiguration): Promise<void>
+}
+
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */
 export interface KeyboardDevice {
   readonly profile: DeviceProfileCapability
   readonly keymap?: KeymapCapability
   readonly configuration?: ConfigurationCapability
   readonly factoryReset?: FactoryResetCapability
+  readonly systemMode?: SystemModeCapability
+  readonly configurationSwitch?: ConfigurationSwitchCapability
   close(): void
 }

@@ -11,6 +11,8 @@ export type SessionStatus =
   | 'error'
 
 export type KeyCategory = 'basic' | 'modifier' | 'navigation' | 'function' | 'media' | 'special'
+export type KeyboardMode = 'win' | 'mac'
+export type KeyboardConfiguration = 1 | 2 | 3 | 4
 
 export interface KeyDefinition {
   code: number

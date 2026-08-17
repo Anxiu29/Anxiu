@@ -145,7 +145,9 @@ App.vue 用户确认
   -> WebHID transport
 ```
 
-本地协议表 `doc/星闪悦动通信协议-V1.0.7.xlsx` 规定：`KB2_CMD_DEFKEY (0x2B)` 上传 Fn0 原始布局，每次读取两行；`KB2_CMD_KEY (0x23)` 读写键位映射；`KB2_CMD` 的 `0x02` 保存参数。XSYD 协议适配器据此生成明确的 `defaultAssignments`：Fn0 使用设备返回的原始键值，其他 Fn 层默认未映射为 `0`。
+本地协议表 `doc/星闪悦动通信协议-V1.0.7.xlsx` 规定：`KB2_CMD_DEFKEY (0x2B)` 上传物理原始布局，每次读取两行；`KB2_CMD_KEY (0x23)` 读写四个 Fn 层的键位映射；`KB2_CMD` 的 `0x02` 保存参数。`0x2B` 不包含各 Fn 层的出厂键值，因此 XSYD 协议适配器以进入当前系统模式时 `0x23` 回读的完整四层映射作为会话恢复基线，不再把 Fn2 等层猜测为全 `0`。
+
+Windows/Mac 是两套独立的系统模式，每套都有 Fn1–Fn4 四层。UI 切换模式时通过 `KB2_CMD` 的 `0x30` / `0x31` 进入 Windows / Mac，然后重新读取物理布局和四层键值，避免沿用上一模式的映射。
 
 默认映射是 `KeyboardProfile` 的一部分，由具体设备协议提供，应用层不根据键帽名称猜测。`DeviceSession.restoreAllKeyDefaults()` 替换全部键位草稿并立即复用保存事务；右键菜单只在 UI 层记录物理位置与当前层级，再调用 `restoreKeyDefaultAndSave(positionId, layer)` 恢复这一个键。单键恢复与普通改键走同一套差异写入、保存和整份配置回读验证，不增加协议专用命令。保存失败时草稿仍保留，方便用户重试。
 
