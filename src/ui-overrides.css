@@ -1,14 +1,50 @@
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body {
+  min-width: 0;
+}
+
+main {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 82px minmax(0, 1fr) 44px;
+  overflow: hidden;
+}
+
+.topbar {
+  position: relative;
+  top: auto;
+}
+
+.hero {
+  min-height: 0;
+}
+
 .keymap-workspace {
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-shell {
   display: grid;
   grid-template-columns: 192px minmax(0, 1fr);
-  min-height: calc(100vh - 126px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   transition: grid-template-columns .2s ease;
 }
 
@@ -17,9 +53,10 @@
 }
 
 .app-sidebar {
-  position: sticky;
-  top: 82px;
-  height: calc(100vh - 126px);
+  position: relative;
+  top: auto;
+  height: 100%;
+  min-height: 0;
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
@@ -355,6 +392,8 @@
 
 .app-content {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   padding: 14px 20px 18px;
   overflow: hidden;
 }
@@ -401,7 +440,11 @@
 
 .device-overview {
   width: min(1180px, 100%);
+  height: 100%;
+  min-height: 0;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .overview-heading {
@@ -800,7 +843,7 @@
 
 @media (max-width: 1200px) {
   .picker-keyboard {
-    --picker-unit: 33px;
+    --picker-unit: 30px;
   }
 
   .compact-keymap-editor {
@@ -811,6 +854,70 @@
   .keymap-side-controls {
     padding: 9px;
     gap: 10px;
+  }
+}
+
+@media (max-height: 1000px) and (min-width: 1201px) {
+  .picker-keyboard {
+    --picker-unit: 38px;
+  }
+}
+
+@media (max-height: 900px) and (min-width: 1201px) {
+  .picker-keyboard {
+    --picker-unit: 34px;
+  }
+}
+
+@media (max-height: 820px) {
+  .app-content {
+    padding: 8px 12px 10px;
+  }
+
+  .keymap-workspace {
+    gap: 8px;
+  }
+
+  .compact-keymap-editor,
+  .picker-wide {
+    padding: 10px;
+  }
+
+  .picker-toolbar {
+    margin-bottom: 8px;
+  }
+
+  .picker-keyboard {
+    --picker-unit: 28px;
+    --picker-gap: 5px;
+    padding: 12px;
+  }
+
+  .picker-key {
+    left: calc(12px + var(--picker-x) * (var(--picker-unit) + var(--picker-gap)));
+    top: calc(12px + var(--picker-y) * (var(--picker-unit) + var(--picker-gap)));
+  }
+
+  .overview-heading {
+    min-height: 54px;
+    margin-bottom: 10px;
+  }
+
+  .overview-device {
+    min-height: 0;
+    flex: 1;
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .overview-image {
+    min-height: 0;
+    flex: 1;
+  }
+
+  .overview-image img {
+    height: 100%;
+    min-height: 0;
   }
 }
 
@@ -835,6 +942,23 @@
 
   .overview-details {
     grid-template-columns: minmax(190px, .7fr) minmax(560px, 2.3fr);
+  }
+}
+
+/* 高度约束必须晚于宽度约束，确保矮屏全屏时不会被 min-height 重新撑开。 */
+@media (max-height: 820px) {
+  .app-content {
+    padding: 8px 12px 10px;
+  }
+
+  .overview-device {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .overview-image,
+  .overview-image img {
+    min-height: 0;
   }
 }
 .editor-actions {

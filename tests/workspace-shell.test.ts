@@ -170,4 +170,24 @@ describe('connected workspace navigation', () => {
     await groups[0]!.findAll('button')[1]!.trigger('click')
     expect(wrapper.emitted('select-mode')).toEqual([['mac']])
   })
+
+  it('scales the physical keyboard with both fullscreen width and height', async () => {
+    const originalWidth = window.innerWidth
+    const originalHeight = window.innerHeight
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 880 })
+    const wrapper = mount(KeymapWorkspace, { props: { profile, status: 'ready', layer: 0, mode: 'win', dirty: false, assignments: profile.assignments, keyOptions: [], keyLabels: { 4: 'A' } } })
+
+    expect(Number.parseFloat((wrapper.find('.keyboard-layout').element as HTMLElement).style.width)).toBeCloseTo(123.6)
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1920 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 1080 })
+    window.dispatchEvent(new Event('resize'))
+    await wrapper.vm.$nextTick()
+    expect(Number.parseFloat((wrapper.find('.keyboard-layout').element as HTMLElement).style.width)).toBeCloseTo(168.4)
+
+    wrapper.unmount()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalHeight })
+  })
 })

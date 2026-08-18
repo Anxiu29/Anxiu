@@ -27,12 +27,20 @@ const emit = defineEmits<{
 }>()
 
 const viewportWidth = ref(window.innerWidth)
+const viewportHeight = ref(window.innerHeight)
 const keyContextMenu = ref<{ positionId: string; layer: number; x: number; y: number }>()
-const keyboardUnit = computed(() => viewportWidth.value <= 1200 ? 38 : viewportWidth.value <= 1500 ? 53 : 58)
+const keyboardUnit = computed(() => {
+  const widthUnit = viewportWidth.value <= 1200 ? 32 : viewportWidth.value <= 1400 ? 39 : viewportWidth.value <= 1500 ? 42 : viewportWidth.value <= 1650 ? 49 : 58
+  const heightUnit = viewportHeight.value <= 820 ? 39 : viewportHeight.value <= 900 ? 48 : viewportHeight.value <= 1000 ? 53 : 58
+  return Math.min(widthUnit, heightUnit)
+})
 const layerDefaults = computed(() => props.profile.defaultAssignments.filter((item) => item.layer === props.layer))
 const busy = () => ['connecting', 'reading', 'writing'].includes(props.status)
 const remapDisabled = () => busy() || props.status === 'disconnected' || props.status === 'unsupported'
-const updateViewportWidth = () => { viewportWidth.value = window.innerWidth }
+const updateViewportSize = () => {
+  viewportWidth.value = window.innerWidth
+  viewportHeight.value = window.innerHeight
+}
 const closeKeyContextMenu = () => { keyContextMenu.value = undefined }
 const openKeyContextMenu = (payload: { positionId: string; clientX: number; clientY: number }) => {
   if (remapDisabled()) return
@@ -59,14 +67,14 @@ const confirmRestoreAllKeys = () => {
   if (confirmed) emit('restore-defaults')
 }
 onMounted(() => {
-  window.addEventListener('resize', updateViewportWidth)
+  window.addEventListener('resize', updateViewportSize)
   window.addEventListener('resize', closeKeyContextMenu)
   window.addEventListener('click', closeKeyContextMenu)
   window.addEventListener('keydown', closeOnEscape)
   window.addEventListener('scroll', closeKeyContextMenu, true)
 })
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateViewportWidth)
+  window.removeEventListener('resize', updateViewportSize)
   window.removeEventListener('resize', closeKeyContextMenu)
   window.removeEventListener('click', closeKeyContextMenu)
   window.removeEventListener('keydown', closeOnEscape)
