@@ -20,27 +20,30 @@ export function encodeMainLighting(settings: LightingSettings, write: boolean, i
   return new Uint8Array(data)
 }
 
-/** XsydCommandClient 已去掉四字节包头，因此官方文档中的偏移统一减 4。 */
+/**
+ * 实机响应与请求保持同一数据布局：data[0] 是状态/读写位，data[1..4]
+ * 是保留区，颜色从 data[5] 开始。这里的偏移已经扣除了四字节协议包头。
+ */
 export function decodeMainLighting(data: Uint8Array): LightingSettings {
-  if (data.length < 39) throw new Error(`灯光响应长度不足：${data.length}`)
+  if (data.length < 43) throw new Error(`灯光响应长度不足：${data.length}`)
   const colors: string[] = []
-  for (let offset = 1; offset < 29; offset += 4) {
+  for (let offset = 5; offset < 33; offset += 4) {
     const [b = 0, g = 0, r = 0] = data.slice(offset, offset + 3)
     colors.push(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase())
   }
-  const bitmap = data[33] ?? 0
-  const mode = data[35] ?? 0
+  const bitmap = data[37] ?? 0
+  const mode = data[39] ?? 0
   return {
     open: (bitmap & 0x01) !== 0,
     direction: (bitmap & 0x02) !== 0,
     superResponse: (bitmap & 0x10) !== 0,
     colors,
-    luminance: data[34] ?? 0,
+    luminance: data[38] ?? 0,
     mode,
-    speed: data[36] ?? 0,
-    sleepDelay: data[37] ?? 0,
-    staticColor: data[38] ?? 0,
-    dynamicColorId: data[39] ?? 0,
+    speed: data[40] ?? 0,
+    sleepDelay: data[41] ?? 0,
+    staticColor: data[42] ?? 0,
+    dynamicColorId: data[43] ?? 0,
     type: typeForMode(mode),
   }
 }
