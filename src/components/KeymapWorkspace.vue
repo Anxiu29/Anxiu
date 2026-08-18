@@ -5,7 +5,7 @@ import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   profile: KeyboardProfile
   status: SessionStatus
   layer: number
@@ -15,9 +15,13 @@ const props = defineProps<{
   assignments: KeyAssignment[]
   selectedAssignment?: KeyAssignment
   keyOptions: readonly KeyDefinition[]
+  extendedKeyCodes?: ReadonlySet<number>
   keyLabels: Record<number, string>
   keyGeometry?: KeyGeometryResolver
-}>()
+}>(), {
+  // 独立预览或测试未注入设备表现时采用空集，避免错误地开放其他型号的扩展功能。
+  extendedKeyCodes: () => new Set<number>(),
+})
 
 const emit = defineEmits<{
   'select-layer': [layer: number]
@@ -103,7 +107,7 @@ onBeforeUnmount(() => {
       </aside>
     </section>
 
-    <KeyPicker :current="selectedAssignment?.keyCode" hint="先选上方物理键，再选下方的新键值。" :keys="keyOptions" :disabled="remapDisabled()" @select="emit('assign-key', $event)" />
+    <KeyPicker :current="selectedAssignment?.keyCode" hint="先选上方物理键，再选下方的新键值。" :keys="keyOptions" :extended-key-codes="extendedKeyCodes" :disabled="remapDisabled()" @select="emit('assign-key', $event)" />
 
     <div v-if="keyContextMenu" class="key-context-menu" :style="{ left: `${keyContextMenu.x}px`, top: `${keyContextMenu.y}px` }" role="menu" @click.stop>
       <button type="button" role="menuitem" @click="restoreContextKey">恢复此键默认</button>
