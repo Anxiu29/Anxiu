@@ -20,6 +20,7 @@ const emit = defineEmits<{ update: [settings: LightingSettings]; reload: [] }>()
 const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.status))
 const luminanceDraft = ref(0)
 const speedDraft = ref(0)
+const colorFormat = ref<'hex' | 'rgb'>('rgb')
 
 // 拖动时只更新本地显示，松手后再写入设备，避免一次拖动产生多次 HID 写入。
 watch(() => props.settings?.luminance, (value) => { if (value !== undefined) luminanceDraft.value = value }, { immediate: true })
@@ -41,6 +42,22 @@ const updatePrimaryColor = (color: string) => {
   const colors = [...props.settings.colors]
   colors[0] = color.toUpperCase()
   update({ colors, staticColor: 0 })
+}
+
+type RgbChannel = 'r' | 'g' | 'b'
+const primaryRgb = computed(() => {
+  const hex = (props.settings?.colors[0] ?? '#FFFFFF').replace('#', '')
+  const normalized = /^[0-9A-Fa-f]{6}$/.test(hex) ? hex : 'FFFFFF'
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16),
+  }
+})
+const updateRgbChannel = (channel: RgbChannel, value: number) => {
+  const nextValue = Number.isFinite(value) ? Math.max(0, Math.min(255, Math.round(value))) : primaryRgb.value[channel]
+  const rgb = { ...primaryRgb.value, [channel]: nextValue }
+  updatePrimaryColor(`#${[rgb.r, rgb.g, rgb.b].map((part) => part.toString(16).padStart(2, '0')).join('')}`)
 }
 </script>
 
@@ -95,7 +112,18 @@ const updatePrimaryColor = (color: string) => {
               <button v-for="(color, index) in settings.colors" :key="`${color}-${index}`" class="lighting-swatch" type="button" :class="{ active: index === 0 }" :style="{ '--swatch-color': color }" :title="color" :disabled="busy || !settings.open" @click="updatePrimaryColor(color)"></button>
             </div>
           </div>
-          <div class="lighting-hex-row"><span class="lighting-hex-label">HEX</span><code class="lighting-hex-value">{{ settings.colors[0] ?? '#FFFFFF' }}</code></div>
+          <div class="lighting-color-format">
+            <div class="lighting-format-tabs">
+              <button type="button" :class="{ active: colorFormat === 'hex' }" :aria-pressed="colorFormat === 'hex'" @click="colorFormat = 'hex'">HEX</button>
+              <button type="button" :class="{ active: colorFormat === 'rgb' }" :aria-pressed="colorFormat === 'rgb'" @click="colorFormat = 'rgb'">RGB</button>
+            </div>
+            <code v-if="colorFormat === 'hex'" class="lighting-hex-value">{{ settings.colors[0] ?? '#FFFFFF' }}</code>
+            <div v-else class="lighting-rgb-fields">
+              <label>R <input type="number" min="0" max="255" :value="primaryRgb.r" :disabled="busy || !settings.open" @change="updateRgbChannel('r', Number(($event.target as HTMLInputElement).value))" /></label>
+              <label>G <input type="number" min="0" max="255" :value="primaryRgb.g" :disabled="busy || !settings.open" @change="updateRgbChannel('g', Number(($event.target as HTMLInputElement).value))" /></label>
+              <label>B <input type="number" min="0" max="255" :value="primaryRgb.b" :disabled="busy || !settings.open" @change="updateRgbChannel('b', Number(($event.target as HTMLInputElement).value))" /></label>
+            </div>
+          </div>
         </div>
       </section>
     </template>

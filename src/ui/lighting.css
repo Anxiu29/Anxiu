@@ -323,7 +323,7 @@
   box-shadow: 0 0 0 2px rgba(69, 214, 255, 0.45);
 }
 
-.lighting-hex-row {
+.lighting-color-format {
   margin-top: 20px;
   display: flex;
   align-items: center;
@@ -331,7 +331,31 @@
   gap: 8px;
 }
 
-.lighting-hex-label,
+.lighting-format-tabs {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--lighting-border);
+  border-radius: 6px;
+}
+
+.lighting-format-tabs button {
+  min-width: 48px;
+  height: 30px;
+  padding: 0 10px;
+  color: #8592a1;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+}
+
+.lighting-format-tabs button + button {
+  border-left: 1px solid var(--lighting-border);
+}
+
+.lighting-format-tabs button.active {
+  color: #071318;
+  background: #b8effb;
+}
+
 .lighting-hex-value {
   min-height: 30px;
   padding: 0 10px;
@@ -341,17 +365,38 @@
   font-size: 12px;
 }
 
-.lighting-hex-label {
-  color: #0b151b;
-  background: #b8effb;
-}
-
 .lighting-hex-value {
   min-width: 84px;
   justify-content: center;
   color: #d7e0e8;
   background: rgba(255, 255, 255, 0.06);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.lighting-rgb-fields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lighting-rgb-fields label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #8e9aa8;
+  font-size: 11px;
+}
+
+.lighting-rgb-fields input {
+  width: 46px;
+  height: 30px;
+  padding: 0 3px;
+  border: 1px solid var(--lighting-border);
+  border-radius: 5px;
+  color: #dce5ec;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  text-align: center;
 }
 
 .lighting-empty {
@@ -406,7 +451,7 @@
     width: min(160px, 100%);
   }
 
-  .lighting-hex-row {
+  .lighting-color-format {
     margin-top: 10px;
   }
 }
