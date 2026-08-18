@@ -3,7 +3,7 @@ import type { KeyboardProfile } from '@/domain/keyboard'
 
 defineProps<{ profile: KeyboardProfile; busy?: boolean; imageUrl?: string; imageAlt?: string }>()
 // 组件只展示注入的设备资源和领域 Profile，不直接认识 C98 图片或驱动实现。
-const emit = defineEmits<{ reload: [] }>()
+const emit = defineEmits<{ reload: []; 'open-keymap': [] }>()
 </script>
 
 <template>
@@ -11,9 +11,9 @@ const emit = defineEmits<{ reload: [] }>()
     <div class="overview-heading"><div><span class="eyebrow">DEVICE OVERVIEW</span><h1>设备首页</h1><p>查看当前连接设备的信息，或从左侧进入改键设置。</p></div><button class="ghost" :disabled="busy" @click="emit('reload')">重新读取</button></div>
 
     <div class="overview-device panel">
-      <div class="overview-image">
+      <button class="overview-image" type="button" title="进入改键设置" aria-label="进入改键设置" @click="emit('open-keymap')">
         <img :src="imageUrl" :alt="imageAlt || `${profile.device.productName} 键盘大图`" />
-      </div>
+      </button>
       <div class="overview-details">
         <div class="overview-device-title">
           <span class="connected-label"><i></i>设备已连接</span>

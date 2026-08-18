@@ -394,6 +394,16 @@ main {
   border: 1px solid #252e39;
   border-radius: 12px;
   background: radial-gradient(circle at 50% 50%, rgba(69,230,208,.08), transparent 58%), #0a0d12;
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.overview-image:hover,
+.overview-image:focus-visible {
+  border-color: rgba(69,230,208,.72);
+  box-shadow: 0 0 0 1px rgba(69,230,208,.22), 0 16px 34px rgba(0,0,0,.22);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .overview-image img {

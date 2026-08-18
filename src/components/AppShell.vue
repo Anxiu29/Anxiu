@@ -74,7 +74,8 @@ watch(() => [props.error, props.message], ([error, message], [previousError, pre
     </aside>
 
     <div class="app-content">
-      <slot v-if="activeView === 'device'" name="device" />
+      <!-- 设备工作区通过插槽函数请求导航，不需要知道 AppShell 如何保存 activeView。 -->
+      <slot v-if="activeView === 'device'" name="device" :open-keymap="() => navigate('keymap')" />
       <slot v-else name="keymap" />
     </div>
 

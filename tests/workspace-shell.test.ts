@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { h } from 'vue'
 import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
@@ -15,13 +16,16 @@ const profile: KeyboardProfile = {
 }
 
 describe('connected workspace navigation', () => {
-  it('uses the product image directly as the device overview hero', () => {
+  it('uses the product image as a button that requests the keymap workspace', async () => {
     const wrapper = mount(DeviceOverview, { props: { profile } })
 
     expect(wrapper.find('.overview-image img').attributes('alt')).toContain('键盘大图')
-    expect(wrapper.find('.overview-image').element.tagName).toBe('DIV')
+    expect(wrapper.find('.overview-image').element.tagName).toBe('BUTTON')
     expect(wrapper.find('.image-lightbox').exists()).toBe(false)
     expect(wrapper.find('.device-specs').exists()).toBe(true)
+
+    await wrapper.find('.overview-image').trigger('click')
+    expect(wrapper.emitted('open-keymap')).toEqual([[]])
   })
 
   it('starts on device overview and renders only the selected workspace', async () => {
@@ -38,6 +42,19 @@ describe('connected workspace navigation', () => {
 
     await wrapper.findAll('.sidebar-nav button')[1]!.trigger('click')
     expect(wrapper.find('[data-view="device"]').exists()).toBe(false)
+    expect(wrapper.find('[data-view="keymap"]').exists()).toBe(true)
+  })
+
+  it('lets the device slot open the keymap workspace', async () => {
+    const wrapper = mount(AppShell, {
+      props: { profile },
+      slots: {
+        device: ({ openKeymap }: { openKeymap: () => void }) => h('button', { 'data-open-keymap': '', onClick: openKeymap }, '进入改键'),
+        keymap: '<div data-view="keymap">改键内容</div>',
+      },
+    })
+
+    await wrapper.find('[data-open-keymap]').trigger('click')
     expect(wrapper.find('[data-view="keymap"]').exists()).toBe(true)
   })
 
