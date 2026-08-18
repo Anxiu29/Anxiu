@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { KeyDefinition } from '@/domain/keyboard'
+import { EXTENDED_KEY_CATEGORIES, extendedCategoryFor, isSelectableExtendedKey, type ExtendedKeyCategory } from '@/ui/extendedKeyCategories'
 
 const props = defineProps<{ current?: number; hint?: string; keys: readonly KeyDefinition[]; disabled?: boolean }>()
 const emit = defineEmits<{ select: [code: number] }>()
@@ -48,6 +49,7 @@ const keyboardKeys: PositionedPickerItem[] = [
 ]
 
 const mode = ref<'keyboard' | 'extended'>('keyboard')
+const extendedCategory = ref<ExtendedKeyCategory>('system')
 const search = ref('')
 const byCode = computed(() => new Map(props.keys.map((item) => [item.code, item])))
 // 标准键盘已经显示的键码不再出现在扩展列表，避免同一功能重复出现。
@@ -59,7 +61,9 @@ const matches = (code: number) => {
   // 同时支持名称、十进制键码和 0x 十六进制键码搜索。
   return definition?.label.toLowerCase().includes(query.value) || String(code).includes(query.value) || code.toString(16).includes(query.value.replace(/^0x/, ''))
 }
-const extendedKeys = computed(() => props.keys.filter((item) => !visualCodes.has(item.code) && matches(item.code)))
+const allExtendedKeys = computed(() => props.keys.filter((item) => !visualCodes.has(item.code) && isSelectableExtendedKey(item)))
+const categoryCounts = computed(() => Object.fromEntries(EXTENDED_KEY_CATEGORIES.map(({ id }) => [id, allExtendedKeys.value.filter((item) => extendedCategoryFor(item) === id && matches(item.code)).length])) as Record<ExtendedKeyCategory, number>)
+const extendedKeys = computed(() => allExtendedKeys.value.filter((item) => extendedCategoryFor(item) === extendedCategory.value && matches(item.code)))
 const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? '' : byCode.value.get(item.code)?.label ?? `0x${item.code.toString(16).toUpperCase()}`)
 </script>
 
@@ -82,10 +86,16 @@ const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? 
       </button>
     </div>
 
-    <div v-else class="extended-key-list">
-      <button v-for="item in extendedKeys" :key="item.code" :class="{ active: current === item.code }" :disabled="disabled" @click="emit('select', item.code)">
-        <span>{{ item.label }}</span><small>0x{{ item.code.toString(16).padStart(4, '0').toUpperCase() }}</small>
-      </button>
+    <div v-else class="extended-key-browser">
+      <div class="extended-category-tabs" aria-label="扩展按键分类">
+        <button v-for="category in EXTENDED_KEY_CATEGORIES" :key="category.id" :class="{ active: extendedCategory === category.id }" @click="extendedCategory = category.id">{{ category.label }}<small>{{ categoryCounts[category.id] }}</small></button>
+      </div>
+      <div v-if="extendedKeys.length" class="extended-key-list">
+        <button v-for="item in extendedKeys" :key="item.code" :class="{ active: current === item.code }" :disabled="disabled" @click="emit('select', item.code)">
+          <span>{{ item.label }}</span><small>0x{{ item.code.toString(16).padStart(4, '0').toUpperCase() }}</small>
+        </button>
+      </div>
+      <div v-else class="extended-key-empty">当前分类没有匹配的按键</div>
     </div>
   </section>
 </template>

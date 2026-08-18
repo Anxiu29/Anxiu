@@ -608,6 +608,40 @@ main {
   opacity: .22;
 }
 
+.extended-key-browser {
+  min-height: 330px;
+}
+
+.extended-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.extended-category-tabs button {
+  padding: 7px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #2a323d;
+  border-radius: 5px;
+  color: #788391;
+  background: #0c1017;
+  font-size: 10px;
+}
+
+.extended-category-tabs button.active {
+  color: #071412;
+  border-color: var(--cyan);
+  background: var(--cyan);
+}
+
+.extended-category-tabs small {
+  opacity: .72;
+  font-size: 8px;
+}
+
 .extended-key-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -636,6 +670,14 @@ main {
 
 .extended-key-list small {
   color: #596472;
+}
+
+.extended-key-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  color: #596472;
+  font-size: 11px;
 }
 
 .compact-keymap-editor {
