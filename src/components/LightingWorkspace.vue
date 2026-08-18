@@ -54,6 +54,61 @@ const primaryRgb = computed(() => {
     b: Number.parseInt(normalized.slice(4, 6), 16),
   }
 })
+
+const primaryHsv = computed(() => {
+  const { r, g, b } = primaryRgb.value
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const delta = max - min
+  let hue = 0
+  if (delta > 0) {
+    if (max === red) hue = 60 * (((green - blue) / delta) % 6)
+    else if (max === green) hue = 60 * ((blue - red) / delta + 2)
+    else hue = 60 * ((red - green) / delta + 4)
+  }
+  return { hue: (hue + 360) % 360, saturation: max === 0 ? 0 : delta / max }
+})
+
+// CSS 圆盘以顶部红色为 0° 并顺时针旋转，选点位置必须使用相同坐标系。
+const wheelSelectionStyle = computed(() => {
+  const angle = primaryHsv.value.hue * Math.PI / 180
+  const radius = primaryHsv.value.saturation * 47
+  return {
+    '--selected-color': props.settings?.colors[0] ?? '#FFFFFF',
+    left: `${50 + Math.sin(angle) * radius}%`,
+    top: `${50 - Math.cos(angle) * radius}%`,
+  }
+})
+
+const hsvToHex = (hue: number, saturation: number) => {
+  const chroma = saturation
+  const segment = hue / 60
+  const intermediate = chroma * (1 - Math.abs(segment % 2 - 1))
+  const [red, green, blue] = segment < 1 ? [chroma, intermediate, 0]
+    : segment < 2 ? [intermediate, chroma, 0]
+      : segment < 3 ? [0, chroma, intermediate]
+        : segment < 4 ? [0, intermediate, chroma]
+          : segment < 5 ? [intermediate, 0, chroma]
+            : [chroma, 0, intermediate]
+  const match = 1 - chroma
+  return `#${[red, green, blue].map((part) => Math.round((part + match) * 255).toString(16).padStart(2, '0')).join('')}`
+}
+
+const selectWheelColor = (event: MouseEvent) => {
+  if (busy.value || !props.settings?.open) return
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const radius = Math.min(rect.width, rect.height) / 2
+  const x = event.clientX - (rect.left + rect.width / 2)
+  const y = event.clientY - (rect.top + rect.height / 2)
+  const distance = Math.hypot(x, y)
+  if (distance > radius) return
+  const hue = (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360
+  updatePrimaryColor(hsvToHex(hue, Math.min(1, distance / radius)))
+}
+
 const updateRgbChannel = (channel: RgbChannel, value: number) => {
   const nextValue = Number.isFinite(value) ? Math.max(0, Math.min(255, Math.round(value))) : primaryRgb.value[channel]
   const rgb = { ...primaryRgb.value, [channel]: nextValue }
@@ -104,10 +159,9 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
             <div class="lighting-inline-setting"><label for="lighting-master">主灯</label><label class="lighting-switch"><input id="lighting-master" type="checkbox" :checked="settings.open" :disabled="busy" @change="update({ open: ($event.target as HTMLInputElement).checked })" /><span></span></label></div>
           </div>
           <div class="lighting-color-body">
-            <label class="lighting-color-wheel" :style="{ '--selected-color': settings.colors[0] ?? '#FFFFFF' }">
-              <input type="color" :value="settings.colors[0] ?? '#FFFFFF'" :disabled="busy || !settings.open" @change="updatePrimaryColor(($event.target as HTMLInputElement).value)" />
-              <span class="lighting-color-wheel-selection"></span>
-            </label>
+            <div class="lighting-color-wheel" :class="{ disabled: busy || !settings.open }" role="button" aria-label="点击调色盘选择颜色" :aria-disabled="busy || !settings.open" @click="selectWheelColor">
+              <span class="lighting-color-wheel-selection" :style="wheelSelectionStyle"></span>
+            </div>
             <div class="lighting-palette">
               <button v-for="(color, index) in settings.colors" :key="`${color}-${index}`" class="lighting-swatch" type="button" :class="{ active: index === 0 }" :style="{ '--swatch-color': color }" :title="color" :disabled="busy || !settings.open" @click="updatePrimaryColor(color)"></button>
             </div>
