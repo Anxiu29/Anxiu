@@ -1,4 +1,5 @@
 import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
+import type { LightingSettings } from '@/domain/lighting'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -44,6 +45,11 @@ export interface ConfigurationSwitchCapability {
   onConfigurationChange?(listener: (configuration: KeyboardConfiguration) => void): () => void
 }
 
+export interface LightingCapability {
+  getLighting(): Promise<LightingSettings>
+  setLighting(settings: LightingSettings): Promise<void>
+}
+
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */
 export interface KeyboardDevice {
   readonly profile: DeviceProfileCapability
@@ -52,5 +58,6 @@ export interface KeyboardDevice {
   readonly factoryReset?: FactoryResetCapability
   readonly systemMode?: SystemModeCapability
   readonly configurationSwitch?: ConfigurationSwitchCapability
+  readonly lighting?: LightingCapability
   close(): void
 }

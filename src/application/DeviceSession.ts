@@ -4,6 +4,7 @@ import { assignmentsEqual, cloneAssignments } from '@/domain/keyboard'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import { DriverError } from './DriverError'
 import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguration'
+import type { LightingSettings } from '@/domain/lighting'
 
 export class DeviceSession {
   // original 是最近一次已验证的设备状态；draft 是允许 UI 修改的工作副本。
@@ -94,6 +95,18 @@ export class DeviceSession {
   /** 与模式事件一样，只暴露领域中的配置编号，不向状态层泄漏 0x70。 */
   onConfigurationChange(listener: (configuration: KeyboardConfiguration) => void) {
     return this.device.configurationSwitch?.onConfigurationChange?.(listener) ?? (() => undefined)
+  }
+
+  async getLighting() {
+    if (!this.device.lighting) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持灯光设置', false, { details: { capability: 'lighting' } })
+    return this.device.lighting.getLighting()
+  }
+
+  /** 灯光采用即时写入，并以设备回读值作为最终状态，避免滑块显示与固件实际值不同。 */
+  async updateLighting(settings: LightingSettings) {
+    if (!this.device.lighting) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持灯光设置', false, { details: { capability: 'lighting' } })
+    await this.device.lighting.setLighting(settings)
+    return this.device.lighting.getLighting()
   }
 
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {

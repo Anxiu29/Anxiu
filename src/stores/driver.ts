@@ -3,11 +3,12 @@ import type { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardConfiguration, KeyboardMode } from '@/domain/keyboard'
 import { toDriverError } from '@/application/DriverError'
 import { createDriverState } from './driverState'
+import type { LightingSettings } from '@/domain/lighting'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
 
@@ -41,6 +42,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     if (!state.session) return
     status.value = 'reading'
     profile.value = await state.session.load()
+    lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
     mode.value = profile.value.mode ?? mode.value
     revision.value++
     status.value = 'ready'
@@ -70,7 +72,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function reload() {
     if (!state.session) return
     clearFeedback(); status.value = 'reading'
-    try { profile.value = await state.session.reload(); revision.value++; status.value = 'ready'; message.value = '已重新读取设备配置' }
+    try { profile.value = await state.session.reload(); lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined; revision.value++; status.value = 'ready'; message.value = '已重新读取设备配置' }
     catch (cause) { fail(cause) }
   }
 
@@ -115,6 +117,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'reading'
     try {
       profile.value = await state.session.switchMode(targetMode)
+      lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
       revision.value++
       mode.value = profile.value.mode ?? targetMode
       layer.value = 0
@@ -130,6 +133,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'reading'
     try {
       profile.value = await state.session.switchConfiguration(configuration)
+      lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
       revision.value++
       activeConfiguration.value = configuration
       layer.value = 0
@@ -149,6 +153,23 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       profile.value = result.profile; revision.value++; status.value = 'ready'
       message.value = result.changedAssignments === 0 ? '该按键已经是默认映射' : '已恢复当前按键默认映射并通过回读验证'
     } catch (cause) { revision.value++; fail(cause) }
+  }
+
+  async function updateLighting(settings: LightingSettings) {
+    if (!state.session || !profile.value?.capabilities.lighting || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try {
+      lighting.value = await state.session.updateLighting(settings)
+      status.value = 'ready'
+      message.value = '灯光设置已写入并通过回读验证'
+    } catch (cause) { fail(cause) }
+  }
+
+  async function reloadLighting() {
+    if (!state.session || !profile.value?.capabilities.lighting || ['connecting', 'reading', 'writing'].includes(status.value)) return
+    clearFeedback(); status.value = 'reading'
+    try { lighting.value = await state.session.getLighting(); status.value = 'ready'; message.value = '已重新读取灯光设置' }
+    catch (cause) { fail(cause) }
   }
 
   function handleDisconnect() {
@@ -191,6 +212,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'reading'
     try {
       profile.value = await observedSession.load()
+      lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
       if (state.session !== observedSession) return
       mode.value = profile.value.mode ?? targetMode
       layer.value = 0
@@ -211,6 +233,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'reading'
     try {
       profile.value = await observedSession.load()
+      lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
       if (state.session !== observedSession) return
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
@@ -226,5 +249,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

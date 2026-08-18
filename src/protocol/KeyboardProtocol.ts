@@ -7,10 +7,14 @@ import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
+import type { LightingSettings } from '@/domain/lighting'
+import { DEFAULT_LIGHTING_SETTINGS } from '@/domain/lighting'
+import { decodeMainLighting, encodeMainLighting } from './xsyd/lightingCodec'
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
   private currentMode: KeyboardMode = 'win'
+  private protocolVersion = '1.0.7'
   private readonly modeListeners = new Set<(mode: KeyboardMode) => void>()
   private readonly configurationListeners = new Set<(configuration: KeyboardConfiguration) => void>()
   private readonly removeNotificationListener: () => void
@@ -25,6 +29,10 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly configurationSwitch = {
     switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration),
     onConfigurationChange: (listener: (configuration: KeyboardConfiguration) => void) => this.onConfigurationChange(listener),
+  }
+  readonly lighting = {
+    getLighting: () => this.getLighting(),
+    setLighting: (settings: LightingSettings) => this.setLighting(settings),
   }
 
   constructor(
@@ -41,6 +49,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   async getProfile(): Promise<KeyboardProfile> {
     // 设备身份与协议版本互不依赖，可以并行查询；能力需要两者齐备后才能解析。
     const [device, protocolVersion, mode] = await Promise.all([this.sync(), this.queryProtocolVersion(), this.queryMode()])
+    this.protocolVersion = protocolVersion
     this.currentMode = mode
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
     // 0x2B 只告诉我们有哪些物理键；每个 Fn 层的实际键值还要通过 0x23 单独读取。
@@ -86,6 +95,14 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     await this.action(XSYD_ACTIONS.switchConfiguration, 1600, [configuration - 1])
     await this.waitForStateSettled()
   }
+  async getLighting() {
+    // 官方 SDK 的读取也携带一份完整占位结构，不能只发送单独的 rw 字节。
+    const request = encodeMainLighting(DEFAULT_LIGHTING_SETTINGS, false, this.supportsDynamicColorId())
+    return decodeMainLighting(await this.commands.request(XSYD_COMMANDS.lighting, request))
+  }
+  async setLighting(settings: LightingSettings) {
+    await this.commands.request(XSYD_COMMANDS.lighting, encodeMainLighting(settings, true, this.supportsDynamicColorId()))
+  }
   close() {
     this.removeNotificationListener()
     this.modeListeners.clear()
@@ -118,6 +135,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
 
   private async action(order: number, timeoutMs: number, args: number[] = []) {
     await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order, ...args]), timeoutMs)
+  }
+
+  private supportsDynamicColorId() {
+    const [major = 0, minor = 0, patch = 0] = this.protocolVersion.split('.').map(Number)
+    return major > 1 || major === 1 && (minor > 0 || minor === 0 && patch >= 9)
   }
 
   /** 按协议响应布局 [Err Code, order, s_arg...] 读取查询结果。 */

@@ -17,6 +17,7 @@ export const XSYD_COMMANDS = {
   action: command('action', 0x00, 1200, 'zero', true),
   keymap: command('keymap', 0x23),
   defaultKeymap: command('default-keymap', 0x2b),
+  lighting: command('main-lighting', 0x18),
 } as const
 
 export const XSYD_ACTIONS = {

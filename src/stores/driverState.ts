@@ -3,6 +3,7 @@ import type { DeviceSession } from '@/application/DeviceSession'
 import type { SaveProgress } from '@/application/SaveConfiguration'
 import type { KeyboardConfiguration, KeyboardMode, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { DriverErrorCode } from '@/application/DriverError'
+import type { LightingSettings } from '@/domain/lighting'
 
 /** Driver Store 的响应式状态与派生查询；不执行连接、协议或写入操作。 */
 export const createDriverState = () => {
@@ -20,6 +21,7 @@ export const createDriverState = () => {
   const driverId = ref<string>()
   const revision = ref(0)
   const saveProgress = ref<SaveProgress>()
+  const lighting = ref<LightingSettings>()
   // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
   const activeSession = shallowRef<DeviceSession>()
 
@@ -33,7 +35,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
-    demo, driverId, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }

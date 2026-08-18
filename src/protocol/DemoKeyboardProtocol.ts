@@ -5,6 +5,7 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { MatrixKeyInput } from '@/domain/layout'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
+import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type LightingSettings } from '@/domain/lighting'
 
 /**
  * 不访问 HID 的内存协议实现。它实现与真机相同的 KeyboardDevice 端口，
@@ -23,8 +24,10 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
   readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
+  readonly lighting = { getLighting: () => this.getLighting(), setLighting: (settings: LightingSettings) => this.setLighting(settings) }
   private readonly capabilities: DeviceCapabilities
   private currentMode: KeyboardMode = 'win'
+  private lightingSettings = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS)
   constructor(
     private readonly keyCatalog: KeyCatalog,
     demoKeys: readonly MatrixKeyInput[],
@@ -60,6 +63,8 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
     this.stored = cloneAssignments(defaults)
   }
   async switchConfiguration(_configuration: KeyboardConfiguration) { await this.wait() }
+  async getLighting() { await this.wait(); return cloneLightingSettings(this.lightingSettings) }
+  async setLighting(settings: LightingSettings) { await this.wait(); this.lightingSettings = cloneLightingSettings(settings) }
   close() {}
 
   private defaultsFor(mode: KeyboardMode) {

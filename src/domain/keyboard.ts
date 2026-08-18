@@ -52,6 +52,8 @@ export interface DeviceCapabilities {
   layers: number
   remap: boolean
   restoreFactory: boolean
+  /** 可选以兼容只实现改键的设备；true 时设备必须提供 LightingCapability。 */
+  lighting?: boolean
   layoutRows: number
   layoutColumns: number
 }
