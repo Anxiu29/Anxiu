@@ -12,6 +12,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
   private currentMode: KeyboardMode = 'win'
   private readonly modeListeners = new Set<(mode: KeyboardMode) => void>()
+  private readonly configurationListeners = new Set<(configuration: KeyboardConfiguration) => void>()
   private readonly removeNotificationListener: () => void
   readonly profile = { getProfile: () => this.getProfile() }
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
@@ -21,7 +22,10 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     switchMode: (mode: KeyboardMode) => this.switchMode(mode),
     onModeChange: (listener: (mode: KeyboardMode) => void) => this.onModeChange(listener),
   }
-  readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
+  readonly configurationSwitch = {
+    switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration),
+    onConfigurationChange: (listener: (configuration: KeyboardConfiguration) => void) => this.onConfigurationChange(listener),
+  }
 
   constructor(
     private readonly transport: DeviceTransport,
@@ -85,6 +89,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   close() {
     this.removeNotificationListener()
     this.modeListeners.clear()
+    this.configurationListeners.clear()
     this.commands.close()
   }
 
@@ -135,16 +140,30 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     return () => this.modeListeners.delete(listener)
   }
 
+  private onConfigurationChange(listener: (configuration: KeyboardConfiguration) => void) {
+    this.configurationListeners.add(listener)
+    return () => this.configurationListeners.delete(listener)
+  }
+
   /**
    * 真机抓包确认：硬件切换后会主动发送 Action 返回包，
-   * data 为 [Err Code, order, s_arg, ...]，order 0x21/0x22 且 s_arg=1 表示 WIN/Mac。
+   * data 为 [Err Code, order, s_arg, ...]：0x21/0x22 表示 WIN/Mac，0x70 表示配置槽。
    */
   private handleNotification(command: number, data: Uint8Array) {
-    if (command !== XSYD_COMMANDS.action.responseCode || data[0] !== 0 || data[2] !== 1) return
-    const mode = data[1] === XSYD_ACTIONS.queryWinMode ? 'win' : data[1] === XSYD_ACTIONS.queryMacMode ? 'mac' : undefined
-    if (!mode || mode === this.currentMode) return
-    this.currentMode = mode
-    for (const listener of this.modeListeners) listener(mode)
+    if (command !== XSYD_COMMANDS.action.responseCode || data[0] !== 0) return
+    const order = data[1]
+    const value = data[2]
+    if (value === 1 && (order === XSYD_ACTIONS.queryWinMode || order === XSYD_ACTIONS.queryMacMode)) {
+      const mode: KeyboardMode = order === XSYD_ACTIONS.queryWinMode ? 'win' : 'mac'
+      if (mode === this.currentMode) return
+      this.currentMode = mode
+      for (const listener of this.modeListeners) listener(mode)
+      return
+    }
+    if (order === XSYD_ACTIONS.switchConfiguration && value !== undefined && value <= 3) {
+      const configuration = (value + 1) as KeyboardConfiguration
+      for (const listener of this.configurationListeners) listener(configuration)
+    }
   }
 
   /** 模式/配置切换后给固件留出完成内部状态切换的时间，再读取新配置。 */

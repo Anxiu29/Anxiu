@@ -91,6 +91,11 @@ export class DeviceSession {
     return this.load()
   }
 
+  /** 与模式事件一样，只暴露领域中的配置编号，不向状态层泄漏 0x70。 */
+  onConfigurationChange(listener: (configuration: KeyboardConfiguration) => void) {
+    return this.device.configurationSwitch?.onConfigurationChange?.(listener) ?? (() => undefined)
+  }
+
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {
     if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
     // 默认值按“层 + 物理位置”索引，同一个物理键在不同 Fn 层可以有不同默认功能。

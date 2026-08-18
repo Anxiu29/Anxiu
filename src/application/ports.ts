@@ -40,6 +40,8 @@ export interface SystemModeCapability {
 
 export interface ConfigurationSwitchCapability {
   switchConfiguration(configuration: KeyboardConfiguration): Promise<void>
+  /** 监听键盘快捷键触发的配置槽变化。 */
+  onConfigurationChange?(listener: (configuration: KeyboardConfiguration) => void): () => void
 }
 
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */

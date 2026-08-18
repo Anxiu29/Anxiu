@@ -201,4 +201,25 @@ describe('DeviceSession', () => {
     expect(configuration.assignments[0]?.keyCode).toBe(3)
     expect(session.draft[2]?.keyCode).toBe(4)
   })
+
+  it('forwards hardware configuration changes without exposing action 0x70', () => {
+    let notifyConfiguration: ((configuration: 1 | 2 | 3 | 4) => void) | undefined
+    const device: KeyboardDevice = {
+      profile: { getProfile: async () => profile() },
+      configurationSwitch: {
+        switchConfiguration: async () => undefined,
+        onConfigurationChange: (listener) => { notifyConfiguration = listener; return () => { notifyConfiguration = undefined } },
+      },
+      close: () => undefined,
+    }
+    const session = new DeviceSession(device, HID_KEY_CATALOG)
+    const received: number[] = []
+    const stop = session.onConfigurationChange((configuration) => received.push(configuration))
+
+    notifyConfiguration?.(2)
+    stop()
+    notifyConfiguration?.(3)
+
+    expect(received).toEqual([2])
+  })
 })
