@@ -1,8 +1,7 @@
 import type { KeyPosition } from '@/domain/keyboard'
 import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import type { DevicePresentation } from '@/ui/DevicePresentation'
-import overviewImageUrl from '@/assets/c98-keyboard.webp'
-import sidebarImageUrl from '@/assets/c98-keyboard-transparent.png'
+import keyboardImageUrl from '@/assets/c98-keyboard-transparent.png'
 
 type VisualKey = Readonly<{ sourceCode: number; x: number; y: number; width?: number; height?: number }>
 
@@ -72,8 +71,8 @@ export const c98KeyGeometry: KeyGeometryResolver = (key: KeyPosition) =>
 /** C98 的所有 UI 专用知识集中在设备目录，共享组件只接收 DevicePresentation。 */
 export const C98_PRESENTATION: DevicePresentation = {
   keyGeometry: c98KeyGeometry,
-  overviewImageUrl,
-  sidebarImageUrl,
+  overviewImageUrl: keyboardImageUrl,
+  sidebarImageUrl: keyboardImageUrl,
   overviewImageAlt: 'C98(739) 单模 US 带旋钮键盘大图',
   solutionName: '星闪',
 }
