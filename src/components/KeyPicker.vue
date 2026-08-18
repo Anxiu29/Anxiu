@@ -92,7 +92,7 @@ const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? 
       </div>
       <div v-if="extendedKeys.length" class="extended-key-list">
         <button v-for="item in extendedKeys" :key="item.code" :class="{ active: current === item.code }" :disabled="disabled" @click="emit('select', item.code)">
-          <span>{{ item.label }}</span><small>0x{{ item.code.toString(16).padStart(4, '0').toUpperCase() }}</small>
+          <span>{{ item.label }}<em v-if="item.hint">{{ item.hint }}</em></span><small>0x{{ item.code.toString(16).padStart(4, '0').toUpperCase() }}</small>
         </button>
       </div>
       <div v-else class="extended-key-empty">当前分类没有匹配的按键</div>

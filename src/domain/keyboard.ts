@@ -18,6 +18,8 @@ export interface KeyDefinition {
   code: number
   label: string
   category: KeyCategory
+  /** 选择该功能前需要了解的设备操作提示，例如长按时长。 */
+  hint?: string
 }
 
 export interface KeyPosition {

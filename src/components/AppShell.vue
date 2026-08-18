@@ -53,7 +53,6 @@ watch(() => [props.error, props.message], ([error, message], [previousError, pre
       <div class="sidebar-configurations">
         <small>当前配置</small>
         <div><button v-for="configuration in configurations" :key="configuration" :class="{ active: activeConfiguration === configuration }" :disabled="navigationDisabled" :title="`切换到配置 ${configuration}`" @click="emit('select-configuration', configuration)">{{ configuration }}</button></div>
-        <p class="configuration-shortcut-hint">键盘快捷键需长按 5 秒才生效</p>
       </div>
 
       <nav class="sidebar-nav">

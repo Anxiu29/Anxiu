@@ -179,13 +179,6 @@ main {
   opacity: .5;
 }
 
-.configuration-shortcut-hint {
-  margin: 8px 0 0;
-  color: #687382;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -660,6 +653,7 @@ main {
 
 .extended-key-list button {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   padding: 11px;
   border: 1px solid #252c36;
@@ -667,6 +661,20 @@ main {
   color: #a9b1bd;
   background: #0c1017;
   font-size: 10px;
+}
+
+.extended-key-list button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.extended-key-list em {
+  color: #d9a74d;
+  font-size: 9px;
+  font-style: normal;
 }
 
 .extended-key-list button:hover,
