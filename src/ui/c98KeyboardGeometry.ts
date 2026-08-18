@@ -1,12 +1,5 @@
 import type { KeyPosition } from '@/domain/keyboard'
-
-export interface KeyGeometry {
-  x: number
-  y: number
-  width: number
-  height: number
-  rotation?: number
-}
+import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from './keyboardGeometry'
 
 type VisualKey = Readonly<{ sourceCode: number; x: number; y: number; width?: number; height?: number }>
 
@@ -68,9 +61,5 @@ const geometryBySourceCode = new Map<number, KeyGeometry>(visualKeys.map((key) =
 }]))
 
 /** 视觉坐标只在 UI 渲染时附加；协议返回的 KeyPosition 不携带宽高。 */
-export const c98KeyGeometry = (key: KeyPosition): KeyGeometry => geometryBySourceCode.get(key.sourceCode) ?? {
-  x: key.address.kind === 'matrix' ? key.address.column : key.address.index,
-  y: key.address.kind === 'matrix' ? key.address.row : 0,
-  width: 1,
-  height: 1,
-}
+export const c98KeyGeometry: KeyGeometryResolver = (key: KeyPosition) =>
+  geometryBySourceCode.get(key.sourceCode) ?? matrixKeyGeometry(key)

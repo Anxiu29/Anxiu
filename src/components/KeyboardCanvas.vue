@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { KeyAssignment, KeyPosition } from '@/domain/keyboard'
-import { c98KeyGeometry, type KeyGeometry } from '@/ui/c98KeyboardGeometry'
+import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 
-const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; unit?: number }>(), { unit: 58, defaultAssignments: () => [] })
+const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; unit?: number; geometry?: KeyGeometryResolver }>(), { unit: 58, defaultAssignments: () => [], geometry: matrixKeyGeometry })
 const emit = defineEmits<{
   select: [id: string]
   contextmenu: [payload: { positionId: string; clientX: number; clientY: number }]
@@ -18,7 +18,7 @@ const labelFor = (code: number) => props.keyLabels[code] ?? `0x${code.toString(1
 const gap = 6
 type RenderedKey = KeyPosition & { geometry: KeyGeometry }
 const renderedPositions = computed<RenderedKey[]>(() => props.positions
-  .map((key) => ({ ...key, geometry: c98KeyGeometry(key) }))
+  .map((key) => ({ ...key, geometry: props.geometry(key) }))
   .sort((a, b) => a.geometry.y - b.geometry.y || a.geometry.x - b.geometry.x))
 const canvasStyle = computed(() => ({
   width: `${Math.max(...renderedPositions.value.map((key) => key.geometry.x + key.geometry.width), 1) * props.unit + gap}px`,

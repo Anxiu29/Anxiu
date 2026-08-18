@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { KeyboardProfile } from '@/domain/keyboard'
-import keyboardImageUrl from '@/assets/c98-keyboard.webp'
 
-defineProps<{ profile: KeyboardProfile; busy?: boolean }>()
+defineProps<{ profile: KeyboardProfile; busy?: boolean; imageUrl?: string; imageAlt?: string }>()
 const emit = defineEmits<{ reload: [] }>()
 </script>
 
@@ -12,7 +11,7 @@ const emit = defineEmits<{ reload: [] }>()
 
     <div class="overview-device panel">
       <div class="overview-image">
-        <img :src="keyboardImageUrl" alt="C98(739) 单模 US 带旋钮键盘大图" />
+        <img :src="imageUrl" :alt="imageAlt || `${profile.device.productName} 键盘大图`" />
       </div>
       <div class="overview-details">
         <div class="overview-device-title">

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
-import keyboardImageUrl from '@/assets/c98-keyboard-transparent.png'
 
 type WorkspaceView = 'device' | 'keymap'
 
@@ -11,6 +10,7 @@ const props = withDefaults(defineProps<{
   navigationDisabled?: boolean
   error?: string
   message?: string
+  sidebarImageUrl?: string
 }>(), { activeConfiguration: 1 })
 
 const emit = defineEmits<{
@@ -43,7 +43,7 @@ watch(() => [props.error, props.message], ([error, message], [previousError, pre
         <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="sidebarCollapsed ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'" /></svg>
       </button>
       <div class="sidebar-device">
-        <img :src="keyboardImageUrl" alt="" />
+        <img :src="sidebarImageUrl" alt="" />
         <div><small>当前设备</small><strong>{{ profile.device.productName }}</strong></div>
       </div>
 

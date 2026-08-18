@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { KeyboardMode, KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
+import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
 
@@ -15,6 +16,7 @@ const props = defineProps<{
   selectedAssignment?: KeyAssignment
   keyOptions: readonly KeyDefinition[]
   keyLabels: Record<number, string>
+  keyGeometry?: KeyGeometryResolver
 }>()
 
 const emit = defineEmits<{
@@ -86,7 +88,7 @@ onBeforeUnmount(() => {
   <div class="keymap-workspace">
     <section class="editor panel compact-keymap-editor">
       <div class="current-keyboard-pane">
-        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :default-assignments="layerDefaults" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" @select="emit('select-position', $event)" @contextmenu="openKeyContextMenu" />
+        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :default-assignments="layerDefaults" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="emit('select-position', $event)" @contextmenu="openKeyContextMenu" />
       </div>
 
       <aside class="keymap-side-controls">

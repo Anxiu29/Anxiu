@@ -4,6 +4,7 @@ import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
 import type { KeyboardProfile } from '@/domain/keyboard'
+import { c98KeyGeometry } from '@/ui/c98KeyboardGeometry'
 
 const profile: KeyboardProfile = {
   device: { productName: 'RK-C98 Test', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1', protocolVersion: '1.0.7', runMode: 'app' },
@@ -171,12 +172,12 @@ describe('connected workspace navigation', () => {
     expect(wrapper.emitted('select-mode')).toEqual([['mac']])
   })
 
-  it('scales the physical keyboard with both fullscreen width and height', async () => {
+  it('scales an injected device geometry with both fullscreen width and height', async () => {
     const originalWidth = window.innerWidth
     const originalHeight = window.innerHeight
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 880 })
-    const wrapper = mount(KeymapWorkspace, { props: { profile, status: 'ready', layer: 0, mode: 'win', dirty: false, assignments: profile.assignments, keyOptions: [], keyLabels: { 4: 'A' } } })
+    const wrapper = mount(KeymapWorkspace, { props: { profile, status: 'ready', layer: 0, mode: 'win', dirty: false, assignments: profile.assignments, keyOptions: [], keyLabels: { 4: 'A' }, keyGeometry: c98KeyGeometry } })
 
     expect(Number.parseFloat((wrapper.find('.keyboard-layout').element as HTMLElement).style.width)).toBeCloseTo(123.6)
 
