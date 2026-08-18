@@ -6,4 +6,6 @@ export interface DevicePresentation {
   overviewImageUrl: string
   sidebarImageUrl: string
   overviewImageAlt?: string
+  /** 面向用户展示的设备方案名称；不是用于能力判断的内部协议版本号。 */
+  solutionName: string
 }

@@ -7,13 +7,14 @@ import { createDriverState } from './driverState'
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
     clearFeedback(); status.value = 'connecting'; demo.value = useDemo; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       state.session = await driverService.connect({ demo: useDemo, onDisconnect: handleDisconnect })
+      driverId.value = driverService.driverId
       await readProfile()
       message.value = useDemo ? '已进入演示模式' : '键盘连接成功'
     } catch (cause) { fail(cause) }
@@ -25,6 +26,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       state.session = await driverService.reconnectAuthorized({ onDisconnect: handleDisconnect })
       if (!state.session) { status.value = 'idle'; return }
+      driverId.value = driverService.driverId
       await readProfile()
     } catch (cause) { fail(cause) }
   }
@@ -84,6 +86,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       await state.session.restoreFactory()
       await driverService.disconnect()
       state.session = undefined
+      driverId.value = undefined
       profile.value = undefined
       selectedPositionId.value = undefined
       revision.value++
@@ -152,5 +155,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

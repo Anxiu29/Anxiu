@@ -13,6 +13,11 @@ const forbiddenImports = (directory: string, forbidden: RegExp) => filesBelow(jo
   return violations.map((line) => `${relative(sourceRoot, path)}: ${line.trim()}`)
 })
 
+const modelNamesInSharedSource = ['application', 'domain', 'protocol', 'transport', 'stores', 'components', 'ui']
+  .flatMap((directory) => filesBelow(join(sourceRoot, directory)))
+  .filter((path) => /\b(?:C98|RK-C98)\b/i.test(readFileSync(path, 'utf8')))
+  .map((path) => relative(sourceRoot, path))
+
 describe('dependency boundaries', () => {
   it('keeps domain independent from application and adapters', () => {
     expect(forbiddenImports('domain', /vue|pinia|@\/application|@\/(protocol|transport|devices|stores|components|composition)/)).toEqual([])
@@ -33,5 +38,10 @@ describe('dependency boundaries', () => {
 
   it('keeps stores dependent on application contracts instead of concrete adapters or the composition root', () => {
     expect(forbiddenImports('stores', /@\/(protocol|transport|devices|composition)/)).toEqual([])
+  })
+
+  it('keeps concrete model names out of shared source', () => {
+    expect(modelNamesInSharedSource).toEqual([])
+    expect(readFileSync(join(sourceRoot, 'App.vue'), 'utf8')).not.toMatch(/\b(?:C98|RK-C98)\b/i)
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { C98_DEMO_KEYS, C98_PHYSICAL_KEY_ROWS } from '@/devices/c98/layout'
-import { c98KeyGeometry } from '@/ui/c98KeyboardGeometry'
+import { c98KeyGeometry } from '@/devices/c98/presentation'
 
 describe('C98 physical data and UI geometry', () => {
   it('keeps the device layout limited to the 101 captured matrix keys', () => {

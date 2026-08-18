@@ -1,5 +1,5 @@
 import type { KeyboardDevice } from '@/application/ports'
-import type { DeviceCapabilities, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
+import type { DeviceCapabilities, DeviceInfo, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import { cloneAssignments } from '@/domain/keyboard'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { MatrixKeyInput } from '@/domain/layout'
@@ -30,17 +30,17 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
     demoKeys: readonly MatrixKeyInput[],
     capabilityDescriptor: CapabilityDescriptor,
     private readonly resolveDefaultKeymap: DefaultKeymapResolver,
+    private readonly deviceInfo: DeviceInfo,
   ) {
     this.positions = demoKeys.map((key) => ({ ...key, label: this.keyCatalog.get(key.sourceCode).label }))
-    const device = { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app' as const, boardId: 'DEMO98' }
-    this.capabilities = capabilityDescriptor.resolve({ device, protocolVersion: device.protocolVersion })
+    this.capabilities = capabilityDescriptor.resolve({ device: this.deviceInfo, protocolVersion: this.deviceInfo.protocolVersion })
     this.initial = this.defaultsFor('win')
     this.stored = cloneAssignments(this.initial)
     this.working = cloneAssignments(this.initial)
   }
   async getProfile(): Promise<KeyboardProfile> {
     await this.wait()
-    return { device: { productName: 'RK-C98 Demo', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1-demo', protocolVersion: '1.0.7', runMode: 'app', boardId: 'DEMO98' }, capabilities: this.capabilities, positions: this.positions, defaultAssignments: cloneAssignments(this.defaultsFor(this.currentMode)), assignments: cloneAssignments(this.working) }
+    return { device: { ...this.deviceInfo }, capabilities: this.capabilities, positions: this.positions, defaultAssignments: cloneAssignments(this.defaultsFor(this.currentMode)), assignments: cloneAssignments(this.working) }
   }
   async writeAssignments(assignments: KeyAssignment[]) {
     await this.wait()

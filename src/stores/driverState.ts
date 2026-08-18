@@ -16,6 +16,8 @@ export const createDriverState = () => {
   const errorCode = ref<DriverErrorCode>()
   const message = ref('')
   const demo = ref(false)
+  // 表现层通过驱动 id 选择对应图片、几何和方案名称，不根据 VID/PID 猜设备型号。
+  const driverId = ref<string>()
   const revision = ref(0)
   const saveProgress = ref<SaveProgress>()
   // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
@@ -31,7 +33,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
-    demo, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }

@@ -61,7 +61,7 @@ MatrixAddress                  UI KeyGeometry
 - `domain/layout.ts` 只定义物理地址；`KeyPosition` 不再携带视觉宽高。
 - `protocol/KeyboardProtocol.ts` 只返回 `0x2B` 实读的键值和矩阵行列。
 - `devices/c98/layout.ts` 只保存恢复出厂后读取到的 101 个物理矩阵键，供演示和校验使用。
-- `ui/c98KeyboardGeometry.ts` 保存 C98 的页面坐标和键帽大小，组合根把它作为 `KeyGeometryResolver` 注入 `KeyboardCanvas`；通用组件只保留矩阵坐标回退实现。
+- `devices/c98/presentation.ts` 保存该设备的页面坐标、键帽大小、图片和方案名称，设备目录把它作为 `DevicePresentation` 交给组合根；通用组件只保留矩阵坐标回退实现。
 
 因此，修改键帽间距、宽高或分区只会改动 UI；不会污染协议读取结果或出厂层数据。
 
@@ -72,7 +72,7 @@ MatrixAddress                  UI KeyGeometry
 1. 在 `devices/<model>/layout.ts` 定义设备返回的物理矩阵键。
 2. 复用现有协议和传输实现。
 3. 在 UI 层提供该型号的视觉几何映射，由组合根注入通用画布；在设备驱动中注入键码目录、能力和默认键位解析器。
-4. 在组合根注册驱动。
+4. 在 `devices/catalog.ts` 登记驱动和表现配置；组合根无需添加具体型号判断。
 
 ### 新增另一套协议
 
@@ -156,6 +156,12 @@ Windows/Mac 是两套独立的系统模式，每套都有 Fn1–Fn4 四层。UI 
 “公共契约需要串行修改”不是说其他层不能并行，而是说被多层共同依赖的接口要先确定版本。比如 `KeyboardDevice`、`KeyboardProfile` 和 `DefaultKeymapResolver` 的字段一旦变化，应用、协议、设备和测试都可能同时需要适配。如果两个 AI 同时以不同假设修改同一个接口，即使修改了不同文件、Git 也没有文本冲突，合并后仍可能出现语义冲突。
 
 推荐顺序：契约负责人先提交接口和契约测试；各层 AI 基于同一个提交，在独立 worktree 中并行实现；最后由一个集成人员修改 `composition/root.ts`。实现期间，普通功能分支不修改公共契约、组合根和全局入口。`tests/dependency-boundaries.test.ts` 会阻止协议重新依赖设备、通用组件依赖具体型号，以及 Store 直接依赖协议、传输、设备或组合根。
+
+## 方案协议与内部协议版本为什么分开
+
+设备首页展示的是用户能理解的方案名称，由 `DevicePresentation.solutionName` 提供。某款设备可以显示“星闪”，另一款设备可以显示自己的方案名称，通用组件不写型号判断。
+
+`DeviceInfo.protocolVersion` 仍保留真实协议版本，例如固件查询得到的 `1.0.7`。它用于能力分支、兼容性判断、协议诊断和测试，不直接作为设备首页的营销方案名称。两者分开后，修改 UI 文案不会破坏底层版本判断，协议升级也不会要求通用组件理解具体方案。
 
 键值 `0xF100 (61696)` 的“恢复出厂设置”是可以分配给物理键的设备功能键，与网页上的“恢复全部按键默认”按钮无关。后续核对协议时，以仓库内 Excel 原始协议为主，并参考[星闪悦动设备信息文档](https://sparklinkplayjoy.github.io/keyboard-docs/keyboard/api/info.html)。
 

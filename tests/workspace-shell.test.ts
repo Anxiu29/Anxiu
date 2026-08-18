@@ -5,7 +5,7 @@ import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
 import type { KeyboardProfile } from '@/domain/keyboard'
-import { c98KeyGeometry } from '@/ui/c98KeyboardGeometry'
+import { c98KeyGeometry } from '@/devices/c98/presentation'
 
 const profile: KeyboardProfile = {
   device: { productName: 'RK-C98 Test', vendorId: 0x1ca2, productId: 0x1604, firmwareVersion: '1.0.1', protocolVersion: '1.0.7', runMode: 'app' },
@@ -17,12 +17,14 @@ const profile: KeyboardProfile = {
 
 describe('connected workspace navigation', () => {
   it('uses the product image as a button that requests the keymap workspace', async () => {
-    const wrapper = mount(DeviceOverview, { props: { profile } })
+    const wrapper = mount(DeviceOverview, { props: { profile, solutionName: '星闪' } })
 
     expect(wrapper.find('.overview-image img').attributes('alt')).toContain('键盘大图')
     expect(wrapper.find('.overview-image').element.tagName).toBe('BUTTON')
     expect(wrapper.find('.image-lightbox').exists()).toBe(false)
     expect(wrapper.find('.device-specs').exists()).toBe(true)
+    expect(wrapper.find('.device-specs').text()).toContain('方案协议')
+    expect(wrapper.find('.device-specs').text()).toContain('星闪')
 
     await wrapper.find('.overview-image').trigger('click')
     expect(wrapper.emitted('open-keymap')).toEqual([[]])

@@ -10,6 +10,7 @@ export interface ConnectOptions {
 /** UI 无关的应用门面；React、Vue、桌面壳或测试都使用同一入口。 */
 export class KeyboardDriverService {
   private active?: DeviceSession
+  private activeDriverId?: string
 
   constructor(private readonly registry: DeviceDriverRegistry) {}
 
@@ -18,6 +19,7 @@ export class KeyboardDriverService {
   }
 
   get session() { return this.active }
+  get driverId() { return this.activeDriverId }
 
   async connect(options: ConnectOptions = {}) {
     // 同一时刻只保留一个活动会话，先关闭旧监听和传输，防止报告被两个会话消费。
@@ -26,6 +28,7 @@ export class KeyboardDriverService {
     this.active = options.demo
       ? driver.createDemoSession()
       : await driver.connect(options.onDisconnect ?? (() => undefined))
+    this.activeDriverId = driver.manifest.id
     return this.active
   }
 
@@ -34,11 +37,13 @@ export class KeyboardDriverService {
     await this.disconnect()
     const driver = options.driverId ? this.registry.get(options.driverId) : this.registry.defaultDriver
     this.active = await driver.reconnectAuthorized(options.onDisconnect ?? (() => undefined))
+    this.activeDriverId = this.active ? driver.manifest.id : undefined
     return this.active
   }
 
   async disconnect() {
     await this.active?.close()
     this.active = undefined
+    this.activeDriverId = undefined
   }
 }

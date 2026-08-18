@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { KeyboardProfile } from '@/domain/keyboard'
 
-defineProps<{ profile: KeyboardProfile; busy?: boolean; imageUrl?: string; imageAlt?: string }>()
-// 组件只展示注入的设备资源和领域 Profile，不直接认识 C98 图片或驱动实现。
+defineProps<{ profile: KeyboardProfile; busy?: boolean; imageUrl?: string; imageAlt?: string; solutionName?: string }>()
+// 组件只展示注入的设备资源和领域 Profile，不直接认识任何型号图片或驱动实现。
 const emit = defineEmits<{ reload: []; 'open-keymap': [] }>()
 </script>
 
@@ -21,7 +21,7 @@ const emit = defineEmits<{ reload: []; 'open-keymap': [] }>()
         </div>
         <div class="device-specs">
           <div><small>固件版本</small><strong>{{ profile.device.firmwareVersion }}</strong></div>
-          <div><small>协议版本</small><strong>{{ profile.device.protocolVersion }}</strong></div>
+          <div><small>方案协议</small><strong>{{ solutionName || '未知' }}</strong></div>
           <div><small>VID / PID</small><strong>{{ profile.device.vendorId.toString(16).padStart(4, '0').toUpperCase() }} / {{ profile.device.productId.toString(16).padStart(4, '0').toUpperCase() }}</strong></div>
           <div><small>配置层数</small><strong>{{ profile.capabilities.layers }}</strong></div>
         </div>

@@ -36,7 +36,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
-    // 协议需要默认值来组装 Profile，但默认表由设备层注入，协议不知道 C98 等具体型号。
+    // 协议需要默认值来组装 Profile，但默认表由设备层注入，协议不知道任何具体型号。
     const defaultAssignments = this.resolveDefaultKeymap({
       mode: this.currentMode,
       positions,

@@ -1,5 +1,5 @@
 import { StaticCapabilityDescriptor } from '@/domain/capabilities'
-import { C98_DEVICE } from '@/config/devices'
+import { C98_DEVICE } from './device'
 
 export const C98_CAPABILITIES = new StaticCapabilityDescriptor('rk-c98-v1', {
   layers: C98_DEVICE.layers,

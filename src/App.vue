@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { devicePresentation, useDriverStore } from '@/composition/root'
+import { getDevicePresentation, useDriverStore } from '@/composition/root'
 import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
 
 const store = useDriverStore()
 // storeToRefs 保留 Pinia 响应性；操作方法仍直接通过 store 调用。
-const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, demo } = storeToRefs(store)
+const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, demo, driverId } = storeToRefs(store)
+// 当前驱动决定设备表现；共享 App 不包含型号名称、图片或配列判断。
+const devicePresentation = computed(() => getDevicePresentation(driverId.value))
 // 切换真机/演示或重新连接时重建工作区壳，清理旧页面内部的导航与弹窗状态。
 const shellRevision = ref(0)
 const labels: Record<string, string> = { idle: '待连接', connecting: '连接中', reading: '读取中', ready: '已就绪', writing: '写入中', disconnected: '已断开', error: '发生错误', unsupported: '不支持' }
@@ -33,16 +35,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
     <section v-if="!profile" class="hero">
       <div class="hero-orb"></div>
-      <span class="eyebrow">WEBHID · C98</span>
+      <span class="eyebrow">WEBHID · KEYBOARD</span>
       <h1>把每一次触发，<br /><em>调成你的手感。</em></h1>
-      <p>连接 RK-C98，读取键盘配置并直接在浏览器中完成键位映射。配置写入后会自动回读验证。</p>
+      <p>连接键盘，读取设备配置并直接在浏览器中完成键位映射。配置写入后会自动回读验证。</p>
       <div class="hero-actions"><button class="primary large" :disabled="busy()" @click="connect(false)">连接我的键盘</button><button class="text-button" :disabled="busy()" @click="connect(true)">没有设备？体验演示</button></div>
       <div class="requirements"><span>● Chrome 89+</span><span>● Edge 89+</span><span>● USB HID</span><span>● HTTPS</span></div>
       <div v-if="error || message" class="notice" :class="{ error }">{{ error || message }}</div>
     </section>
 
     <AppShell v-else :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :sidebar-image-url="devicePresentation.sidebarImageUrl" @select-configuration="store.selectConfiguration" @restore-factory="store.restoreFactory">
-      <template #device="{ openKeymap }"><DeviceOverview :profile="profile" :busy="busy()" :image-url="devicePresentation.overviewImageUrl" :image-alt="devicePresentation.overviewImageAlt" @reload="store.reload" @open-keymap="openKeymap" /></template>
+      <template #device="{ openKeymap }"><DeviceOverview :profile="profile" :busy="busy()" :image-url="devicePresentation.overviewImageUrl" :image-alt="devicePresentation.overviewImageAlt" :solution-name="devicePresentation.solutionName" @reload="store.reload" @open-keymap="openKeymap" /></template>
       <template #keymap>
         <KeymapWorkspace :profile="profile" :status="status" :layer="layer" :mode="mode" :selected-position-id="selectedPositionId" :dirty="dirty" :assignments="assignments" :selected-assignment="selectedAssignment" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-layer="store.selectLayer" @select-mode="store.selectMode" @select-position="selectedPositionId = $event" @assign-key="store.assignKey" @restore-defaults="store.restoreAllKeyDefaults" @restore-key="store.restoreKeyDefault" />
       </template>
