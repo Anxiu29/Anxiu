@@ -166,6 +166,9 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       void syncExternalMode(observedSession, targetMode)
     })
     removeConfigurationListener = observedSession.onConfigurationChange((configuration) => {
+      if (state.session !== observedSession || activeConfiguration.value === configuration) return
+      // 主动包已经是键盘确认后的最终状态，先切换左侧高亮，不必等待四层键值全部回读。
+      activeConfiguration.value = configuration
       void syncExternalConfiguration(observedSession, configuration)
     })
   }
@@ -200,7 +203,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   /** 键盘快捷键切换配置槽后，重读该槽的四层映射并同步左侧配置按钮。 */
   async function syncExternalConfiguration(observedSession: NonNullable<typeof state.session>, configuration: KeyboardConfiguration) {
-    if (state.session !== observedSession || activeConfiguration.value === configuration || status.value === 'disconnected') return
+    if (state.session !== observedSession || status.value === 'disconnected') return
     if (['connecting', 'reading', 'writing'].includes(status.value)) {
       setTimeout(() => void syncExternalConfiguration(observedSession, configuration), 100)
       return
@@ -209,7 +212,6 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       profile.value = await observedSession.load()
       if (state.session !== observedSession) return
-      activeConfiguration.value = configuration
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
       revision.value++
