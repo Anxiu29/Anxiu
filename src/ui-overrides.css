@@ -179,6 +179,13 @@ main {
   opacity: .5;
 }
 
+.configuration-shortcut-hint {
+  margin: 8px 0 0;
+  color: #687382;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
