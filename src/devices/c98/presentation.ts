@@ -3,6 +3,7 @@ import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@
 import type { DevicePresentation } from '@/ui/DevicePresentation'
 import keyboardImageUrl from '@/assets/c98-keyboard-transparent.png'
 import { C98_EXTENDED_KEY_CODES } from './extendedKeys'
+import { C98_LIGHTING_MODES } from './lightingModes'
 
 type VisualKey = Readonly<{ sourceCode: number; x: number; y: number; width?: number; height?: number }>
 
@@ -77,4 +78,5 @@ export const C98_PRESENTATION: DevicePresentation = {
   sidebarImageUrl: keyboardImageUrl,
   overviewImageAlt: 'C98(739) 单模 US 带旋钮键盘大图',
   solutionName: '星闪',
+  lightingModes: C98_LIGHTING_MODES,
 }

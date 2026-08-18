@@ -49,7 +49,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <template #keymap>
         <KeymapWorkspace :profile="profile" :status="status" :layer="layer" :mode="mode" :selected-position-id="selectedPositionId" :dirty="dirty" :assignments="assignments" :selected-assignment="selectedAssignment" :key-options="keyOptions" :extended-key-codes="devicePresentation.extendedKeyCodes" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-layer="store.selectLayer" @select-mode="store.selectMode" @select-position="selectedPositionId = $event" @assign-key="store.assignKey" @restore-defaults="store.restoreAllKeyDefaults" @restore-key="store.restoreKeyDefault" />
       </template>
-      <template #lighting><LightingWorkspace :settings="lighting" :status="status" :profile="profile" :assignments="assignments" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @update="store.updateLighting" @reload="store.reloadLighting" /></template>
+      <template #lighting><LightingWorkspace :settings="lighting" :status="status" :profile="profile" :assignments="assignments" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" :lighting-modes="devicePresentation.lightingModes" @update="store.updateLighting" @reload="store.reloadLighting" /></template>
     </AppShell>
 
     <footer><span>ANXIU STUDIO · v0.1.0</span><span>配置仅在本地与设备间传输</span></footer>

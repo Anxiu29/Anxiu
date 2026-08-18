@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
+import type { LightingModePresentation } from '@/ui/DevicePresentation'
 import { cloneLightingSettings, type LightingSettings } from '@/domain/lighting'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 
@@ -12,12 +13,10 @@ const props = defineProps<{
   assignments: KeyAssignment[]
   keyLabels: Record<number, string>
   keyGeometry?: KeyGeometryResolver
+  lightingModes: readonly LightingModePresentation[]
 }>()
 const emit = defineEmits<{ update: [settings: LightingSettings]; reload: [] }>()
 const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.status))
-
-// 方案协议只给出了 0～20 的模式编号，名称尚未得到实机资料确认，因此先用稳定编号展示。
-const modes = Array.from({ length: 21 }, (_, mode) => ({ mode, label: mode === 0 ? '静态灯光' : `动态灯效 ${mode}` }))
 
 const update = (patch: Partial<LightingSettings>) => {
   if (!props.settings || busy.value) return
@@ -55,7 +54,7 @@ const updatePrimaryColor = (color: string) => {
         <div class="lighting-panel-section lighting-modes">
           <div class="lighting-section-title"><h3>灯效模式</h3><small>{{ settings.open ? '主灯开启' : '主灯关闭' }}</small></div>
           <div class="lighting-mode-grid">
-            <button v-for="item in modes" :key="item.mode" class="lighting-mode-button" type="button" :class="{ active: settings.mode === item.mode }" :disabled="busy || !settings.open" @click="update({ mode: item.mode })">{{ item.label }}</button>
+            <button v-for="item in lightingModes" :key="item.value" class="lighting-mode-button" type="button" :class="{ active: settings.mode === item.value }" :disabled="busy || !settings.open" @click="update({ mode: item.value })">{{ item.label }}</button>
           </div>
         </div>
 

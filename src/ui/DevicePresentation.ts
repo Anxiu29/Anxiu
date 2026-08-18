@@ -1,5 +1,11 @@
 import type { KeyGeometryResolver } from './keyboardGeometry'
 
+/** 固件灯效编号在 UI 中的型号专属名称；编号仍由设备协议负责传输。 */
+export interface LightingModePresentation {
+  value: number
+  label: string
+}
+
 /** 设备在 Vue UI 中的纯表现资源；由组合根选择，不进入领域或协议模型。 */
 export interface DevicePresentation {
   keyGeometry: KeyGeometryResolver
@@ -10,4 +16,6 @@ export interface DevicePresentation {
   overviewImageAlt?: string
   /** 面向用户展示的设备方案名称；不是用于能力判断的内部协议版本号。 */
   solutionName: string
+  /** 不同型号支持的灯效数量和命名可能不同，因此由设备目录提供给公共 UI。 */
+  lightingModes: readonly LightingModePresentation[]
 }
