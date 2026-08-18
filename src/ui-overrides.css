@@ -407,10 +407,13 @@ main {
 }
 
 .overview-image img {
+  display: block;
   width: 100%;
+  max-width: 100%;
   height: min(470px, calc(100vh - 330px));
   min-height: 360px;
-  object-fit: cover;
+  /* 设备图可能是很宽的透明 PNG；contain 会完整缩放，避免 cover 裁掉左右键区。 */
+  object-fit: contain;
   object-position: center;
 }
 
