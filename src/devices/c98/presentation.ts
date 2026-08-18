@@ -79,4 +79,9 @@ export const C98_PRESENTATION: DevicePresentation = {
   overviewImageAlt: 'C98(739) 单模 US 带旋钮键盘大图',
   solutionName: '星闪',
   lightingModes: C98_LIGHTING_MODES,
+  // C98 实机回读与官方 UI 均使用 0～4 五档，3 对应滑块的 75% 位置。
+  lightingRanges: {
+    luminance: { min: 0, max: 4, step: 1 },
+    speed: { min: 0, max: 4, step: 1 },
+  },
 }

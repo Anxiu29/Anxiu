@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
-import type { LightingModePresentation } from '@/ui/DevicePresentation'
+import type { LightingModePresentation, LightingRangePresentation } from '@/ui/DevicePresentation'
 import { cloneLightingSettings, type LightingSettings } from '@/domain/lighting'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 
@@ -14,9 +14,21 @@ const props = defineProps<{
   keyLabels: Record<number, string>
   keyGeometry?: KeyGeometryResolver
   lightingModes: readonly LightingModePresentation[]
+  lightingRanges: { luminance: LightingRangePresentation; speed: LightingRangePresentation }
 }>()
 const emit = defineEmits<{ update: [settings: LightingSettings]; reload: [] }>()
 const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.status))
+const luminanceDraft = ref(0)
+const speedDraft = ref(0)
+
+// 拖动时只更新本地显示，松手后再写入设备，避免一次拖动产生多次 HID 写入。
+watch(() => props.settings?.luminance, (value) => { if (value !== undefined) luminanceDraft.value = value }, { immediate: true })
+watch(() => props.settings?.speed, (value) => { if (value !== undefined) speedDraft.value = value }, { immediate: true })
+
+const rangeProgress = (value: number, range: LightingRangePresentation) => ({
+  '--range-progress': `${Math.max(0, Math.min(100, ((value - range.min) / Math.max(1, range.max - range.min)) * 100))}%`,
+})
+const rangeValue = (event: Event) => Number((event.target as HTMLInputElement).value)
 
 const update = (patch: Partial<LightingSettings>) => {
   if (!props.settings || busy.value) return
@@ -34,27 +46,16 @@ const updatePrimaryColor = (color: string) => {
 
 <template>
   <section class="lighting-workspace">
-    <header class="lighting-header">
-      <div>
-        <h2>灯光设置</h2>
-        <p>设备灯效预览与主灯参数设置</p>
-      </div>
-      <div class="lighting-actions">
-        <span class="lighting-status">{{ status === 'writing' ? '正在写入并回读…' : '修改后即时写入并回读' }}</span>
-        <button class="lighting-refresh" type="button" :disabled="busy" @click="emit('reload')">重新读取</button>
-      </div>
-    </header>
-
     <template v-if="settings">
-      <section class="panel lighting-keyboard-preview" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / 100)) : 0 }">
-        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="36" />
+      <section class="panel lighting-keyboard-preview" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }">
+        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="44" />
       </section>
 
       <section class="panel lighting-dashboard">
         <div class="lighting-panel-section lighting-modes">
           <div class="lighting-section-title"><h3>灯效模式</h3><small>{{ settings.open ? '主灯开启' : '主灯关闭' }}</small></div>
           <div class="lighting-mode-grid">
-            <button v-for="item in lightingModes" :key="item.value" class="lighting-mode-button" type="button" :class="{ active: settings.mode === item.value }" :disabled="busy || !settings.open" @click="update({ mode: item.value })">{{ item.label }}</button>
+            <button v-for="item in lightingModes" :key="item.value" class="lighting-mode-button" type="button" :class="{ active: settings.mode === item.value }" :disabled="busy" @click="update({ mode: item.value, open: true })">{{ item.label }}</button>
           </div>
         </div>
 
@@ -62,12 +63,12 @@ const updatePrimaryColor = (color: string) => {
           <div class="lighting-section-title"><h3>灯效设置</h3></div>
           <div class="lighting-control-list">
             <div class="lighting-control">
-              <div class="lighting-control-value"><label for="lighting-luminance">亮度</label><output>{{ settings.luminance }}</output></div>
-              <input id="lighting-luminance" class="lighting-range" type="range" min="0" max="255" :value="settings.luminance" :disabled="busy || !settings.open" @change="update({ luminance: Number(($event.target as HTMLInputElement).value) })" />
+              <div class="lighting-control-value"><label for="lighting-luminance">亮度</label><output>{{ luminanceDraft }} / {{ lightingRanges.luminance.max }}</output></div>
+              <input id="lighting-luminance" class="lighting-range" type="range" :min="lightingRanges.luminance.min" :max="lightingRanges.luminance.max" :step="lightingRanges.luminance.step" :value="luminanceDraft" :style="rangeProgress(luminanceDraft, lightingRanges.luminance)" :disabled="busy || !settings.open" @input="luminanceDraft = rangeValue($event)" @change="update({ luminance: luminanceDraft })" />
             </div>
             <div class="lighting-control">
-              <div class="lighting-control-value"><label for="lighting-speed">速度</label><output>{{ settings.speed }}</output></div>
-              <input id="lighting-speed" class="lighting-range" type="range" min="0" max="255" :value="settings.speed" :disabled="busy || !settings.open || settings.mode === 0" @change="update({ speed: Number(($event.target as HTMLInputElement).value) })" />
+              <div class="lighting-control-value"><label for="lighting-speed">速度</label><output>{{ speedDraft }} / {{ lightingRanges.speed.max }}</output></div>
+              <input id="lighting-speed" class="lighting-range" type="range" :min="lightingRanges.speed.min" :max="lightingRanges.speed.max" :step="lightingRanges.speed.step" :value="speedDraft" :style="rangeProgress(speedDraft, lightingRanges.speed)" :disabled="busy || !settings.open || settings.mode === 0" @input="speedDraft = rangeValue($event)" @change="update({ speed: speedDraft })" />
             </div>
             <div class="lighting-inline-setting">
               <label class="lighting-toggle-label" for="lighting-direction">灯效方向 · {{ settings.direction ? '正向' : '反向' }}</label>
