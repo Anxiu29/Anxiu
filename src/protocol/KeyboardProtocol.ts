@@ -97,7 +97,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
   async getLighting() {
     // 官方 SDK 的读取也携带一份完整占位结构，不能只发送单独的 rw 字节。
-    const request = encodeMainLighting(DEFAULT_LIGHTING_SETTINGS, false, this.supportsDynamicColorId())
+    const request = encodeMainLighting({ ...DEFAULT_LIGHTING_SETTINGS, colors: [] }, false, this.supportsDynamicColorId())
     return decodeMainLighting(await this.commands.request(XSYD_COMMANDS.lighting, request))
   }
   async setLighting(settings: LightingSettings) {

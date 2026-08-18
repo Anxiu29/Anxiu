@@ -6,7 +6,8 @@ const typeForMode = (mode: number): LightingModeType => mode === 0 ? 'static' : 
 
 /** 官方 PRGB 格式：rw + 4 保留字节 + 7 个 BGR/FF + 4 保留字节 + 灯光参数。 */
 export function encodeMainLighting(settings: LightingSettings, write: boolean, includeDynamicColorId: boolean): Uint8Array {
-  const colors = Array.from({ length: 7 }, (_, index) => validColor(settings.colors[index] ?? '#000000'))
+  // 官方首次读取使用空 colors，写入和后续读取才可能携带最多七色；长度必须按实参生成。
+  const colors = settings.colors.slice(0, 7).map(validColor)
   const colorBytes = colors.flatMap((color) => [
     Number.parseInt(color.slice(5, 7), 16),
     Number.parseInt(color.slice(3, 5), 16),
