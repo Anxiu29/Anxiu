@@ -16,14 +16,15 @@ const visualKeys: readonly VisualKey[] = [
   { sourceCode: 0x3a, x: 2, y: 0 }, { sourceCode: 0x3b, x: 3, y: 0 }, { sourceCode: 0x3c, x: 4, y: 0 }, { sourceCode: 0x3d, x: 5, y: 0 },
   { sourceCode: 0x3e, x: 6.5, y: 0 }, { sourceCode: 0x3f, x: 7.5, y: 0 }, { sourceCode: 0x40, x: 8.5, y: 0 }, { sourceCode: 0x41, x: 9.5, y: 0 },
   { sourceCode: 0x42, x: 11, y: 0 }, { sourceCode: 0x43, x: 12, y: 0 }, { sourceCode: 0x44, x: 13, y: 0 }, { sourceCode: 0x45, x: 14, y: 0 },
-  { sourceCode: 0x4c, x: 15.4, y: 0 }, { sourceCode: 0x46, x: 16.8, y: 0 }, { sourceCode: 0x49, x: 17.8, y: 0 }, { sourceCode: 0x4a, x: 18.8, y: 0 },
+  // 出厂表 0-14~0-17：Print Screen、Insert、End、Home。
+  { sourceCode: 0x46, x: 15.4, y: 0 }, { sourceCode: 0x49, x: 16.8, y: 0 }, { sourceCode: 0x4d, x: 17.8, y: 0 }, { sourceCode: 0x4a, x: 18.8, y: 0 },
 
   // 数字行、独立导航列与数字键盘。
   { sourceCode: 0x35, x: 0, y: 1.5 },
   { sourceCode: 0x1e, x: 1, y: 1.5 }, { sourceCode: 0x1f, x: 2, y: 1.5 }, { sourceCode: 0x20, x: 3, y: 1.5 }, { sourceCode: 0x21, x: 4, y: 1.5 },
   { sourceCode: 0x22, x: 5, y: 1.5 }, { sourceCode: 0x23, x: 6, y: 1.5 }, { sourceCode: 0x24, x: 7, y: 1.5 }, { sourceCode: 0x25, x: 8, y: 1.5 },
   { sourceCode: 0x26, x: 9, y: 1.5 }, { sourceCode: 0x27, x: 10, y: 1.5 }, { sourceCode: 0x2d, x: 11, y: 1.5 }, { sourceCode: 0x2e, x: 12, y: 1.5 },
-  { sourceCode: 0x2a, x: 13, y: 1.5, width: 2 }, { sourceCode: 0x4b, x: 15.4, y: 1.5 },
+  { sourceCode: 0x2a, x: 13, y: 1.5, width: 2 }, { sourceCode: 0x4c, x: 15.4, y: 1.5 },
   { sourceCode: 0x53, x: 16.8, y: 1.5 }, { sourceCode: 0x54, x: 17.8, y: 1.5 }, { sourceCode: 0x55, x: 18.8, y: 1.5 }, { sourceCode: 0x56, x: 19.8, y: 1.5 },
 
   // QWERTY 行。
@@ -31,7 +32,7 @@ const visualKeys: readonly VisualKey[] = [
   { sourceCode: 0x14, x: 1.5, y: 2.5 }, { sourceCode: 0x1a, x: 2.5, y: 2.5 }, { sourceCode: 0x08, x: 3.5, y: 2.5 }, { sourceCode: 0x15, x: 4.5, y: 2.5 },
   { sourceCode: 0x17, x: 5.5, y: 2.5 }, { sourceCode: 0x1c, x: 6.5, y: 2.5 }, { sourceCode: 0x18, x: 7.5, y: 2.5 }, { sourceCode: 0x0c, x: 8.5, y: 2.5 },
   { sourceCode: 0x12, x: 9.5, y: 2.5 }, { sourceCode: 0x13, x: 10.5, y: 2.5 }, { sourceCode: 0x2f, x: 11.5, y: 2.5 }, { sourceCode: 0x30, x: 12.5, y: 2.5 },
-  { sourceCode: 0x31, x: 13.5, y: 2.5, width: 1.5 }, { sourceCode: 0x4e, x: 15.4, y: 2.5 },
+  { sourceCode: 0x31, x: 13.5, y: 2.5, width: 1.5 }, { sourceCode: 0x4b, x: 15.4, y: 2.5 },
   { sourceCode: 0x5f, x: 16.8, y: 2.5 }, { sourceCode: 0x60, x: 17.8, y: 2.5 }, { sourceCode: 0x61, x: 18.8, y: 2.5 }, { sourceCode: 0x57, x: 19.8, y: 2.5, height: 2 },
 
   // ASDF 行。
@@ -39,7 +40,8 @@ const visualKeys: readonly VisualKey[] = [
   { sourceCode: 0x04, x: 1.8, y: 3.5 }, { sourceCode: 0x16, x: 2.8, y: 3.5 }, { sourceCode: 0x07, x: 3.8, y: 3.5 }, { sourceCode: 0x09, x: 4.8, y: 3.5 },
   { sourceCode: 0x0a, x: 5.8, y: 3.5 }, { sourceCode: 0x0b, x: 6.8, y: 3.5 }, { sourceCode: 0x0d, x: 7.8, y: 3.5 }, { sourceCode: 0x0e, x: 8.8, y: 3.5 },
   { sourceCode: 0x0f, x: 9.8, y: 3.5 }, { sourceCode: 0x33, x: 10.8, y: 3.5 }, { sourceCode: 0x34, x: 11.8, y: 3.5 }, { sourceCode: 0x28, x: 12.8, y: 3.5, width: 2.2 },
-  { sourceCode: 0x4d, x: 15.4, y: 3.5 }, { sourceCode: 0x5c, x: 16.8, y: 3.5 }, { sourceCode: 0x5d, x: 17.8, y: 3.5 }, { sourceCode: 0x5e, x: 18.8, y: 3.5 },
+  // 出厂表 1-14、2-14、3-14：独立导航列从上到下为 Del、PgUp、PgDn。
+  { sourceCode: 0x4e, x: 15.4, y: 3.5 }, { sourceCode: 0x5c, x: 16.8, y: 3.5 }, { sourceCode: 0x5d, x: 17.8, y: 3.5 }, { sourceCode: 0x5e, x: 18.8, y: 3.5 },
 
   // ZXCV 行。上方向键保持参考图中的正常箭头簇位置，不额外下沉。
   { sourceCode: 0xe1, x: 0, y: 4.5, width: 2.2 },
