@@ -5,6 +5,7 @@ import { XSYD_FAILURE_RESPONSE, type CommandDefinition } from './commands'
 
 interface PendingRequest {
   definition: CommandDefinition
+  expectedOrder?: number
   resolve: (packet: Uint8Array) => void
   reject: (error: Error) => void
   timer: ReturnType<typeof setTimeout>
@@ -34,7 +35,7 @@ export class XsydCommandClient {
         this.pending = undefined
         reject(new DriverError('PROTOCOL_TIMEOUT', `设备响应超时（${definition.name}: 0x${definition.code.toString(16)}）`, true, { details: { command: definition.code, commandName: definition.name } }))
       }, timeoutMs)
-      this.pending = { definition, resolve, reject, timer }
+      this.pending = { definition, expectedOrder: definition.responseEchoesOrder ? data[0] : undefined, resolve, reject, timer }
       try {
         await this.transport.send(encodePacket(definition.code, data, this.crc))
       } catch (error) {
@@ -51,7 +52,7 @@ export class XsydCommandClient {
 
   /**
    * 命令响应由 request 消费；没有对应请求的主动上报从这里交给设备协议解释。
-   * 命令客户端只负责分流，不在公共层猜测 0xA3 对某款键盘意味着什么。
+   * 命令客户端只负责分流，不在公共层解释某款键盘的主动包含义。
    */
   onNotification(listener: (packet: ProtocolPacket) => void) {
     this.notificationListeners.add(listener)
@@ -83,7 +84,6 @@ export class XsydCommandClient {
         const errorCode = packet.data[0] ?? 0xff
         throw new DriverError('PROTOCOL_REJECTED', `键盘拒绝命令，错误码 0x${errorCode.toString(16).padStart(2, '0')}`, true, { details: { errorCode } })
       }
-      // 非当前命令响应可能是主动通知：转发它，同时保持 pending 等待真正响应。
       if (packet.command !== pending.definition.responseCode) {
         this.emitNotification(packet)
         return
@@ -92,6 +92,11 @@ export class XsydCommandClient {
       if (definition.responseStatus === 'zero' && (packet.data[0] ?? 0) !== 0) {
         const errorCode = packet.data[0]!
         throw new DriverError('PROTOCOL_REJECTED', `设备返回错误码 0x${errorCode.toString(16)}`, true, { details: { errorCode, commandName: definition.name } })
+      }
+      // Action 都返回 0x80；成功包还要核对回显 order，不同 order 属于硬件主动上报。
+      if (pending.expectedOrder !== undefined && packet.data[1] !== pending.expectedOrder) {
+        this.emitNotification(packet)
+        return
       }
       clearTimeout(timer)
       this.pending = undefined

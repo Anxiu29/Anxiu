@@ -54,9 +54,25 @@ describe('XsydCommandClient', () => {
     const received: number[] = []
     client.onNotification((packet) => received.push(packet.command))
 
-    transport.respond(0xa3, [0, 4, 0, 5])
+    transport.respond(XSYD_COMMANDS.action.responseCode, [0, 0x22, 1, 0xff])
 
-    expect(received).toEqual([0xa3])
+    expect(received).toEqual([XSYD_COMMANDS.action.responseCode])
+    client.close()
+  })
+
+  it('does not consume an unsolicited action packet as another action response', async () => {
+    const transport = new FakeTransport()
+    const client = new XsydCommandClient(transport)
+    const notifications: number[] = []
+    client.onNotification((packet) => notifications.push(packet.data[1] ?? -1))
+    const pending = client.request(XSYD_COMMANDS.action, new Uint8Array([0x01]))
+
+    await Promise.resolve()
+    transport.respond(XSYD_COMMANDS.action.responseCode, [0, 0x22, 1, 0xff])
+    transport.respond(XSYD_COMMANDS.action.responseCode, [0, 0x01, 0x31])
+
+    await expect(pending).resolves.toEqual(new Uint8Array([0, 0x01, 0x31]))
+    expect(notifications).toEqual([0x22])
     client.close()
   })
 

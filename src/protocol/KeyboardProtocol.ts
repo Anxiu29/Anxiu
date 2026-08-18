@@ -3,7 +3,7 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceInfo, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import type { MatrixKeyInput } from '@/domain/layout'
 import { readUint16le, uint16le, type CrcStrategy } from './codec'
-import { XSYD_ACTIONS, XSYD_COMMANDS, XSYD_NOTIFICATIONS } from './xsyd/commands'
+import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
@@ -13,7 +13,6 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   private currentMode: KeyboardMode = 'win'
   private readonly modeListeners = new Set<(mode: KeyboardMode) => void>()
   private readonly removeNotificationListener: () => void
-  private modeQueryTimer?: ReturnType<typeof setTimeout>
   readonly profile = { getProfile: () => this.getProfile() }
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
@@ -32,9 +31,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     crc?: CrcStrategy,
   ) {
     this.commands = new XsydCommandClient(transport, crc)
-    this.removeNotificationListener = this.commands.onNotification((packet) => {
-      if (packet.command === XSYD_NOTIFICATIONS.deviceStateChanged) this.scheduleModeQuery()
-    })
+    this.removeNotificationListener = this.commands.onNotification((packet) => this.handleNotification(packet.command, packet.data))
   }
 
   async getProfile(): Promise<KeyboardProfile> {
@@ -79,14 +76,13 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   async switchMode(mode: KeyboardMode) {
     await this.action(mode === 'mac' ? XSYD_ACTIONS.switchToMac : XSYD_ACTIONS.switchToWin, 1600)
     this.currentMode = mode
-    await this.waitForModeReports()
+    await this.waitForStateSettled()
   }
   async switchConfiguration(configuration: KeyboardConfiguration) {
     await this.action(XSYD_ACTIONS.switchConfiguration, 1600, [configuration - 1])
-    await this.waitForModeReports()
+    await this.waitForStateSettled()
   }
   close() {
-    if (this.modeQueryTimer) clearTimeout(this.modeQueryTimer)
     this.removeNotificationListener()
     this.modeListeners.clear()
     this.commands.close()
@@ -139,28 +135,20 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     return () => this.modeListeners.delete(listener)
   }
 
-  /** 连续 0xA3 上报结束后再查询一次，避免每个通知都占用 HID 命令队列。 */
-  private scheduleModeQuery() {
-    if (this.modeQueryTimer) clearTimeout(this.modeQueryTimer)
-    this.modeQueryTimer = setTimeout(() => {
-      this.modeQueryTimer = undefined
-      void this.refreshModeFromDevice()
-    }, 300)
+  /**
+   * 真机抓包确认：硬件切换后会主动发送 Action 返回包，
+   * data 为 [Err Code, order, s_arg, ...]，order 0x21/0x22 且 s_arg=1 表示 WIN/Mac。
+   */
+  private handleNotification(command: number, data: Uint8Array) {
+    if (command !== XSYD_COMMANDS.action.responseCode || data[0] !== 0 || data[2] !== 1) return
+    const mode = data[1] === XSYD_ACTIONS.queryWinMode ? 'win' : data[1] === XSYD_ACTIONS.queryMacMode ? 'mac' : undefined
+    if (!mode || mode === this.currentMode) return
+    this.currentMode = mode
+    for (const listener of this.modeListeners) listener(mode)
   }
 
-  private async refreshModeFromDevice() {
-    try {
-      const mode = await this.queryMode()
-      if (mode === this.currentMode) return
-      this.currentMode = mode
-      for (const listener of this.modeListeners) listener(mode)
-    } catch {
-      // 主动同步失败不打断当前会话；下一次设备通知或用户刷新会再次查询。
-    }
-  }
-
-  /** 模式/配置切换后固件会连续主动上报 0xA3 通知；等待其结束再开始查询。 */
-  private waitForModeReports() { return new Promise<void>((resolve) => setTimeout(resolve, 2000)) }
+  /** 模式/配置切换后给固件留出完成内部状态切换的时间，再读取新配置。 */
+  private waitForStateSettled() { return new Promise<void>((resolve) => setTimeout(resolve, 2000)) }
 
   private async readDefaultLayout(rows: number, columns: number): Promise<KeyPosition[]> {
     const matrixKeys: MatrixKeyInput[] = []

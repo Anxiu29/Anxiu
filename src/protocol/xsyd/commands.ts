@@ -4,15 +4,17 @@ export interface CommandDefinition {
   readonly responseCode: number
   readonly timeoutMs: number
   readonly responseStatus: 'zero' | 'none'
+  /** Action 响应会在 data[1] 回显请求的 order，可用于排除同为 0x80 的主动上报。 */
+  readonly responseEchoesOrder: boolean
 }
 
-const command = (name: string, code: number, timeoutMs = 1200, responseStatus: CommandDefinition['responseStatus'] = 'zero'): CommandDefinition => ({
-  name, code, responseCode: code | 0x80, timeoutMs, responseStatus,
+const command = (name: string, code: number, timeoutMs = 1200, responseStatus: CommandDefinition['responseStatus'] = 'zero', responseEchoesOrder = false): CommandDefinition => ({
+  name, code, responseCode: code | 0x80, timeoutMs, responseStatus, responseEchoesOrder,
 })
 
 export const XSYD_COMMANDS = {
   sync: command('sync', 0x01),
-  action: command('action', 0x00),
+  action: command('action', 0x00, 1200, 'zero', true),
   keymap: command('keymap', 0x23),
   defaultKeymap: command('default-keymap', 0x2b),
 } as const
@@ -24,6 +26,3 @@ export const XSYD_ACTIONS = {
 } as const
 
 export const XSYD_FAILURE_RESPONSE = 0xff
-
-/** 固件在模式或配置变化后主动发送与 0x23 响应同码的通知。 */
-export const XSYD_NOTIFICATIONS = { deviceStateChanged: 0xa3 } as const
