@@ -54,6 +54,8 @@ export interface DeviceCapabilities {
   restoreFactory: boolean
   /** 可选以兼容只实现改键的设备；true 时设备必须提供 LightingCapability。 */
   lighting?: boolean
+  /** true 时设备提供 DKS、MPT、MT、TGL、END、SOCD 高级键能力。 */
+  advancedKey?: boolean
   layoutRows: number
   layoutColumns: number
 }

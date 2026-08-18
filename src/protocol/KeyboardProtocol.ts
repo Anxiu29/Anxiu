@@ -10,6 +10,17 @@ import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 import type { LightingSettings } from '@/domain/lighting'
 import { DEFAULT_LIGHTING_SETTINGS } from '@/domain/lighting'
 import { decodeMainLighting, encodeMainLighting } from './xsyd/lightingCodec'
+import type { AdvancedKeySettings, DksAdvancedKey } from '@/domain/advancedKey'
+import { advancedReadRequest, decodeEnd, decodeMpt, decodeSocd, decodeTgl, encodeDks, encodeEnd, encodeMpt, encodeMt, encodeSocd, encodeTgl } from './xsyd/advancedKeyCodec'
+
+const ADVANCED_LAYOUT = {
+  db1: 0x05, db3: 0x07, mode: 0x08,
+  dks1: 0x09, dks2: 0x0a, dks3: 0x0b, dks4: 0x0c,
+  trps1: 0x0d, trps2: 0x0e, trps3: 0x0f, trps4: 0x10,
+  delay: 0x13,
+} as const
+
+const ADVANCED_MODE = { dks: 1, mpt: 2, mt: 3, tgl: 4, end: 5, socd: 8 } as const
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
@@ -33,6 +44,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly lighting = {
     getLighting: () => this.getLighting(),
     setLighting: (settings: LightingSettings) => this.setLighting(settings),
+  }
+  readonly advancedKey = {
+    getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode),
+    setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings),
+    deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode),
   }
 
   constructor(
@@ -103,6 +119,45 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   async setLighting(settings: LightingSettings) {
     await this.commands.request(XSYD_COMMANDS.lighting, encodeMainLighting(settings, true, this.supportsDynamicColorId()))
   }
+
+  async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> {
+    const modeValue = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
+    const type = modeValue & 0x0f
+    if (type === ADVANCED_MODE.dks) {
+      const layouts = [ADVANCED_LAYOUT.dks1, ADVANCED_LAYOUT.dks2, ADVANCED_LAYOUT.dks3, ADVANCED_LAYOUT.dks4, ADVANCED_LAYOUT.trps1, ADVANCED_LAYOUT.trps2, ADVANCED_LAYOUT.trps3, ADVANCED_LAYOUT.trps4, ADVANCED_LAYOUT.db1, ADVANCED_LAYOUT.db3]
+      const values: number[] = []
+      // HID 命令客户端按请求串行匹配响应；这里显式串行，避免同命令 0x23 的响应互相抢占。
+      for (const layout of layouts) values.push(await this.readLayoutValue(sourceCode, layout))
+      return { type: 'dks', sourceCode, keyCodes: values.slice(0, 4) as DksAdvancedKey['keyCodes'], triggers: values.slice(4, 8).map((value) => value & 0xff) as DksAdvancedKey['triggers'], travels: [(values[8] ?? 0) / 1000, (values[9] ?? 0) / 1000] }
+    }
+    if (type === ADVANCED_MODE.mpt) return decodeMpt(sourceCode, await this.commands.request(XSYD_COMMANDS.mpt, advancedReadRequest(sourceCode)))
+    if (type === ADVANCED_MODE.mt) {
+      const first = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.dks1)
+      const second = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.dks2)
+      const delay = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.delay)
+      return { type: 'mt', sourceCode, keyCodes: [first, second], delay: delay * 10 }
+    }
+    if (type === ADVANCED_MODE.tgl) return decodeTgl(sourceCode, await this.commands.request(XSYD_COMMANDS.tgl, advancedReadRequest(sourceCode)))
+    if (type === ADVANCED_MODE.end) return decodeEnd(sourceCode, await this.commands.request(XSYD_COMMANDS.end, advancedReadRequest(sourceCode)))
+    if (type === ADVANCED_MODE.socd) return decodeSocd(sourceCode, await this.commands.request(XSYD_COMMANDS.socd, advancedReadRequest(sourceCode)))
+    return { type: 'none', sourceCode }
+  }
+
+  async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
+    // 这些专用命令会同时让固件更新 Layout_Mode；SDK 的 setX 也只发送对应命令。
+    if (settings.type === 'dks') await this.commands.request(XSYD_COMMANDS.dks, encodeDks(settings))
+    else if (settings.type === 'mpt') await this.commands.request(XSYD_COMMANDS.mpt, encodeMpt(settings))
+    else if (settings.type === 'mt') await this.commands.request(XSYD_COMMANDS.mt, encodeMt(settings))
+    else if (settings.type === 'tgl') await this.commands.request(XSYD_COMMANDS.tgl, encodeTgl(settings))
+    else if (settings.type === 'end') await this.commands.request(XSYD_COMMANDS.end, encodeEnd(settings))
+    else await this.commands.request(XSYD_COMMANDS.socd, encodeSocd(settings))
+  }
+
+  async deleteAdvancedKey(sourceCode: number) {
+    const modeValue = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
+    // 高四位属于性能触发方式，删除高级键只能清除低四位，不能把另一项设置一并破坏。
+    await this.writeLayoutValue(sourceCode, ADVANCED_LAYOUT.mode, modeValue & 0xf0)
+  }
   close() {
     this.removeNotificationListener()
     this.modeListeners.clear()
@@ -130,7 +185,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
 
   private async queryProtocolVersion() {
     const data = await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([XSYD_ACTIONS.protocolVersion]))
-    return new TextDecoder().decode(data.slice(2)).replace(/\0/g, '').trim() || '1.0.x'
+    // 官方响应为 [Err, order, minor|patch, major] 的压缩 BCD，不是 ASCII 字符串。
+    if (data.length >= 4) return `${(data[3] ?? 0) & 0x0f}.${((data[2] ?? 0) >> 4) & 0x0f}.${(data[2] ?? 0) & 0x0f}`
+    return '1.0.7'
   }
 
   private async action(order: number, timeoutMs: number, args: number[] = []) {
@@ -225,5 +282,15 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
       }
     }
     return assignments
+  }
+
+  /** 0x23 也承载高级键的细分 Layout；响应 value 与普通键码一样为小端 16 位。 */
+  private async readLayoutValue(sourceCode: number, layout: number) {
+    const data = await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array([0, sourceCode, layout, 0xff, 0xff]))
+    return readUint16le(data, 3)
+  }
+
+  private async writeLayoutValue(sourceCode: number, layout: number, value: number) {
+    await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array([1, sourceCode, layout, ...uint16le(value)]))
   }
 }

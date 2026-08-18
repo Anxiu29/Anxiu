@@ -6,6 +6,7 @@ export type DeviceCapabilityId =
   | 'system-mode'
   | 'configuration-switch'
   | 'lighting'
+  | 'advanced-key'
   | 'performance'
   | 'macro'
   | 'firmware-update'

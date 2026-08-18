@@ -1,5 +1,6 @@
 import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import type { LightingSettings } from '@/domain/lighting'
+import type { AdvancedKeySettings } from '@/domain/advancedKey'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -50,6 +51,12 @@ export interface LightingCapability {
   setLighting(settings: LightingSettings): Promise<void>
 }
 
+export interface AdvancedKeyCapability {
+  getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings>
+  setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>): Promise<void>
+  deleteAdvancedKey(sourceCode: number): Promise<void>
+}
+
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */
 export interface KeyboardDevice {
   readonly profile: DeviceProfileCapability
@@ -59,5 +66,6 @@ export interface KeyboardDevice {
   readonly systemMode?: SystemModeCapability
   readonly configurationSwitch?: ConfigurationSwitchCapability
   readonly lighting?: LightingCapability
+  readonly advancedKey?: AdvancedKeyCapability
   close(): void
 }

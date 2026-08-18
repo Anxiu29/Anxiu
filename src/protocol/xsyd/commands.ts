@@ -18,6 +18,12 @@ export const XSYD_COMMANDS = {
   keymap: command('keymap', 0x23),
   defaultKeymap: command('default-keymap', 0x2b),
   lighting: command('main-lighting', 0x18),
+  mt: command('advanced-mt', 0x24),
+  tgl: command('advanced-tgl', 0x25),
+  dks: command('advanced-dks', 0x26),
+  mpt: command('advanced-mpt', 0x27),
+  end: command('advanced-end', 0x28),
+  socd: command('advanced-socd', 0x2c),
 } as const
 
 export const XSYD_ACTIONS = {

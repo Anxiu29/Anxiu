@@ -5,6 +5,7 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import { DriverError } from './DriverError'
 import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguration'
 import type { LightingSettings } from '@/domain/lighting'
+import type { AdvancedKeySettings } from '@/domain/advancedKey'
 
 export class DeviceSession {
   // original 是最近一次已验证的设备状态；draft 是允许 UI 修改的工作副本。
@@ -107,6 +108,24 @@ export class DeviceSession {
     if (!this.device.lighting) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持灯光设置', false, { details: { capability: 'lighting' } })
     await this.device.lighting.setLighting(settings)
     return this.device.lighting.getLighting()
+  }
+
+  async getAdvancedKey(sourceCode: number) {
+    if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
+    return this.device.advancedKey.getAdvancedKey(sourceCode)
+  }
+
+  /** 高级键是单键即时事务：写入后立即回读，UI 始终展示固件实际接受的值。 */
+  async updateAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
+    if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
+    await this.device.advancedKey.setAdvancedKey(settings)
+    return this.device.advancedKey.getAdvancedKey(settings.sourceCode)
+  }
+
+  async deleteAdvancedKey(sourceCode: number) {
+    if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
+    await this.device.advancedKey.deleteAdvancedKey(sourceCode)
+    return this.device.advancedKey.getAdvancedKey(sourceCode)
   }
 
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {
