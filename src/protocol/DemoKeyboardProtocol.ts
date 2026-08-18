@@ -40,7 +40,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async getProfile(): Promise<KeyboardProfile> {
     await this.wait()
-    return { device: { ...this.deviceInfo }, capabilities: this.capabilities, positions: this.positions, defaultAssignments: cloneAssignments(this.defaultsFor(this.currentMode)), assignments: cloneAssignments(this.working) }
+    return { device: { ...this.deviceInfo }, capabilities: this.capabilities, positions: this.positions, mode: this.currentMode, defaultAssignments: cloneAssignments(this.defaultsFor(this.currentMode)), assignments: cloneAssignments(this.working) }
   }
   async writeAssignments(assignments: KeyAssignment[]) {
     await this.wait()

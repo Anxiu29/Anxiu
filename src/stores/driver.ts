@@ -8,12 +8,15 @@ import { createDriverState } from './driverState'
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
   const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  let removeModeListener: () => void = () => undefined
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
+    removeModeListener()
     clearFeedback(); status.value = 'connecting'; demo.value = useDemo; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       state.session = await driverService.connect({ demo: useDemo, onDisconnect: handleDisconnect })
+      observeModeChanges()
       driverId.value = driverService.driverId
       await readProfile()
       message.value = useDemo ? '已进入演示模式' : '键盘连接成功'
@@ -22,10 +25,12 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   /** 浏览器只允许无提示重连已经授权过的 HID 设备；没有授权设备不是错误。 */
   async function reconnectAuthorized() {
+    removeModeListener()
     clearFeedback(); status.value = 'connecting'; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       state.session = await driverService.reconnectAuthorized({ onDisconnect: handleDisconnect })
       if (!state.session) { status.value = 'idle'; return }
+      observeModeChanges()
       driverId.value = driverService.driverId
       await readProfile()
     } catch (cause) { fail(cause) }
@@ -35,6 +40,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     if (!state.session) return
     status.value = 'reading'
     profile.value = await state.session.load()
+    mode.value = profile.value.mode ?? mode.value
     revision.value++
     status.value = 'ready'
     // 默认选中第一个真实物理键，避免 UI 初次进入时出现无键位上下文。
@@ -85,6 +91,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       await state.session.restoreFactory()
       await driverService.disconnect()
+      removeModeListener()
       state.session = undefined
       driverId.value = undefined
       profile.value = undefined
@@ -108,7 +115,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       profile.value = await state.session.switchMode(targetMode)
       revision.value++
-      mode.value = targetMode
+      mode.value = profile.value.mode ?? targetMode
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
       status.value = 'ready'
@@ -144,9 +151,40 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   }
 
   function handleDisconnect() {
+    removeModeListener()
     // 保留 profile/draft 供用户查看；操作入口会根据 disconnected 状态被禁用。
     status.value = 'disconnected'
     error.value = '键盘已断开连接，未保存的草稿仍保留在页面中'
+  }
+
+  function observeModeChanges() {
+    const observedSession = state.session
+    if (!observedSession) return
+    removeModeListener = observedSession.onModeChange((targetMode) => {
+      // 回调只通知状态层；真实回读仍通过 DeviceSession，避免协议事件直接修改 UI 数据。
+      void syncExternalMode(observedSession, targetMode)
+    })
+  }
+
+  /** 键盘本体切换模式后重读 Profile，让模式标签、默认表和四层键值一起更新。 */
+  async function syncExternalMode(observedSession: NonNullable<typeof state.session>, targetMode: KeyboardMode) {
+    if (state.session !== observedSession || mode.value === targetMode || status.value === 'disconnected') return
+    if (['connecting', 'reading', 'writing'].includes(status.value)) {
+      // 用户操作正在占用会话时稍后再同步，不能因为 UI 忙而永久丢掉硬件模式事件。
+      setTimeout(() => void syncExternalMode(observedSession, targetMode), 100)
+      return
+    }
+    clearFeedback(); status.value = 'reading'
+    try {
+      profile.value = await observedSession.load()
+      if (state.session !== observedSession) return
+      mode.value = profile.value.mode ?? targetMode
+      layer.value = 0
+      selectedPositionId.value = profile.value.positions[0]?.id
+      revision.value++
+      status.value = 'ready'
+      message.value = mode.value === 'mac' ? '检测到键盘已切换至 Mac 模式，已同步四层映射' : '检测到键盘已切换至 Windows 模式，已同步四层映射'
+    } catch (cause) { fail(cause) }
   }
   function clearFeedback() { error.value = ''; errorCode.value = undefined; message.value = '' }
   function fail(cause: unknown) {

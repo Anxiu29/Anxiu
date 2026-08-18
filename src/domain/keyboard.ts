@@ -58,6 +58,8 @@ export interface KeyboardProfile {
   device: DeviceInfo
   capabilities: DeviceCapabilities
   positions: KeyPosition[]
+  /** 设备当前系统模式；旧设备适配器可不提供，由界面保留已有模式。 */
+  mode?: KeyboardMode
   /** 由具体设备协议提供，不能由 UI 根据键帽文字猜测。 */
   defaultAssignments: KeyAssignment[]
   assignments: KeyAssignment[]

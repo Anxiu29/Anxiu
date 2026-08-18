@@ -18,7 +18,12 @@ export const XSYD_COMMANDS = {
 } as const
 
 export const XSYD_ACTIONS = {
-  protocolVersion: 0x01, save: 0x02, reload: 0x03, restoreFactory: 0x11, switchToWin: 0x30, switchToMac: 0x31, switchConfiguration: 0x70,
+  protocolVersion: 0x01, save: 0x02, reload: 0x03, restoreFactory: 0x11,
+  queryWinMode: 0x21, queryMacMode: 0x22,
+  switchToWin: 0x30, switchToMac: 0x31, switchConfiguration: 0x70,
 } as const
 
 export const XSYD_FAILURE_RESPONSE = 0xff
+
+/** 固件在模式或配置变化后主动发送与 0x23 响应同码的通知。 */
+export const XSYD_NOTIFICATIONS = { deviceStateChanged: 0xa3 } as const

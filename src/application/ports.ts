@@ -34,6 +34,8 @@ export interface FactoryResetCapability {
 
 export interface SystemModeCapability {
   switchMode(mode: KeyboardMode): Promise<void>
+  /** 监听键盘本体触发的模式变化；返回函数用于随会话解除监听。 */
+  onModeChange?(listener: (mode: KeyboardMode) => void): () => void
 }
 
 export interface ConfigurationSwitchCapability {

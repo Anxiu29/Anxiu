@@ -48,6 +48,18 @@ describe('XsydCommandClient', () => {
     client.close()
   })
 
+  it('forwards unsolicited reports so device state can be synchronized', () => {
+    const transport = new FakeTransport()
+    const client = new XsydCommandClient(transport)
+    const received: number[] = []
+    client.onNotification((packet) => received.push(packet.command))
+
+    transport.respond(0xa3, [0, 4, 0, 5])
+
+    expect(received).toEqual([0xa3])
+    client.close()
+  })
+
   it('rejects queued work when the session closes', async () => {
     const transport = new FakeTransport()
     const client = new XsydCommandClient(transport)

@@ -160,6 +160,27 @@ describe('DeviceSession', () => {
     expect(session.draft.filter((item) => item.layer === 1).every((item) => item.keyCode === 58)).toBe(true)
   })
 
+  it('forwards hardware mode changes without exposing protocol details', () => {
+    let notifyMode: ((mode: 'win' | 'mac') => void) | undefined
+    const device: KeyboardDevice = {
+      profile: { getProfile: async () => profile() },
+      systemMode: {
+        switchMode: async () => undefined,
+        onModeChange: (listener) => { notifyMode = listener; return () => { notifyMode = undefined } },
+      },
+      close: () => undefined,
+    }
+    const session = new DeviceSession(device, HID_KEY_CATALOG)
+    const received: string[] = []
+    const stop = session.onModeChange((mode) => received.push(mode))
+
+    notifyMode?.('mac')
+    stop()
+    notifyMode?.('win')
+
+    expect(received).toEqual(['mac'])
+  })
+
   it('switches configuration and reloads its key mappings', async () => {
     let current = profile()
     let switchedTo: number | undefined

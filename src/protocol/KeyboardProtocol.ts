@@ -3,7 +3,7 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceInfo, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
 import type { MatrixKeyInput } from '@/domain/layout'
 import { readUint16le, uint16le, type CrcStrategy } from './codec'
-import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
+import { XSYD_ACTIONS, XSYD_COMMANDS, XSYD_NOTIFICATIONS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
@@ -11,11 +11,17 @@ import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
   private currentMode: KeyboardMode = 'win'
+  private readonly modeListeners = new Set<(mode: KeyboardMode) => void>()
+  private readonly removeNotificationListener: () => void
+  private modeQueryTimer?: ReturnType<typeof setTimeout>
   readonly profile = { getProfile: () => this.getProfile() }
   readonly keymap = { writeAssignments: (assignments: KeyAssignment[]) => this.writeAssignments(assignments) }
   readonly configuration = { save: () => this.save(), reload: () => this.reload() }
   readonly factoryReset = { restoreFactory: () => this.restoreFactory() }
-  readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
+  readonly systemMode = {
+    switchMode: (mode: KeyboardMode) => this.switchMode(mode),
+    onModeChange: (listener: (mode: KeyboardMode) => void) => this.onModeChange(listener),
+  }
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
 
   constructor(
@@ -26,11 +32,15 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     crc?: CrcStrategy,
   ) {
     this.commands = new XsydCommandClient(transport, crc)
+    this.removeNotificationListener = this.commands.onNotification((packet) => {
+      if (packet.command === XSYD_NOTIFICATIONS.deviceStateChanged) this.scheduleModeQuery()
+    })
   }
 
   async getProfile(): Promise<KeyboardProfile> {
     // 设备身份与协议版本互不依赖，可以并行查询；能力需要两者齐备后才能解析。
-    const [device, protocolVersion] = await Promise.all([this.sync(), this.queryProtocolVersion()])
+    const [device, protocolVersion, mode] = await Promise.all([this.sync(), this.queryProtocolVersion(), this.queryMode()])
+    this.currentMode = mode
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
     // 0x2B 只告诉我们有哪些物理键；每个 Fn 层的实际键值还要通过 0x23 单独读取。
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
@@ -47,6 +57,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
       device: { ...device, protocolVersion },
       capabilities,
       positions,
+      mode,
       defaultAssignments,
       assignments,
     }
@@ -74,7 +85,12 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     await this.action(XSYD_ACTIONS.switchConfiguration, 1600, [configuration - 1])
     await this.waitForModeReports()
   }
-  close() { this.commands.close() }
+  close() {
+    if (this.modeQueryTimer) clearTimeout(this.modeQueryTimer)
+    this.removeNotificationListener()
+    this.modeListeners.clear()
+    this.commands.close()
+  }
 
   private async sync(): Promise<DeviceInfo> {
     // 随机挑战值用于建立本次同步请求；响应中的字段偏移来自 XSYD 设备信息报文。
@@ -101,6 +117,46 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
 
   private async action(order: number, timeoutMs: number, args: number[] = []) {
     await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order, ...args]), timeoutMs)
+  }
+
+  /** 按协议响应布局 [Err Code, order, s_arg...] 读取查询结果。 */
+  private async queryMode(): Promise<KeyboardMode> {
+    const mac = await this.queryActionFlag(XSYD_ACTIONS.queryMacMode)
+    if (mac === 1) return 'mac'
+    const win = await this.queryActionFlag(XSYD_ACTIONS.queryWinMode)
+    if (win === 1) return 'win'
+    // 0xFF 表示设备不支持该模式查询；兼容这种固件时保留最后一次已知模式。
+    return this.currentMode
+  }
+
+  private async queryActionFlag(order: number) {
+    const data = await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([order]))
+    return data[2] ?? 0xff
+  }
+
+  private onModeChange(listener: (mode: KeyboardMode) => void) {
+    this.modeListeners.add(listener)
+    return () => this.modeListeners.delete(listener)
+  }
+
+  /** 连续 0xA3 上报结束后再查询一次，避免每个通知都占用 HID 命令队列。 */
+  private scheduleModeQuery() {
+    if (this.modeQueryTimer) clearTimeout(this.modeQueryTimer)
+    this.modeQueryTimer = setTimeout(() => {
+      this.modeQueryTimer = undefined
+      void this.refreshModeFromDevice()
+    }, 300)
+  }
+
+  private async refreshModeFromDevice() {
+    try {
+      const mode = await this.queryMode()
+      if (mode === this.currentMode) return
+      this.currentMode = mode
+      for (const listener of this.modeListeners) listener(mode)
+    } catch {
+      // 主动同步失败不打断当前会话；下一次设备通知或用户刷新会再次查询。
+    }
   }
 
   /** 模式/配置切换后固件会连续主动上报 0xA3 通知；等待其结束再开始查询。 */

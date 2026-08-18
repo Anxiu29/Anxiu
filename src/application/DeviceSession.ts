@@ -80,6 +80,11 @@ export class DeviceSession {
     return this.load()
   }
 
+  /** 向状态层转发设备模式事件，应用层不需要认识具体的 HID 通知码。 */
+  onModeChange(listener: (mode: KeyboardMode) => void) {
+    return this.device.systemMode?.onModeChange?.(listener) ?? (() => undefined)
+  }
+
   async switchConfiguration(configuration: KeyboardConfiguration) {
     if (!this.device.configurationSwitch) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持切换配置', false, { details: { capability: 'configuration-switch', configuration } })
     await this.device.configurationSwitch.switchConfiguration(configuration)

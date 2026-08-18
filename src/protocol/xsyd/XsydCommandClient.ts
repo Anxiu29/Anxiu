@@ -1,6 +1,6 @@
 import { DriverError } from '@/application/DriverError'
 import type { DeviceTransport } from '@/application/ports'
-import { decodePacket, encodePacket, type CrcStrategy } from '../codec'
+import { decodePacket, encodePacket, type CrcStrategy, type ProtocolPacket } from '../codec'
 import { XSYD_FAILURE_RESPONSE, type CommandDefinition } from './commands'
 
 interface PendingRequest {
@@ -17,6 +17,7 @@ export class XsydCommandClient {
   private queue: Promise<unknown> = Promise.resolve()
   private closed = false
   private readonly removeReportListener: () => void
+  private readonly notificationListeners = new Set<(packet: ProtocolPacket) => void>()
 
   constructor(private readonly transport: DeviceTransport, private readonly crc?: CrcStrategy) {
     this.removeReportListener = transport.onReport((report) => this.handleReport(report))
@@ -48,10 +49,20 @@ export class XsydCommandClient {
     return result
   }
 
+  /**
+   * 命令响应由 request 消费；没有对应请求的主动上报从这里交给设备协议解释。
+   * 命令客户端只负责分流，不在公共层猜测 0xA3 对某款键盘意味着什么。
+   */
+  onNotification(listener: (packet: ProtocolPacket) => void) {
+    this.notificationListeners.add(listener)
+    return () => this.notificationListeners.delete(listener)
+  }
+
   close() {
     if (this.closed) return
     this.closed = true
     this.removeReportListener()
+    this.notificationListeners.clear()
     // 关闭时必须拒绝正在等待的 Promise，否则上层会一直停留在 reading/writing 状态。
     if (!this.pending) return
     clearTimeout(this.pending.timer)
@@ -60,17 +71,23 @@ export class XsydCommandClient {
   }
 
   private handleReport(report: Uint8Array) {
-    // 固件可能主动上报通知；没有 pending 时由本客户端忽略，不误认成请求响应。
-    if (!this.pending) return
     const pending = this.pending
     try {
       const packet = decodePacket(report, this.crc)
+      // 空闲时收到的合法包是设备主动上报，不能丢弃，否则硬件侧状态变化无法同步到 UI。
+      if (!pending) {
+        this.emitNotification(packet)
+        return
+      }
       if (packet.command === XSYD_FAILURE_RESPONSE) {
         const errorCode = packet.data[0] ?? 0xff
         throw new DriverError('PROTOCOL_REJECTED', `键盘拒绝命令，错误码 0x${errorCode.toString(16).padStart(2, '0')}`, true, { details: { errorCode } })
       }
-      // 非当前命令响应可能是模式切换通知，保持 pending 等待真正的 responseCode。
-      if (packet.command !== pending.definition.responseCode) return
+      // 非当前命令响应可能是主动通知：转发它，同时保持 pending 等待真正响应。
+      if (packet.command !== pending.definition.responseCode) {
+        this.emitNotification(packet)
+        return
+      }
       const { definition, resolve, timer } = pending
       if (definition.responseStatus === 'zero' && (packet.data[0] ?? 0) !== 0) {
         const errorCode = packet.data[0]!
@@ -80,9 +97,15 @@ export class XsydCommandClient {
       this.pending = undefined
       resolve(packet.data)
     } catch (error) {
+      // 空闲时的损坏上报不对应任何调用方，忽略即可；请求响应损坏仍应让请求失败。
+      if (!pending) return
       clearTimeout(pending.timer)
       if (this.pending === pending) this.pending = undefined
       pending.reject(error instanceof Error ? error : new Error(String(error)))
     }
+  }
+
+  private emitNotification(packet: ProtocolPacket) {
+    for (const listener of this.notificationListeners) listener(packet)
   }
 }
