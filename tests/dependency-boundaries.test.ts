@@ -22,8 +22,16 @@ describe('dependency boundaries', () => {
     expect(forbiddenImports('application', /vue|pinia|@\/(protocol|transport|devices|stores|components|composition)/)).toEqual([])
   })
 
-  it('keeps protocol and transport adapters independent from UI', () => {
-    expect(forbiddenImports('protocol', /vue|pinia|@\/(stores|components|composition)/)).toEqual([])
-    expect(forbiddenImports('transport', /vue|pinia|@\/(stores|components|composition)/)).toEqual([])
+  it('keeps protocol and transport adapters independent from devices and UI', () => {
+    expect(forbiddenImports('protocol', /vue|pinia|@\/(devices|stores|components|composition)/)).toEqual([])
+    expect(forbiddenImports('transport', /vue|pinia|@\/(protocol|devices|stores|components|composition)/)).toEqual([])
+  })
+
+  it('keeps generic components independent from model-specific adapters', () => {
+    expect(forbiddenImports('components', /@\/(assets|devices|protocol|transport)|@\/ui\/(?:c98|rk|mg)[^/]*?/i)).toEqual([])
+  })
+
+  it('keeps stores dependent on application contracts instead of concrete adapters or the composition root', () => {
+    expect(forbiddenImports('stores', /@\/(protocol|transport|devices|composition)/)).toEqual([])
   })
 })
