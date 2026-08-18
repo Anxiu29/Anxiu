@@ -1,5 +1,6 @@
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { KeyboardMode, KeyAssignment, KeyPosition } from '@/domain/keyboard'
+import type { DefaultKeymapResolver } from '@/protocol/DefaultKeymapResolver'
 
 export interface C98FactoryKey {
   positionId: string
@@ -867,3 +868,7 @@ export function c98FactoryAssignments(mode: KeyboardMode, positions: KeyPosition
     })
   })
 }
+
+/** C98 设备层提供给协议适配器的默认键位解析器。 */
+export const resolveC98DefaultKeymap: DefaultKeymapResolver = ({ mode, positions, layers, keyCatalog }) =>
+  c98FactoryAssignments(mode, positions, layers, keyCatalog)

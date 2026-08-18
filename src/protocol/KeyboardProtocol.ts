@@ -6,7 +6,7 @@ import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
-import { c98FactoryAssignments } from '@/devices/c98/factoryKeymap'
+import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
@@ -18,7 +18,13 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
 
-  constructor(private readonly transport: DeviceTransport, private readonly keyCatalog: KeyCatalog, private readonly capabilityDescriptor: CapabilityDescriptor, crc?: CrcStrategy) {
+  constructor(
+    private readonly transport: DeviceTransport,
+    private readonly keyCatalog: KeyCatalog,
+    private readonly capabilityDescriptor: CapabilityDescriptor,
+    private readonly resolveDefaultKeymap: DefaultKeymapResolver,
+    crc?: CrcStrategy,
+  ) {
     this.commands = new XsydCommandClient(transport, crc)
   }
 
@@ -28,7 +34,12 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
-    const defaultAssignments = c98FactoryAssignments(this.currentMode, positions, capabilities.layers, this.keyCatalog)
+    const defaultAssignments = this.resolveDefaultKeymap({
+      mode: this.currentMode,
+      positions,
+      layers: capabilities.layers,
+      keyCatalog: this.keyCatalog,
+    })
     return {
       device: { ...device, protocolVersion },
       capabilities,
