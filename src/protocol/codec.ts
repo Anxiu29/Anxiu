@@ -25,6 +25,7 @@ export const computePacketCrc: CrcStrategy = (bytes) => {
 }
 
 export function encodePacket(command: number, data: Uint8Array, crc: CrcStrategy = computePacketCrc): Uint8Array {
+  // 64 字节 HID 报告扣除 head、len、cmd、crc 后，业务数据最多 60 字节。
   if (data.length > 60) throw new Error('协议数据超过 60 字节')
   const packet = new Uint8Array(4 + data.length)
   packet[0] = PACKET_HEAD
@@ -36,6 +37,7 @@ export function encodePacket(command: number, data: Uint8Array, crc: CrcStrategy
 }
 
 export function decodePacket(report: Uint8Array, crc: CrcStrategy = computePacketCrc): ProtocolPacket {
+  // 解码先检查结构，再校验 CRC；只有完全可信的数据才交给命令客户端匹配。
   if (report.length < 4 || report[0] !== PACKET_HEAD) throw new DriverError('PROTOCOL_REJECTED', '无效协议包头')
   const length = report[1] ?? 0
   if (length > report.length - 4) throw new DriverError('PROTOCOL_REJECTED', '协议包长度错误')

@@ -19,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const activeView = ref<WorkspaceView>('device')
+// 这些状态只影响应用壳外观，不进入全局 Store；切换工作区不会丢失设备会话和改键草稿。
 const feedbackVisible = ref(true)
 const sidebarCollapsed = ref(false)
 const settingsOpen = ref(false)
@@ -26,12 +27,14 @@ const configurations: KeyboardConfiguration[] = [1, 2, 3, 4]
 const navigate = (view: WorkspaceView) => { activeView.value = view }
 const toggleSidebar = () => { sidebarCollapsed.value = !sidebarCollapsed.value }
 const requestFactoryReset = () => {
+  // 恢复出厂是不可逆设备操作，确认留在最靠近用户交互的 UI 层。
   const confirmed = window.confirm('恢复出厂设置会清除全部改键、灯光和宏配置，键盘随后需要重新连接。是否继续？')
   if (!confirmed) return
   settingsOpen.value = false
   emit('restore-factory')
 }
 watch(() => [props.error, props.message], ([error, message], [previousError, previousMessage]) => {
+  // 用户关闭旧提示后，新消息到来要重新显示；仅组件重渲染不应把旧提示弹回来。
   if ((error || message) && (error !== previousError || message !== previousMessage)) feedbackVisible.value = true
 })
 </script>

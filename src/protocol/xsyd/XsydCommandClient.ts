@@ -11,7 +11,9 @@ interface PendingRequest {
 }
 
 export class XsydCommandClient {
+  // 协议没有可确认的事务序号，因此任何时刻只允许一个 pending 请求。
   private pending?: PendingRequest
+  // Promise 链把所有请求串行化；前一请求失败后仍从拒绝分支继续执行下一项。
   private queue: Promise<unknown> = Promise.resolve()
   private closed = false
   private readonly removeReportListener: () => void
@@ -41,6 +43,7 @@ export class XsydCommandClient {
       }
     })
     const result = this.queue.then(operation, operation)
+    // queue 自身吞掉错误只为保持队列可继续；调用者拿到的 result 仍会正常 reject。
     this.queue = result.catch(() => undefined)
     return result
   }
@@ -49,6 +52,7 @@ export class XsydCommandClient {
     if (this.closed) return
     this.closed = true
     this.removeReportListener()
+    // 关闭时必须拒绝正在等待的 Promise，否则上层会一直停留在 reading/writing 状态。
     if (!this.pending) return
     clearTimeout(this.pending.timer)
     this.pending.reject(new DriverError('DEVICE_NOT_CONNECTED', '设备会话已关闭'))
@@ -56,6 +60,7 @@ export class XsydCommandClient {
   }
 
   private handleReport(report: Uint8Array) {
+    // 固件可能主动上报通知；没有 pending 时由本客户端忽略，不误认成请求响应。
     if (!this.pending) return
     const pending = this.pending
     try {
@@ -64,6 +69,7 @@ export class XsydCommandClient {
         const errorCode = packet.data[0] ?? 0xff
         throw new DriverError('PROTOCOL_REJECTED', `键盘拒绝命令，错误码 0x${errorCode.toString(16).padStart(2, '0')}`, true, { details: { errorCode } })
       }
+      // 非当前命令响应可能是模式切换通知，保持 pending 等待真正的 responseCode。
       if (packet.command !== pending.definition.responseCode) return
       const { definition, resolve, timer } = pending
       if (definition.responseStatus === 'zero' && (packet.data[0] ?? 0) !== 0) {

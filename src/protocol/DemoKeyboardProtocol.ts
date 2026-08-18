@@ -5,9 +5,15 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { MatrixKeyInput } from '@/domain/layout'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
+
+/**
+ * 不访问 HID 的内存协议实现。它实现与真机相同的 KeyboardDevice 端口，
+ * 因此 UI 和应用用例无需为演示模式增加分支。
+ */
 export class DemoKeyboardProtocol implements KeyboardDevice {
   private readonly positions: KeyPosition[]
   private readonly initial: KeyAssignment[]
+  // working 模拟固件 RAM；stored 模拟执行“保存”后写入的持久化配置。
   private stored: KeyAssignment[]
   private working: KeyAssignment[]
   private wait = () => new Promise((resolve) => setTimeout(resolve, 260))
@@ -38,6 +44,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async writeAssignments(assignments: KeyAssignment[]) {
     await this.wait()
+    // 真机允许差异写入，所以演示协议也只合并传入项，不能用局部数组覆盖整张键位表。
     const changes = new Map(assignments.map((item) => [`${item.layer}:${item.positionId}`, item]))
     this.working = this.working.map((item) => ({ ...(changes.get(`${item.layer}:${item.positionId}`) ?? item) }))
   }
@@ -47,6 +54,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async switchMode(mode: KeyboardMode) {
     await this.wait()
     this.currentMode = mode
+    // WIN/MAC 拥有独立出厂表；切换后重建当前模式的内存与持久化快照。
     const defaults = this.defaultsFor(mode)
     this.working = cloneAssignments(defaults)
     this.stored = cloneAssignments(defaults)

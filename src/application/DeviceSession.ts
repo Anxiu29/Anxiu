@@ -6,6 +6,7 @@ import { DriverError } from './DriverError'
 import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguration'
 
 export class DeviceSession {
+  // original 是最近一次已验证的设备状态；draft 是允许 UI 修改的工作副本。
   profile?: KeyboardProfile
   original: KeyAssignment[] = []
   draft: KeyAssignment[] = []
@@ -15,6 +16,7 @@ export class DeviceSession {
   get dirty() { return !assignmentsEqual(this.original, this.draft) }
 
   async load() {
+    // 每次加载都重建两个副本，防止 UI 修改 draft 时污染回读基线。
     this.profile = await this.device.profile.getProfile()
     this.original = cloneAssignments(this.profile.assignments)
     this.draft = cloneAssignments(this.profile.assignments)
@@ -53,6 +55,7 @@ export class DeviceSession {
   async save(onProgress?: SaveProgressObserver) {
     if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
     const result = await saveConfiguration(this.device, this.profile, this.original, this.draft, onProgress)
+    // 只有保存且回读验证成功后，才推进 original 基线并清除 dirty 状态。
     this.profile = result.profile
     this.original = cloneAssignments(result.profile.assignments)
     this.draft = cloneAssignments(result.profile.assignments)
@@ -85,6 +88,7 @@ export class DeviceSession {
 
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {
     if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
+    // 默认值按“层 + 物理位置”索引，同一个物理键在不同 Fn 层可以有不同默认功能。
     const defaults = new Map(this.profile.defaultAssignments.map((item) => [`${item.layer}:${item.positionId}`, item]))
     let matched = false
     this.draft = this.draft.map((item) => {

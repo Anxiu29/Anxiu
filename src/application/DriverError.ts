@@ -27,6 +27,10 @@ export class DriverError extends Error {
   readonly details?: Readonly<Record<string, unknown>>
 }
 
+/**
+ * 应用边界只向 UI 暴露 DriverError。未知的浏览器、协议或第三方异常在此归一化，
+ * 让界面可以依赖稳定 code，而不是匹配可能变化的错误文本。
+ */
 export const toDriverError = (cause: unknown): DriverError =>
   cause instanceof DriverError
     ? cause

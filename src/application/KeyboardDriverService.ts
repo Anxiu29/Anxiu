@@ -20,6 +20,7 @@ export class KeyboardDriverService {
   get session() { return this.active }
 
   async connect(options: ConnectOptions = {}) {
+    // 同一时刻只保留一个活动会话，先关闭旧监听和传输，防止报告被两个会话消费。
     await this.disconnect()
     const driver = options.driverId ? this.registry.get(options.driverId) : this.registry.defaultDriver
     this.active = options.demo
@@ -29,6 +30,7 @@ export class KeyboardDriverService {
   }
 
   async reconnectAuthorized(options: Omit<ConnectOptions, 'demo'> = {}) {
+    // WebHID 的 getDevices 只能返回用户过去授权过的设备，因此此路径不会弹选择框。
     await this.disconnect()
     const driver = options.driverId ? this.registry.get(options.driverId) : this.registry.defaultDriver
     this.active = await driver.reconnectAuthorized(options.onDisconnect ?? (() => undefined))

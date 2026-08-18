@@ -16,6 +16,7 @@ export class WebHidTransport implements DeviceTransport {
   private disconnectListeners = new Set<() => void>()
   private readonly reportHandler = (event: HIDInputReportEvent) => {
     const bytes = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength)
+    // 每个订阅者收到独立副本，避免某个解析器修改共享 HID 缓冲区。
     this.reportListeners.forEach((listener) => listener(bytes.slice()))
   }
   private readonly disconnectHandler = (event: HIDConnectionEvent) => {
@@ -32,6 +33,7 @@ export class WebHidTransport implements DeviceTransport {
   get productId() { return this.device?.productId ?? this.config.productId }
 
   async requestDevice() {
+    // requestDevice 必须由用户手势触发；这里只筛选目标 VID/PID 和 usage。
     this.ensureSupported()
     const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: this.config.vendorId, productId: this.config.productId, usagePage: this.config.usagePage, usage: this.config.usage }] })
     if (!devices[0]) throw new DriverError('DEVICE_NOT_SELECTED', '未选择键盘')
@@ -53,6 +55,7 @@ export class WebHidTransport implements DeviceTransport {
   }
 
   async close() {
+    // 释放设备的同时移除浏览器级监听，避免多次连接后重复触发回调。
     if (this.device?.opened) await this.device.close()
     this.device?.removeEventListener('inputreport', this.reportHandler)
     navigator.hid?.removeEventListener('disconnect', this.disconnectHandler)
@@ -63,6 +66,7 @@ export class WebHidTransport implements DeviceTransport {
 
   async send(report: Uint8Array) {
     if (!this.device?.opened) throw new DriverError('DEVICE_NOT_CONNECTED', '键盘未连接')
+    // 固件要求固定长度报告，未使用区域填 0xFF；codec 只负责有效协议包部分。
     const payload = new Uint8Array(this.config.reportSize)
     payload.fill(0xff)
     payload.set(report.slice(0, payload.length))
@@ -80,6 +84,7 @@ export class WebHidTransport implements DeviceTransport {
   }
 
   private setDevice(device: HIDDevice) {
+    // 切换设备前先解绑旧实例，确保一个 transport 只消费当前设备报告。
     this.device?.removeEventListener('inputreport', this.reportHandler)
     this.device = device
     this.device.addEventListener('inputreport', this.reportHandler)

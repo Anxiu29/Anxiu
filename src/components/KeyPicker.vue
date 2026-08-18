@@ -11,6 +11,7 @@ const spacer = (width = 0.5): PickerItem => ({ width })
 const key = (code: number, width = 1, label?: string, height = 1): PickerItem => ({ code, width, label, height })
 const modifierWidth = 9 / 7
 
+// 将一行相对宽度累加为绝对视觉坐标；spacer 只推进 x，不生成可点击键。
 const placeRow = (y: number, items: PickerItem[], startX = 0): PositionedPickerItem[] => {
   let x = startX
   return items.flatMap((item) => {
@@ -49,11 +50,13 @@ const keyboardKeys: PositionedPickerItem[] = [
 const mode = ref<'keyboard' | 'extended'>('keyboard')
 const search = ref('')
 const byCode = computed(() => new Map(props.keys.map((item) => [item.code, item])))
+// 标准键盘已经显示的键码不再出现在扩展列表，避免同一功能重复出现。
 const visualCodes = new Set(keyboardKeys.map((item) => item.code))
 const query = computed(() => search.value.trim().toLowerCase())
 const matches = (code: number) => {
   if (!query.value) return true
   const definition = byCode.value.get(code)
+  // 同时支持名称、十进制键码和 0x 十六进制键码搜索。
   return definition?.label.toLowerCase().includes(query.value) || String(code).includes(query.value) || code.toString(16).includes(query.value.replace(/^0x/, ''))
 }
 const extendedKeys = computed(() => props.keys.filter((item) => !visualCodes.has(item.code) && matches(item.code)))

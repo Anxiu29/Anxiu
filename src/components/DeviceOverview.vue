@@ -2,6 +2,7 @@
 import type { KeyboardProfile } from '@/domain/keyboard'
 
 defineProps<{ profile: KeyboardProfile; busy?: boolean; imageUrl?: string; imageAlt?: string }>()
+// 组件只展示注入的设备资源和领域 Profile，不直接认识 C98 图片或驱动实现。
 const emit = defineEmits<{ reload: [] }>()
 </script>
 

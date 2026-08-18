@@ -9,6 +9,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   const state = createDriverState()
   const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, revision, saveProgress, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
 
+  /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
     clearFeedback(); status.value = 'connecting'; demo.value = useDemo; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
@@ -18,6 +19,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     } catch (cause) { fail(cause) }
   }
 
+  /** 浏览器只允许无提示重连已经授权过的 HID 设备；没有授权设备不是错误。 */
   async function reconnectAuthorized() {
     clearFeedback(); status.value = 'connecting'; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
@@ -33,9 +35,11 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     profile.value = await state.session.load()
     revision.value++
     status.value = 'ready'
+    // 默认选中第一个真实物理键，避免 UI 初次进入时出现无键位上下文。
     selectedPositionId.value = profile.value.positions[0]?.id
   }
 
+  /** 单键选择采用即时写入：更新草稿、保存、回读验证是同一个应用事务。 */
   async function assignKey(keyCode: number) {
     if (!state.session || !selectedPositionId.value || !['ready', 'error'].includes(status.value)) return
     const positionId = selectedPositionId.value
@@ -44,6 +48,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'writing'; saveProgress.value = undefined
     try {
       const pending = state.session.updateAndSave(positionId, targetLayer, key.code, key.category, (progress) => { saveProgress.value = progress })
+      // updateAndSave 在 Promise 返回前已经同步修改 draft，先刷新一次让键帽立即反映选择。
       revision.value++
       const result = await pending
       profile.value = result.profile
@@ -60,6 +65,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     catch (cause) { fail(cause) }
   }
 
+  /** 只恢复键位默认表，不执行会清除灯光、宏等数据的恢复出厂命令。 */
   async function restoreAllKeyDefaults() {
     if (!state.session) return
     clearFeedback(); status.value = 'writing'; saveProgress.value = undefined
@@ -70,6 +76,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     } catch (cause) { fail(cause) }
   }
 
+  /** 恢复出厂会导致设备状态整体失效，因此成功后主动结束会话并要求重新连接。 */
   async function restoreFactory() {
     if (!state.session || !profile.value || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'
@@ -90,6 +97,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     layer.value = targetLayer
   }
 
+  /** 模式切换由固件完成；切换后必须重新读取，不能复用上一模式的四层映射。 */
   async function selectMode(targetMode: KeyboardMode) {
     if (!state.session || !profile.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
     if (mode.value === targetMode) { layer.value = 0; return }
@@ -105,6 +113,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     } catch (cause) { fail(cause) }
   }
 
+  /** 四个配置槽是设备端状态，切换成功后回到 FN1 并重建当前 Profile。 */
   async function selectConfiguration(configuration: KeyboardConfiguration) {
     if (!state.session || !profile.value || activeConfiguration.value === configuration || ['connecting', 'reading', 'writing'].includes(status.value)) return
     clearFeedback(); status.value = 'reading'
@@ -132,11 +141,13 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   }
 
   function handleDisconnect() {
+    // 保留 profile/draft 供用户查看；操作入口会根据 disconnected 状态被禁用。
     status.value = 'disconnected'
     error.value = '键盘已断开连接，未保存的草稿仍保留在页面中'
   }
   function clearFeedback() { error.value = ''; errorCode.value = undefined; message.value = '' }
   function fail(cause: unknown) {
+    // 所有外层异常在这里收敛为稳定错误码，Vue 组件只处理展示，不解析底层异常。
     const driverError = toDriverError(cause)
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }

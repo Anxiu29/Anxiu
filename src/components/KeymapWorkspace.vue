@@ -31,12 +31,14 @@ const emit = defineEmits<{
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
 const keyContextMenu = ref<{ positionId: string; layer: number; x: number; y: number }>()
+// 同时受宽度和高度约束，避免宽屏但矮窗口把第二块键盘挤出首屏。
 const keyboardUnit = computed(() => {
   const widthUnit = viewportWidth.value <= 1200 ? 32 : viewportWidth.value <= 1400 ? 39 : viewportWidth.value <= 1500 ? 42 : viewportWidth.value <= 1650 ? 49 : 58
   const heightUnit = viewportHeight.value <= 820 ? 39 : viewportHeight.value <= 900 ? 48 : viewportHeight.value <= 1000 ? 53 : 58
   return Math.min(widthUnit, heightUnit)
 })
 const layerDefaults = computed(() => props.profile.defaultAssignments.filter((item) => item.layer === props.layer))
+// reading/writing 期间禁用切换和改键，保证没有两个 HID 命令事务交错执行。
 const busy = () => ['connecting', 'reading', 'writing'].includes(props.status)
 const remapDisabled = () => busy() || props.status === 'disconnected' || props.status === 'unsupported'
 const updateViewportSize = () => {
@@ -47,6 +49,7 @@ const closeKeyContextMenu = () => { keyContextMenu.value = undefined }
 const openKeyContextMenu = (payload: { positionId: string; clientX: number; clientY: number }) => {
   if (remapDisabled()) return
   emit('select-position', payload.positionId)
+  // 菜单坐标限制在视口内，窄窗口下仍能点击“恢复此键默认”。
   keyContextMenu.value = {
     positionId: payload.positionId,
     layer: props.layer,

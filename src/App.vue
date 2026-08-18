@@ -7,11 +7,14 @@ import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
 
 const store = useDriverStore()
+// storeToRefs 保留 Pinia 响应性；操作方法仍直接通过 store 调用。
 const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, demo } = storeToRefs(store)
+// 切换真机/演示或重新连接时重建工作区壳，清理旧页面内部的导航与弹窗状态。
 const shellRevision = ref(0)
 const labels: Record<string, string> = { idle: '待连接', connecting: '连接中', reading: '读取中', ready: '已就绪', writing: '写入中', disconnected: '已断开', error: '发生错误', unsupported: '不支持' }
 const busy = () => ['connecting', 'reading', 'writing'].includes(status.value)
 const connect = async (useDemo: boolean) => { shellRevision.value++; await store.connect(useDemo) }
+// 浏览器关闭保护只关心尚未确认写入的草稿，不阻止已经回读验证成功的配置离开页面。
 const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }
 onMounted(() => { window.addEventListener('beforeunload', beforeUnload); store.reconnectAuthorized() })
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))

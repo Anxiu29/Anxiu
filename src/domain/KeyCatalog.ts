@@ -15,6 +15,7 @@ export class StaticKeyCatalog implements KeyCatalog {
   list() { return this.definitions }
 
   get(code: number): KeyDefinition {
+    // 固件可能返回文档之外的新键码；保留数值比抛错更利于诊断和后续补表。
     return this.index.get(code) ?? unknownKey(code)
   }
 }

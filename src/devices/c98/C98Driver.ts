@@ -41,6 +41,7 @@ export class C98Driver implements DeviceDriver {
   }
 
   createDemoSession() {
+    // 演示模式与真机共享键码目录、能力和默认表，只替换最外层协议实现。
     return new DeviceSession(new DemoKeyboardProtocol(XSYD_KEY_CATALOG, C98_DEMO_KEYS, C98_CAPABILITIES, resolveC98DefaultKeymap), XSYD_KEY_CATALOG)
   }
 
@@ -52,6 +53,7 @@ export class C98Driver implements DeviceDriver {
   }
 
   private createSession(transport: WebHidTransport) {
+    // 设备层是具体实现相遇的位置：传输、协议、能力和 C98 默认数据都在这里注入。
     return new DeviceSession(new XsydKeyboardProtocol(transport, XSYD_KEY_CATALOG, C98_CAPABILITIES, resolveC98DefaultKeymap), XSYD_KEY_CATALOG, transport)
   }
 }

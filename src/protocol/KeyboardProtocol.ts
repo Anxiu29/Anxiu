@@ -29,11 +29,14 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async getProfile(): Promise<KeyboardProfile> {
+    // 设备身份与协议版本互不依赖，可以并行查询；能力需要两者齐备后才能解析。
     const [device, protocolVersion] = await Promise.all([this.sync(), this.queryProtocolVersion()])
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
+    // 0x2B 只告诉我们有哪些物理键；每个 Fn 层的实际键值还要通过 0x23 单独读取。
     const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
+    // 协议需要默认值来组装 Profile，但默认表由设备层注入，协议不知道 C98 等具体型号。
     const defaultAssignments = this.resolveDefaultKeymap({
       mode: this.currentMode,
       positions,
@@ -50,6 +53,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async writeAssignments(assignments: KeyAssignment[]) {
+    // 一个 HID 报告最多容纳 14 条四字节键位记录，超出部分必须按同样格式分批发送。
     for (let offset = 0; offset < assignments.length; offset += 14) {
       const batch = assignments.slice(offset, offset + 14)
       const data = [1]
@@ -73,6 +77,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   close() { this.commands.close() }
 
   private async sync(): Promise<DeviceInfo> {
+    // 随机挑战值用于建立本次同步请求；响应中的字段偏移来自 XSYD 设备信息报文。
     const random = crypto.getRandomValues(new Uint8Array(4))
     const data = await this.commands.request(XSYD_COMMANDS.sync, new Uint8Array([...random, 0xff, 0xff]))
     const ascii = (start: number, length: number) => new TextDecoder().decode(data.slice(start + 1, start + length)).replace(/\0/g, '').trim()
@@ -103,12 +108,14 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
 
   private async readDefaultLayout(rows: number, columns: number): Promise<KeyPosition[]> {
     const matrixKeys: MatrixKeyInput[] = []
+    // defaultKeymap 每次返回相邻两行，所以 row 按 2 递增。
     for (let row = 0; row < rows; row += 2) {
       const data = await this.commands.request(XSYD_COMMANDS.defaultKeymap, new Uint8Array([0, row, row + 1]))
       const blocks = [{ row: data[1] ?? row, start: 2 }, { row: data[2 + columns] ?? row + 1, start: 3 + columns }]
       for (const block of blocks) {
         for (let column = 0; column < columns; column++) {
           const sourceCode = data[block.start + column] ?? 0xff
+          // 0xFF 和 0x00 都代表矩阵空位，不创建可改键的物理位置。
           if (sourceCode === 0xff || sourceCode === 0) continue
           matrixKeys.push({ id: `${block.row}-${column}`, sourceCode, label: this.keyCatalog.get(sourceCode).label, address: { kind: 'matrix', row: block.row, column } })
         }
@@ -122,10 +129,12 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     for (let offset = 0; offset < positions.length; offset += 14) {
       const batch = positions.slice(offset, offset + 14)
       const request = [0]
+      // 读取请求中每项是 sourceCode、layer 和两个占位字节；响应返回同样的四字节槽位。
       batch.forEach((position) => request.push(position.sourceCode, layer, 0xff, 0xff))
       const data = await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array(request))
       for (let index = 0; index < batch.length; index++) {
         const position = batch[index]!
+        // 每项前两字节回显物理键与层，后两字节是小端序目标键码。
         const keyCode = readUint16le(data, 1 + index * 4 + 2)
         assignments.push({ positionId: position.id, sourceCode: position.sourceCode, layer, keyCode, category: this.keyCatalog.get(keyCode).category })
       }

@@ -18,9 +18,11 @@ export const createDriverState = () => {
   const demo = ref(false)
   const revision = ref(0)
   const saveProgress = ref<SaveProgress>()
+  // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
   const activeSession = shallowRef<DeviceSession>()
 
   const connected = computed(() => ['ready', 'writing', 'reading'].includes(status.value))
+  // Session 内的 draft 不是 Vue 响应式对象；操作完成后递增 revision，显式通知这些查询重算。
   const dirty = computed(() => { revision.value; return activeSession.value?.dirty ?? false })
   const assignments = computed(() => { revision.value; return activeSession.value?.draft.filter((item) => item.layer === layer.value) ?? [] })
   const selectedAssignment = computed(() => assignments.value.find((item) => item.positionId === selectedPositionId.value))
