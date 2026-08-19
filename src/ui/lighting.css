@@ -453,3 +453,11 @@
     margin-top: 10px;
   }
 }
+
+/* 大屏预览无需显示由像素取整造成的滚动条，小屏仍允许正常查看溢出内容。 */
+@media (min-width: 1400px) and (min-height: 800px) {
+  .lighting-keyboard-preview,
+  .lighting-keyboard-preview .keyboard-shell { scrollbar-width: none; }
+  .lighting-keyboard-preview::-webkit-scrollbar,
+  .lighting-keyboard-preview .keyboard-shell::-webkit-scrollbar { display: none; }
+}
