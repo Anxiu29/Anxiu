@@ -186,7 +186,6 @@ function cancelEditing() {
       </aside>
 
       <section class="advanced-form">
-        <CompactKeyTest :key-labels="keyLabels" />
         <div v-if="loading && !draft" class="advanced-placeholder">正在读取当前按键的高级键设置…</div>
         <div v-else-if="!draft || draft.type === 'none'" class="advanced-placeholder">此键尚未设置高级功能。请从左侧选择一种模式。</div>
 
@@ -236,6 +235,9 @@ function cancelEditing() {
         </div>
 
       </section>
+      <aside class="advanced-test-rail">
+        <CompactKeyTest :key-labels="keyLabels" />
+      </aside>
     </div>
     <KeyCodeKeyboardDialog :open="!!keyPickerTarget" :profile="profile" :model-value="keyPickerValue" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="keyPickerTarget = undefined" @confirm="confirmKeyPicker" />
   </section>

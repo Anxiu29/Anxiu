@@ -30,9 +30,9 @@
 .advanced-editor {
   min-height: 0;
   display: grid;
-  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-columns: 270px minmax(0, 1fr) 220px;
   grid-template-rows: 62px minmax(0, 1fr);
-  grid-template-areas: "heading heading" "types form";
+  grid-template-areas: "heading heading heading" "types form test";
   overflow: hidden;
 }
 
@@ -137,7 +137,15 @@
   flex-direction: column;
 }
 
+.advanced-test-rail {
+  grid-area: test;
+  min-width: 0;
+  padding: 13px 12px;
+  border-left: 1px solid #252c36;
+}
+
 .compact-key-test {
+  width: 100%;
   min-height: 42px;
   padding: 7px 12px;
   display: flex;
@@ -155,9 +163,11 @@
 .compact-key-test.active { border-color: rgba(69, 230, 208, .5); background: rgba(69, 230, 208, .07); }
 .compact-key-test.active span i { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
 .compact-key-test.active strong { color: var(--cyan); }
+.advanced-test-rail .compact-key-test { min-height: 64px; align-items: flex-start; flex-direction: column; justify-content: center; gap: 6px; }
+.advanced-test-rail .compact-key-test strong { width: 100%; min-width: 0; max-width: 100%; text-align: left; }
 
 .advanced-placeholder { flex: 1; display: grid; place-items: center; color: #707b89; font-size: 12px; }
-.advanced-fields { min-height: 0; padding: 8px 0 12px; display: grid; align-content: start; gap: 9px; overflow: auto; }
+.advanced-fields { min-height: 0; padding: 12px 0; display: grid; align-content: start; gap: 9px; overflow: auto; }
 .advanced-field-row { display: grid; grid-template-columns: 120px minmax(210px, 520px); align-items: center; gap: 12px; }
 .advanced-field-row.three-columns { grid-template-columns: 105px minmax(180px, 440px) minmax(180px, 280px); }
 .advanced-field-row > label,
@@ -337,6 +347,7 @@
 .key-code-dialog > footer button { min-width: 72px; }
 
 @media (max-width: 1300px) {
+  .advanced-editor { grid-template-columns: 230px minmax(0, 1fr) 190px; }
   .dks-editor { min-width: 680px; grid-template-columns: minmax(500px, 1fr) 200px; gap: 16px; }
   .dks-matrix { --dks-column-gap: 9px; grid-template-columns: 96px repeat(4, minmax(64px, 1fr)); gap: 7px var(--dks-column-gap); }
   .advanced-card-grid.three { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
