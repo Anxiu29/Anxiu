@@ -1,1 +1,151 @@
-.advanced-workspace{display:grid;grid-template-rows:minmax(315px,42vh) minmax(370px,1fr);gap:12px;height:100%;padding:16px;overflow:auto}.advanced-keyboard-panel{padding:16px 20px;overflow:hidden}.advanced-keyboard-panel .keyboard-shell{min-height:0;height:calc(100% - 52px);padding:12px;justify-content:flex-start}.advanced-keyboard-panel .keyboard-layout{transform-origin:top left}.advanced-heading{display:flex;align-items:center;justify-content:space-between;height:42px}.advanced-heading h2{font-size:18px;margin:3px 0}.advanced-heading p{color:#7f8998;font-size:11px}.advanced-editor{display:grid;grid-template-columns:245px 1fr;min-height:370px;overflow:hidden}.advanced-type-list{display:grid;align-content:start;gap:7px;padding:16px;border-right:1px solid #252c36}.advanced-type-list button{display:flex;flex-direction:column;gap:4px;text-align:left;padding:10px 12px;border:1px solid #2a323e;border-radius:7px;background:#0d1117;color:#dde3ea}.advanced-type-list button small{font-size:9px;line-height:1.35;color:#778290}.advanced-type-list button.active{border-color:var(--cyan);background:rgba(69,230,208,.08);color:var(--cyan)}.advanced-type-list button:disabled{opacity:.45}.advanced-form{display:flex;flex-direction:column;min-width:0;padding:18px 22px}.advanced-form>header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:13px;border-bottom:1px solid #252c36}.advanced-form>header div{display:flex;align-items:center;gap:10px}.advanced-form>header span,.advanced-form>header p{font-size:10px;color:#76818e}.advanced-form>header p{margin:3px 0;max-width:430px}.advanced-form>header code{font-size:9px;color:#708090}.advanced-placeholder{display:grid;place-items:center;flex:1;color:#707b89;font-size:12px}.advanced-fields{display:grid;align-content:start;gap:9px;padding:15px 0;overflow:auto}.advanced-field-row{display:grid;grid-template-columns:120px minmax(210px,420px);align-items:center;gap:12px}.advanced-field-row.three-columns{grid-template-columns:105px minmax(180px,360px) minmax(180px,260px)}.advanced-field-row>label,.standalone-field{font-size:11px;color:#9da7b3}.advanced-form select,.advanced-form input{height:34px;border:1px solid #2d3642;border-radius:5px;background:#0a0e14;color:#dbe1e8;padding:0 10px;outline:none}.advanced-form select:focus,.advanced-form input:focus{border-color:var(--cyan)}.inline-number{display:flex;align-items:center;gap:8px}.inline-number input{width:90px}.travel-grid{display:flex;gap:18px}.travel-grid label,.standalone-field{display:flex;align-items:center;gap:10px}.travel-grid input,.standalone-field input{width:110px}.field-help{margin:0;color:#6f7a88;font-size:10px}.advanced-form>footer{display:flex;justify-content:flex-end;gap:10px;margin-top:auto;padding-top:13px;border-top:1px solid #252c36}.advanced-form>footer button{min-width:130px}.advanced-form>footer button:disabled{opacity:.45;cursor:not-allowed}@media(max-height:850px){.advanced-workspace{grid-template-rows:280px minmax(340px,1fr)}.advanced-type-list{grid-template-columns:1fr 1fr;width:330px}.advanced-editor{grid-template-columns:330px 1fr}.advanced-type-list button{padding:7px 9px}}
+/* 高级键页使用整个内容区：上方大键盘，下方“添加/编辑高级键”面板。 */
+.advanced-workspace {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 52%) minmax(0, 1fr);
+  gap: 10px;
+  overflow: hidden;
+}
+
+.advanced-keyboard-panel {
+  min-height: 0;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.advanced-keyboard-panel .keyboard-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.advanced-editor {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-rows: 62px minmax(0, 1fr);
+  grid-template-areas: "heading heading" "types form";
+  overflow: hidden;
+}
+
+.advanced-editor-heading {
+  grid-area: heading;
+  padding: 11px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid #252c36;
+}
+
+.advanced-editor-heading h2 {
+  margin: 2px 0 0;
+  font-size: 18px;
+}
+
+.advanced-editor-heading p {
+  margin: 0;
+  color: #7f8998;
+  font-size: 11px;
+}
+
+.advanced-type-list {
+  grid-area: types;
+  min-height: 0;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 7px;
+  overflow: auto;
+  border-right: 1px solid #252c36;
+}
+
+.advanced-type-list button {
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid #2a323e;
+  border-radius: 7px;
+  color: #dde3ea;
+  background: #0d1117;
+  text-align: left;
+}
+
+.advanced-type-list button small {
+  color: #778290;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.advanced-type-list button.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(69, 230, 208, .08);
+}
+
+.advanced-type-list button:disabled { opacity: .45; }
+
+.advanced-form {
+  grid-area: form;
+  min-width: 0;
+  min-height: 0;
+  padding: 13px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.advanced-form > header {
+  padding-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid #252c36;
+}
+
+.advanced-form > header div { display: flex; align-items: center; gap: 10px; }
+.advanced-form > header span,
+.advanced-form > header p { color: #76818e; font-size: 10px; }
+.advanced-form > header p { max-width: 430px; margin: 3px 0; }
+.advanced-form > header code { color: #708090; font-size: 9px; }
+.advanced-placeholder { flex: 1; display: grid; place-items: center; color: #707b89; font-size: 12px; }
+.advanced-fields { min-height: 0; padding: 12px 0; display: grid; align-content: start; gap: 9px; overflow: auto; }
+.advanced-field-row { display: grid; grid-template-columns: 120px minmax(210px, 520px); align-items: center; gap: 12px; }
+.advanced-field-row.three-columns { grid-template-columns: 105px minmax(180px, 440px) minmax(180px, 280px); }
+.advanced-field-row > label,
+.standalone-field { color: #9da7b3; font-size: 11px; }
+.advanced-form select,
+.advanced-form input { height: 34px; padding: 0 10px; border: 1px solid #2d3642; border-radius: 5px; outline: none; color: #dbe1e8; background: #0a0e14; }
+.advanced-form select:focus,
+.advanced-form input:focus { border-color: var(--cyan); }
+.inline-number { display: flex; align-items: center; gap: 8px; }
+.inline-number input { width: 90px; }
+.travel-grid { display: flex; gap: 18px; }
+.travel-grid label,
+.standalone-field { display: flex; align-items: center; gap: 10px; }
+.travel-grid input,
+.standalone-field input { width: 110px; }
+.field-help { margin: 0; color: #6f7a88; font-size: 10px; }
+.advanced-form > footer { margin-top: auto; padding-top: 10px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #252c36; }
+.advanced-form > footer button { min-width: 140px; }
+.advanced-form > footer button:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-height: 820px) {
+  .advanced-workspace { grid-template-rows: minmax(0, 48%) minmax(0, 1fr); gap: 8px; }
+  .advanced-editor { grid-template-rows: 52px minmax(0, 1fr); }
+  .advanced-editor-heading { padding-block: 7px; }
+  .advanced-type-list { padding: 8px; gap: 5px; }
+  .advanced-type-list button { min-height: 48px; padding: 6px 8px; }
+  .advanced-form { padding-block: 9px; }
+}

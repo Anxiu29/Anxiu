@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
 import { createAdvancedKeySettings } from '@/domain/advancedKey'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
@@ -24,6 +24,8 @@ const emit = defineEmits<{
 }>()
 
 const draft = ref<AdvancedKeySettings>()
+const viewportWidth = ref(window.innerWidth)
+const viewportHeight = ref(window.innerHeight)
 const types: { id: Exclude<AdvancedKeyType, 'none'>; label: string; summary: string }[] = [
   { id: 'dks', label: 'DKS', summary: '按键行程的多个阶段触发不同键值' },
   { id: 'mpt', label: 'MPT', summary: '在三个指定行程点依次触发键值' },
@@ -36,6 +38,14 @@ const selectedPosition = computed(() => props.profile.positions.find((item) => i
 const selectedAssignment = computed(() => props.assignments.find((item) => item.positionId === props.selectedPositionId))
 const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.status))
 const currentDescription = computed(() => types.find((item) => item.id === draft.value?.type)?.summary ?? '当前按键没有高级键设置')
+const keyboardUnit = computed(() => {
+  const widthUnit = viewportWidth.value <= 1250 ? 38 : viewportWidth.value <= 1450 ? 46 : viewportWidth.value <= 1650 ? 52 : viewportWidth.value <= 1850 ? 58 : 62
+  const heightUnit = viewportHeight.value <= 800 ? 43 : viewportHeight.value <= 900 ? 50 : viewportHeight.value <= 1000 ? 57 : 62
+  return Math.min(widthUnit, heightUnit)
+})
+const updateViewportSize = () => { viewportWidth.value = window.innerWidth; viewportHeight.value = window.innerHeight }
+onMounted(() => window.addEventListener('resize', updateViewportSize))
+onBeforeUnmount(() => window.removeEventListener('resize', updateViewportSize))
 
 watch(() => props.settings, (value) => { draft.value = value ? structuredClone(value) : undefined }, { immediate: true, deep: true })
 watch(() => props.selectedPositionId, (positionId) => { draft.value = undefined; if (positionId) emit('load', positionId) }, { immediate: true })
@@ -68,11 +78,14 @@ function remove() {
 <template>
   <section class="advanced-workspace">
     <div class="panel advanced-keyboard-panel">
-      <div class="advanced-heading"><div><span class="eyebrow">ADVANCED KEY</span><h2>高级键设置</h2></div><p>先选择物理键，再配置高级触发逻辑</p></div>
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="46" :geometry="keyGeometry" @select="emit('select-position', $event)" />
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="emit('select-position', $event)" />
     </div>
 
     <div class="panel advanced-editor">
+      <header class="advanced-editor-heading">
+        <div><span class="eyebrow">ADVANCED KEY</span><h2>{{ draft && draft.type !== 'none' ? '编辑高级键' : '添加高级键' }}</h2></div>
+        <p>先在上方选择物理键，再选择高级键类型并配置触发逻辑</p>
+      </header>
       <aside class="advanced-type-list">
         <button v-for="item in types" :key="item.id" :class="{ active: draft?.type === item.id }" :disabled="busy || !selectedPosition" @click="selectType(item.id)"><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></button>
       </aside>
