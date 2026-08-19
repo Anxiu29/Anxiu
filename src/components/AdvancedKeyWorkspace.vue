@@ -6,6 +6,7 @@ import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } fro
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import KeyboardCanvas from './KeyboardCanvas.vue'
 import KeyCodeKeyboardDialog from './KeyCodeKeyboardDialog.vue'
+import CompactKeyTest from './CompactKeyTest.vue'
 
 const props = defineProps<{
   profile: KeyboardProfile
@@ -185,6 +186,7 @@ function cancelEditing() {
       </aside>
 
       <section class="advanced-form">
+        <CompactKeyTest :key-labels="keyLabels" />
         <div v-if="loading && !draft" class="advanced-placeholder">正在读取当前按键的高级键设置…</div>
         <div v-else-if="!draft || draft.type === 'none'" class="advanced-placeholder">此键尚未设置高级功能。请从左侧选择一种模式。</div>
 

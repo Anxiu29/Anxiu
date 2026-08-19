@@ -137,8 +137,27 @@
   flex-direction: column;
 }
 
+.compact-key-test {
+  min-height: 42px;
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 14px;
+  border: 1px solid #2a333e;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.compact-key-test span { display: flex; align-items: center; gap: 6px; color: #75818e; font-size: 9px; white-space: nowrap; }
+.compact-key-test span i { width: 6px; height: 6px; border-radius: 50%; background: #4e5965; }
+.compact-key-test strong { min-width: 110px; max-width: 260px; overflow: hidden; color: #dbe2e8; font-size: 13px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.compact-key-test.active { border-color: rgba(69, 230, 208, .5); background: rgba(69, 230, 208, .07); }
+.compact-key-test.active span i { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.compact-key-test.active strong { color: var(--cyan); }
+
 .advanced-placeholder { flex: 1; display: grid; place-items: center; color: #707b89; font-size: 12px; }
-.advanced-fields { min-height: 0; padding: 12px 0; display: grid; align-content: start; gap: 9px; overflow: auto; }
+.advanced-fields { min-height: 0; padding: 8px 0 12px; display: grid; align-content: start; gap: 9px; overflow: auto; }
 .advanced-field-row { display: grid; grid-template-columns: 120px minmax(210px, 520px); align-items: center; gap: 12px; }
 .advanced-field-row.three-columns { grid-template-columns: 105px minmax(180px, 440px) minmax(180px, 280px); }
 .advanced-field-row > label,
