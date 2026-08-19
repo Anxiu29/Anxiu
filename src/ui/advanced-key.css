@@ -192,6 +192,7 @@
 }
 
 .dks-matrix {
+  --dks-column-gap: 14px;
   display: grid;
   grid-template-columns: 112px repeat(4, minmax(74px, 1fr));
   align-items: center;
@@ -226,20 +227,42 @@
 .advanced-key-value.compact { min-height: 42px; padding: 4px 8px; }
 .advanced-key-value.large { min-width: 130px; min-height: 74px; font-size: 16px; }
 
-.dks-trigger-cell {
-  width: 34px;
+.dks-trigger-slot {
+  position: relative;
+  width: 100%;
   height: 34px;
-  justify-self: center;
+  display: grid;
+  place-items: center;
+}
+
+.dks-trigger-slot.connected-next::after {
+  position: absolute;
+  left: 50%;
+  z-index: 0;
+  width: calc(100% + var(--dks-column-gap));
+  height: 20px;
+  border-radius: 999px;
+  background: #f4f5f5;
+  content: '';
+}
+
+.dks-trigger-cell {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
   border: 1px solid #56606b;
   border-radius: 50%;
   color: #c4cbd2;
   background: #434a52;
-  font-size: 20px;
+  font-size: 15px;
   line-height: 1;
+  touch-action: none;
+  user-select: none;
 }
 
 .dks-trigger-cell.single { border-color: #7ce9d9; color: #071310; background: var(--cyan); }
-.dks-trigger-cell.continuous { border-color: #78baff; color: #07101a; background: #78baff; box-shadow: 0 0 12px rgba(120, 186, 255, .28); }
+.dks-trigger-cell.continuous { width: 26px; border-color: #f4f5f5; background: #f4f5f5; box-shadow: none; }
 .dks-help { padding: 16px 18px; border-radius: 9px; color: #d4dce4; background: rgba(255, 255, 255, .055); }
 .dks-help strong { display: block; margin-bottom: 10px; font-size: 12px; }
 .dks-help p { margin: 6px 0; color: #aeb9c4; font-size: 10px; line-height: 1.45; }
@@ -296,6 +319,6 @@
 
 @media (max-width: 1300px) {
   .dks-editor { min-width: 680px; grid-template-columns: minmax(500px, 1fr) 200px; gap: 16px; }
-  .dks-matrix { grid-template-columns: 96px repeat(4, minmax(64px, 1fr)); gap: 7px 9px; }
+  .dks-matrix { --dks-column-gap: 9px; grid-template-columns: 96px repeat(4, minmax(64px, 1fr)); gap: 7px var(--dks-column-gap); }
   .advanced-card-grid.three { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
 }

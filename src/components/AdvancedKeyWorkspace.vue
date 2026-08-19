@@ -28,6 +28,8 @@ const emit = defineEmits<{
 const draft = ref<AdvancedKeySettings>()
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
+const triggerDrag = ref<{ row: number; startPhase: number; endPhase: number; moved: boolean }>()
+const ignoreTriggerClick = ref(false)
 type KeyPickerTarget = { kind: 'keyCodes'; index: number } | { kind: 'keyCode' } | { kind: 'pairedSourceCode' }
 const keyPickerTarget = ref<KeyPickerTarget>()
 const types: { id: Exclude<AdvancedKeyType, 'none'>; label: string; summary: string }[] = [
@@ -59,8 +61,16 @@ const keyboardUnit = computed(() => {
   return Math.min(widthUnit, heightUnit)
 })
 const updateViewportSize = () => { viewportWidth.value = window.innerWidth; viewportHeight.value = window.innerHeight }
-onMounted(() => window.addEventListener('resize', updateViewportSize))
-onBeforeUnmount(() => window.removeEventListener('resize', updateViewportSize))
+onMounted(() => {
+  window.addEventListener('resize', updateViewportSize)
+  window.addEventListener('pointerup', finishTriggerDrag)
+  window.addEventListener('pointercancel', cancelTriggerDrag)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateViewportSize)
+  window.removeEventListener('pointerup', finishTriggerDrag)
+  window.removeEventListener('pointercancel', cancelTriggerDrag)
+})
 
 watch([() => props.settings, () => props.selectedPositionId], ([value]) => {
   // Store 只缓存最近读取的一键；切换物理键时绝不能短暂展示上一键的数据。
@@ -91,6 +101,40 @@ function cycleTrigger(row: number, phase: number) {
   const next = current === 0 ? 1 : current === 1 ? 3 : 0
   const shift = phase * 2
   draft.value.triggers[row] = (draft.value.triggers[row]! & ~(0x03 << shift)) | (next << shift)
+}
+function setTriggerState(row: number, phase: number, state: 0 | 1 | 3) {
+  if (draft.value?.type !== 'dks') return
+  const shift = phase * 2
+  draft.value.triggers[row] = (draft.value.triggers[row]! & ~(0x03 << shift)) | (state << shift)
+}
+function startTriggerDrag(row: number, phase: number) {
+  triggerDrag.value = { row, startPhase: phase, endPhase: phase, moved: false }
+}
+function extendTriggerDrag(row: number, phase: number) {
+  if (!triggerDrag.value || triggerDrag.value.row !== row || triggerDrag.value.endPhase === phase) return
+  triggerDrag.value.endPhase = phase
+  triggerDrag.value.moved = phase !== triggerDrag.value.startPhase
+}
+function finishTriggerDrag() {
+  const drag = triggerDrag.value
+  triggerDrag.value = undefined
+  if (!drag?.moved) return
+
+  // 拖过的阶段统一写为 11（连续触发）；相邻的 11 在 UI 中会合并成一条连续横条。
+  const first = Math.min(drag.startPhase, drag.endPhase)
+  const last = Math.max(drag.startPhase, drag.endPhase)
+  for (let phase = first; phase <= last; phase += 1) setTriggerState(drag.row, phase, 3)
+  ignoreTriggerClick.value = true
+  // pointerup 后浏览器会紧接着派发 click；下一轮事件循环再复位，也能覆盖在格外松手、没有 click 的情况。
+  window.setTimeout(() => { ignoreTriggerClick.value = false }, 0)
+}
+function cancelTriggerDrag() { triggerDrag.value = undefined }
+function handleTriggerClick(row: number, phase: number) {
+  if (ignoreTriggerClick.value) {
+    ignoreTriggerClick.value = false
+    return
+  }
+  cycleTrigger(row, phase)
 }
 function openKeyPicker(target: KeyPickerTarget) { keyPickerTarget.value = target }
 function confirmKeyPicker(keyCode: number) {
@@ -157,10 +201,12 @@ function cancelEditing() {
                 </div>
                 <template v-for="(keyCode, row) in draft.keyCodes" :key="row">
                   <button class="advanced-key-value compact" type="button" @click="openKeyPicker({ kind: 'keyCodes', index: row })"><span>{{ keyLabel(keyCode) }}</span><small>键值 {{ row + 1 }}</small></button>
-                  <button v-for="phase in 4" :key="phase" class="dks-trigger-cell" :class="{ single: triggerState(row, phase - 1) === 1, continuous: triggerState(row, phase - 1) === 3 }" type="button" :title="triggerState(row, phase - 1) === 0 ? '未触发' : triggerState(row, phase - 1) === 1 ? '单次触发' : '连续触发'" @click="cycleTrigger(row, phase - 1)">{{ triggerState(row, phase - 1) === 0 ? '+' : triggerState(row, phase - 1) === 1 ? '●' : '━' }}</button>
+                  <div v-for="phase in 4" :key="phase" class="dks-trigger-slot" :class="{ continuous: triggerState(row, phase - 1) === 3, 'connected-next': phase < 4 && triggerState(row, phase - 1) === 3 && triggerState(row, phase) === 3 }">
+                    <button class="dks-trigger-cell" :class="{ single: triggerState(row, phase - 1) === 1, continuous: triggerState(row, phase - 1) === 3 }" type="button" :title="triggerState(row, phase - 1) === 0 ? '未触发' : triggerState(row, phase - 1) === 1 ? '单次触发' : '连续触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)">{{ triggerState(row, phase - 1) === 0 ? '+' : triggerState(row, phase - 1) === 1 ? '●' : '' }}</button>
+                  </div>
                 </template>
               </div>
-              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”设为单次触发</p><p>再次单击切换为连续触发</p><p>第三次单击取消该阶段</p><p>每行可以选择不同的输出键值</p></aside>
+              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”图标：设置单次触发</p><p>再次单击：切换连续或取消选中</p><p>按住并横向拖动：设置连续触发</p><p>拖过的相邻阶段会显示为连续横条</p></aside>
             </div>
           </template>
 
