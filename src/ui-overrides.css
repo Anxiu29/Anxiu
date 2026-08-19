@@ -16,7 +16,7 @@ main {
   height: 100dvh;
   min-height: 0;
   display: grid;
-  grid-template-rows: 82px minmax(0, 1fr) 44px;
+  grid-template-rows: 82px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -119,8 +119,7 @@ main {
   flex-direction: column;
 }
 
-.sidebar-device small,
-.sidebar-meta small {
+.sidebar-device small {
   color: #596472;
   font-size: 11px;
 }
@@ -214,8 +213,7 @@ main {
 .app-shell.sidebar-collapsed .sidebar-device div,
 .app-shell.sidebar-collapsed .sidebar-configurations,
 .app-shell.sidebar-collapsed .sidebar-nav span,
-.app-shell.sidebar-collapsed .sidebar-settings span,
-.app-shell.sidebar-collapsed .sidebar-meta {
+.app-shell.sidebar-collapsed .sidebar-settings span {
   display: none;
 }
 
@@ -289,16 +287,6 @@ main {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.6;
-}
-
-.sidebar-meta {
-  margin-top: 8px;
-  padding: 14px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  color: #778290;
-  font-size: 9px;
 }
 
 .app-content {

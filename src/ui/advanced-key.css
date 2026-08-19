@@ -57,6 +57,19 @@
   font-size: 11px;
 }
 
+.advanced-heading-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.advanced-heading-main > div { flex: none; }
+.advanced-heading-main p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.advanced-heading-actions { flex: none; display: flex; align-items: center; gap: 9px; }
+.advanced-heading-actions button { min-width: 76px; padding: 10px 16px; }
+.advanced-heading-actions button:disabled { opacity: .45; cursor: not-allowed; }
+
 .advanced-type-list {
   grid-area: types;
   min-height: 0;
@@ -97,6 +110,24 @@
 
 .advanced-type-list button:disabled { opacity: .45; }
 
+.advanced-current-physical {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-top: 5px;
+  padding: 11px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  border: 1px solid #29323d;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.advanced-current-physical span { grid-column: 1 / -1; color: #6f7b89; font-size: 9px; }
+.advanced-current-physical strong { color: #e0e6ec; font-size: 12px; }
+.advanced-current-physical code { color: var(--cyan); font-size: 9px; }
+.advanced-current-physical small { grid-column: 1 / -1; overflow: hidden; color: #788491; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
 .advanced-form {
   grid-area: form;
   min-width: 0;
@@ -106,19 +137,6 @@
   flex-direction: column;
 }
 
-.advanced-form > header {
-  padding-bottom: 10px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  border-bottom: 1px solid #252c36;
-}
-
-.advanced-form > header div { display: flex; align-items: center; gap: 10px; }
-.advanced-form > header span,
-.advanced-form > header p { color: #76818e; font-size: 10px; }
-.advanced-form > header p { max-width: 430px; margin: 3px 0; }
-.advanced-form > header code { color: #708090; font-size: 9px; }
 .advanced-placeholder { flex: 1; display: grid; place-items: center; color: #707b89; font-size: 12px; }
 .advanced-fields { min-height: 0; padding: 12px 0; display: grid; align-content: start; gap: 9px; overflow: auto; }
 .advanced-field-row { display: grid; grid-template-columns: 120px minmax(210px, 520px); align-items: center; gap: 12px; }
@@ -137,9 +155,6 @@
 .travel-grid input,
 .standalone-field input { width: 110px; }
 .field-help { margin: 0; color: #6f7a88; font-size: 10px; }
-.advanced-form > footer { margin-top: auto; padding-top: 10px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #252c36; }
-.advanced-form > footer button { min-width: 140px; }
-.advanced-form > footer button:disabled { opacity: .45; cursor: not-allowed; }
 
 @media (max-height: 820px) {
   .advanced-workspace { grid-template-rows: minmax(0, 48%) minmax(0, 1fr); gap: 8px; }

@@ -23,7 +23,6 @@ const emit = defineEmits<{
   'select-position': [positionId: string]
   load: [positionId: string]
   update: [settings: Exclude<AdvancedKeySettings, { type: 'none' }>]
-  delete: [sourceCode: number]
 }>()
 
 const draft = ref<AdvancedKeySettings>()
@@ -105,9 +104,12 @@ function confirmKeyPicker(keyCode: number) {
 function save() {
   if (draft.value && draft.value.type !== 'none') emit('update', cloneAdvancedKeySettings(draft.value) as Exclude<AdvancedKeySettings, { type: 'none' }>)
 }
-function remove() {
-  if (!selectedPosition.value || draft.value?.type === 'none') return
-  if (window.confirm('清除当前物理键的高级键设置？普通键位映射不会改变。')) emit('delete', selectedPosition.value.sourceCode)
+
+// “取消”只丢弃尚未确认的表单修改，并恢复最近一次从设备读到的配置，避免误删设备数据。
+function cancelEditing() {
+  keyPickerTarget.value = undefined
+  const saved = props.settings
+  draft.value = saved && saved.sourceCode === selectedPosition.value?.sourceCode ? cloneAdvancedKeySettings(saved) : undefined
 }
 </script>
 
@@ -119,15 +121,26 @@ function remove() {
 
     <div class="panel advanced-editor">
       <header class="advanced-editor-heading">
-        <div><span class="eyebrow">ADVANCED KEY</span><h2>{{ draft && draft.type !== 'none' ? '编辑高级键' : '添加高级键' }}</h2></div>
-        <p>先在上方选择物理键，再选择高级键类型并配置触发逻辑</p>
+        <div class="advanced-heading-main">
+          <div><span class="eyebrow">ADVANCED KEY</span><h2>{{ draft && draft.type !== 'none' ? '编辑高级键' : '添加高级键' }}</h2></div>
+          <p>先在上方选择物理键，再选择高级键类型并配置触发逻辑</p>
+        </div>
+        <div class="advanced-heading-actions">
+          <button class="ghost" type="button" :disabled="busy || !draft || draft.type === 'none'" @click="cancelEditing">取消</button>
+          <button class="primary" type="button" :disabled="busy || !draft || draft.type === 'none'" @click="save">{{ status === 'writing' ? '正在确认…' : '确认' }}</button>
+        </div>
       </header>
       <aside class="advanced-type-list">
         <button v-for="item in types" :key="item.id" :class="{ active: draft?.type === item.id }" :disabled="busy || !selectedPosition" @click="selectType(item.id)"><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></button>
+        <div class="advanced-current-physical">
+          <span>当前物理按键</span>
+          <strong>{{ selectedPosition?.label ?? '未选择' }}</strong>
+          <code v-if="selectedPosition">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code>
+          <small>{{ currentDescription }}</small>
+        </div>
       </aside>
 
       <section class="advanced-form">
-        <header><div><span>当前物理键</span><strong>{{ selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div><p>{{ currentDescription }}</p></header>
         <div v-if="loading && !draft" class="advanced-placeholder">正在读取当前按键的高级键设置…</div>
         <div v-else-if="!draft || draft.type === 'none'" class="advanced-placeholder">此键尚未设置高级功能。请从左侧选择一种模式。</div>
 
@@ -174,7 +187,6 @@ function remove() {
           </template>
         </div>
 
-        <footer><button class="ghost danger" :disabled="busy || !draft || draft.type === 'none'" @click="remove">清除高级键</button><button class="primary" :disabled="busy || !draft || draft.type === 'none'" @click="save">{{ status === 'writing' ? '正在写入…' : '写入并回读验证' }}</button></footer>
       </section>
     </div>
     <KeyCodeKeyboardDialog :open="!!keyPickerTarget" :profile="profile" :model-value="keyPickerValue" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="keyPickerTarget = undefined" @confirm="confirmKeyPicker" />
