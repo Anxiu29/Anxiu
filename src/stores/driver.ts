@@ -9,9 +9,11 @@ import type { AdvancedKeySettings } from '@/domain/advancedKey'
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
+  let advancedKeyReadRevision = 0
+  let loadingAdvancedSourceCode: number | undefined
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
@@ -44,7 +46,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'reading'
     profile.value = await state.session.load()
     lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
-    advancedKey.value = undefined
+    invalidateAdvancedKeyCache()
     mode.value = profile.value.mode ?? mode.value
     revision.value++
     status.value = 'ready'
@@ -73,7 +75,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   async function reload() {
     if (!state.session) return
-    clearFeedback(); status.value = 'reading'
+    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
     try { profile.value = await state.session.reload(); lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined; revision.value++; status.value = 'ready'; message.value = '已重新读取设备配置' }
     catch (cause) { fail(cause) }
   }
@@ -116,7 +118,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function selectMode(targetMode: KeyboardMode) {
     if (!state.session || !profile.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
     if (mode.value === targetMode) { layer.value = 0; return }
-    clearFeedback(); status.value = 'reading'
+    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
     try {
       profile.value = await state.session.switchMode(targetMode)
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
@@ -132,7 +134,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   /** 四个配置槽是设备端状态，切换成功后回到 FN1 并重建当前 Profile。 */
   async function selectConfiguration(configuration: KeyboardConfiguration) {
     if (!state.session || !profile.value || activeConfiguration.value === configuration || ['connecting', 'reading', 'writing'].includes(status.value)) return
-    clearFeedback(); status.value = 'reading'
+    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
     try {
       profile.value = await state.session.switchConfiguration(configuration)
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
@@ -178,9 +180,25 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     if (!state.session || !profile.value?.capabilities.advancedKey || !positionId || ['connecting', 'writing'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
     if (!position) return
-    clearFeedback(); status.value = 'reading'; advancedKey.value = undefined
-    try { advancedKey.value = await state.session.getAdvancedKey(position.sourceCode); status.value = 'ready' }
-    catch (cause) { fail(cause) }
+    // 页面重新挂载或同一键被重复点击时复用已有数据/请求，不再向 HID 队列追加相同命令。
+    if (advancedKey.value?.sourceCode === position.sourceCode || advancedKeyLoading.value && loadingAdvancedSourceCode === position.sourceCode) return
+    const observedSession = state.session
+    const readRevision = ++advancedKeyReadRevision
+    loadingAdvancedSourceCode = position.sourceCode
+    advancedKeyLoading.value = true
+    clearFeedback()
+    try {
+      const result = await observedSession.getAdvancedKey(position.sourceCode)
+      // 用户可能已经选择另一键或切换设备；过期结果不能覆盖当前页面。
+      if (state.session === observedSession && readRevision === advancedKeyReadRevision) advancedKey.value = result
+    } catch (cause) {
+      if (state.session === observedSession && readRevision === advancedKeyReadRevision) fail(cause)
+    } finally {
+      if (readRevision === advancedKeyReadRevision) {
+        advancedKeyLoading.value = false
+        loadingAdvancedSourceCode = undefined
+      }
+    }
   }
 
   async function updateAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
@@ -199,6 +217,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   function handleDisconnect() {
     removeDeviceStateListeners()
+    invalidateAdvancedKeyCache()
     // 保留 profile/draft 供用户查看；操作入口会根据 disconnected 状态被禁用。
     status.value = 'disconnected'
     error.value = '键盘已断开连接，未保存的草稿仍保留在页面中'
@@ -234,7 +253,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       setTimeout(() => void syncExternalMode(observedSession, targetMode), 100)
       return
     }
-    clearFeedback(); status.value = 'reading'
+    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
     try {
       profile.value = await observedSession.load()
       lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
@@ -255,7 +274,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       setTimeout(() => void syncExternalConfiguration(observedSession, configuration), 100)
       return
     }
-    clearFeedback(); status.value = 'reading'
+    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
     try {
       profile.value = await observedSession.load()
       lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
@@ -268,11 +287,18 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     } catch (cause) { fail(cause) }
   }
   function clearFeedback() { error.value = ''; errorCode.value = undefined; message.value = '' }
+  /** 模式、配置槽或设备会话改变后，上一上下文的单键缓存和在途结果都必须失效。 */
+  function invalidateAdvancedKeyCache() {
+    advancedKeyReadRevision++
+    advancedKey.value = undefined
+    advancedKeyLoading.value = false
+    loadingAdvancedSourceCode = undefined
+  }
   function fail(cause: unknown) {
     // 所有外层异常在这里收敛为稳定错误码，Vue 组件只处理展示，不解析底层异常。
     const driverError = toDriverError(cause)
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

@@ -39,6 +39,19 @@ export interface SocdAdvancedKey extends AdvancedKeyBase {
 
 export type AdvancedKeySettings = NoAdvancedKey | DksAdvancedKey | MptAdvancedKey | MtAdvancedKey | TglAdvancedKey | EndAdvancedKey | SocdAdvancedKey
 
+/**
+ * Vue 会把 Store 对象包装为 Proxy，而 structuredClone 不能克隆 Proxy。
+ * 在领域层逐类型复制，既保留联合类型，也保证所有可编辑数组都有独立引用。
+ */
+export function cloneAdvancedKeySettings(value: AdvancedKeySettings): AdvancedKeySettings {
+  if (value.type === 'none') return { ...value }
+  if (value.type === 'dks') return { ...value, keyCodes: [...value.keyCodes], triggers: [...value.triggers], travels: [...value.travels] }
+  if (value.type === 'mpt') return { ...value, keyCodes: [...value.keyCodes], travels: [...value.travels] }
+  if (value.type === 'mt') return { ...value, keyCodes: [...value.keyCodes] }
+  if (value.type === 'socd') return { ...value, keyCodes: [...value.keyCodes] }
+  return { ...value }
+}
+
 /** 切换类型时提供可编辑初值；真正设备状态仍须通过 getAdvancedKey 回读。 */
 export function createAdvancedKeySettings(type: Exclude<AdvancedKeyType, 'none'>, sourceCode: number, fallbackKeyCode: number): Exclude<AdvancedKeySettings, NoAdvancedKey> {
   if (type === 'dks') return { type, sourceCode, keyCodes: [fallbackKeyCode, 0, 0, 0], triggers: [0, 0, 0, 0], travels: [0.5, 3.5] }

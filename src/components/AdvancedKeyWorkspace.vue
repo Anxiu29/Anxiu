@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
-import { createAdvancedKeySettings } from '@/domain/advancedKey'
+import { cloneAdvancedKeySettings, createAdvancedKeySettings } from '@/domain/advancedKey'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import KeyboardCanvas from './KeyboardCanvas.vue'
@@ -11,6 +11,7 @@ const props = defineProps<{
   status: SessionStatus
   selectedPositionId?: string
   settings?: AdvancedKeySettings
+  loading?: boolean
   assignments: KeyAssignment[]
   keyOptions: readonly KeyDefinition[]
   keyLabels: Record<number, string>
@@ -36,7 +37,7 @@ const types: { id: Exclude<AdvancedKeyType, 'none'>; label: string; summary: str
 ]
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
 const selectedAssignment = computed(() => props.assignments.find((item) => item.positionId === props.selectedPositionId))
-const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.status))
+const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
 const currentDescription = computed(() => types.find((item) => item.id === draft.value?.type)?.summary ?? '当前按键没有高级键设置')
 const keyboardUnit = computed(() => {
   const widthUnit = viewportWidth.value <= 1250 ? 38 : viewportWidth.value <= 1450 ? 46 : viewportWidth.value <= 1650 ? 52 : viewportWidth.value <= 1850 ? 58 : 62
@@ -47,8 +48,14 @@ const updateViewportSize = () => { viewportWidth.value = window.innerWidth; view
 onMounted(() => window.addEventListener('resize', updateViewportSize))
 onBeforeUnmount(() => window.removeEventListener('resize', updateViewportSize))
 
-watch(() => props.settings, (value) => { draft.value = value ? structuredClone(value) : undefined }, { immediate: true, deep: true })
-watch(() => props.selectedPositionId, (positionId) => { draft.value = undefined; if (positionId) emit('load', positionId) }, { immediate: true })
+watch([() => props.settings, () => props.selectedPositionId], ([value]) => {
+  // Store 只缓存最近读取的一键；切换物理键时绝不能短暂展示上一键的数据。
+  draft.value = value && value.sourceCode === selectedPosition.value?.sourceCode ? cloneAdvancedKeySettings(value) : undefined
+}, { immediate: true, deep: true })
+watch(() => props.selectedPositionId, (positionId) => {
+  // 无条件把新选择交给 Store；Store 会复用同键缓存/在途请求，并处理快速切键产生的旧结果。
+  if (positionId && props.settings?.sourceCode !== selectedPosition.value?.sourceCode) emit('load', positionId)
+}, { immediate: true })
 
 function selectType(type: Exclude<AdvancedKeyType, 'none'>) {
   if (!selectedPosition.value) return
@@ -67,7 +74,7 @@ function updateTrigger(index: number, value: string) {
   draft.value.triggers[index] = Math.max(0, Math.min(255, Number(value)))
 }
 function save() {
-  if (draft.value && draft.value.type !== 'none') emit('update', structuredClone(draft.value))
+  if (draft.value && draft.value.type !== 'none') emit('update', cloneAdvancedKeySettings(draft.value) as Exclude<AdvancedKeySettings, { type: 'none' }>)
 }
 function remove() {
   if (!selectedPosition.value || draft.value?.type === 'none') return
@@ -92,7 +99,7 @@ function remove() {
 
       <section class="advanced-form">
         <header><div><span>当前物理键</span><strong>{{ selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div><p>{{ currentDescription }}</p></header>
-        <div v-if="busy && !draft" class="advanced-placeholder">正在读取当前按键的高级键设置…</div>
+        <div v-if="loading && !draft" class="advanced-placeholder">正在读取当前按键的高级键设置…</div>
         <div v-else-if="!draft || draft.type === 'none'" class="advanced-placeholder">此键尚未设置高级功能。请从左侧选择一种模式。</div>
 
         <div v-else class="advanced-fields">

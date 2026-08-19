@@ -6,7 +6,7 @@ import type { MatrixKeyInput } from '@/domain/layout'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type LightingSettings } from '@/domain/lighting'
-import type { AdvancedKeySettings } from '@/domain/advancedKey'
+import { cloneAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
 
 /**
  * 不访问 HID 的内存协议实现。它实现与真机相同的 KeyboardDevice 端口，
@@ -68,8 +68,8 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async switchConfiguration(_configuration: KeyboardConfiguration) { await this.wait() }
   async getLighting() { await this.wait(); return cloneLightingSettings(this.lightingSettings) }
   async setLighting(settings: LightingSettings) { await this.wait(); this.lightingSettings = cloneLightingSettings(settings) }
-  async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> { await this.wait(); return structuredClone(this.advancedKeys.get(sourceCode) ?? { type: 'none', sourceCode }) }
-  async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) { await this.wait(); this.advancedKeys.set(settings.sourceCode, structuredClone(settings)) }
+  async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> { await this.wait(); return cloneAdvancedKeySettings(this.advancedKeys.get(sourceCode) ?? { type: 'none', sourceCode }) }
+  async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) { await this.wait(); this.advancedKeys.set(settings.sourceCode, cloneAdvancedKeySettings(settings)) }
   async deleteAdvancedKey(sourceCode: number) { await this.wait(); this.advancedKeys.delete(sourceCode) }
   close() {}
 
