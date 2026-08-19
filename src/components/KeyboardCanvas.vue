@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { KeyAssignment, KeyPosition } from '@/domain/keyboard'
 import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 
-const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; unit?: number; geometry?: KeyGeometryResolver }>(), { unit: 58, defaultAssignments: () => [], geometry: matrixKeyGeometry })
+const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; unit?: number; geometry?: KeyGeometryResolver; badges?: Record<string, string> }>(), { unit: 58, defaultAssignments: () => [], geometry: matrixKeyGeometry, badges: () => ({}) })
 const emit = defineEmits<{
   select: [id: string]
   contextmenu: [payload: { positionId: string; clientX: number; clientY: number }]
@@ -40,6 +40,7 @@ const keyStyle = (key: RenderedKey) => ({
   <div class="keyboard-shell">
     <div class="keyboard-layout" :style="canvasStyle">
       <button v-for="key in renderedPositions" :key="key.id" class="keycap" :class="{ selected: selected === key.id, changed: isChanged(key.id) }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
+        <b v-if="badges[key.id]" class="keycap-badge">{{ badges[key.id] }}</b>
         <span>{{ labelFor(assignment(key.id)?.keyCode ?? key.sourceCode) }}</span>
         <small>{{ key.label }}</small>
       </button>

@@ -9,7 +9,7 @@ import type { AdvancedKeySettings } from '@/domain/advancedKey'
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -190,7 +190,10 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       const result = await observedSession.getAdvancedKey(position.sourceCode)
       // 用户可能已经选择另一键或切换设备；过期结果不能覆盖当前页面。
-      if (state.session === observedSession && readRevision === advancedKeyReadRevision) advancedKey.value = result
+      if (state.session === observedSession && readRevision === advancedKeyReadRevision) {
+        advancedKey.value = result
+        rememberAdvancedKeyType(result)
+      }
     } catch (cause) {
       if (state.session === observedSession && readRevision === advancedKeyReadRevision) fail(cause)
     } finally {
@@ -204,14 +207,14 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function updateAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
     if (!state.session || !profile.value?.capabilities.advancedKey || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'
-    try { advancedKey.value = await state.session.updateAdvancedKey(settings); status.value = 'ready'; message.value = '高级键已写入并通过回读验证' }
+    try { advancedKey.value = await state.session.updateAdvancedKey(settings); rememberAdvancedKeyType(advancedKey.value); status.value = 'ready'; message.value = '高级键已写入并通过回读验证' }
     catch (cause) { fail(cause) }
   }
 
   async function deleteAdvancedKey(sourceCode: number) {
     if (!state.session || !profile.value?.capabilities.advancedKey || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'
-    try { advancedKey.value = await state.session.deleteAdvancedKey(sourceCode); status.value = 'ready'; message.value = '已清除当前按键的高级键设置' }
+    try { advancedKey.value = await state.session.deleteAdvancedKey(sourceCode); rememberAdvancedKeyType(advancedKey.value); status.value = 'ready'; message.value = '已清除当前按键的高级键设置' }
     catch (cause) { fail(cause) }
   }
 
@@ -293,6 +296,14 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     advancedKey.value = undefined
     advancedKeyLoading.value = false
     loadingAdvancedSourceCode = undefined
+    advancedKeyTypes.value = {}
+  }
+  /** 角标只依据设备回读结果更新，未保存的 UI 草稿不会污染键盘状态。 */
+  function rememberAdvancedKeyType(settings: AdvancedKeySettings) {
+    const next = { ...advancedKeyTypes.value }
+    if (settings.type === 'none') delete next[settings.sourceCode]
+    else next[settings.sourceCode] = settings.type.toUpperCase()
+    advancedKeyTypes.value = next
   }
   function fail(cause: unknown) {
     // 所有外层异常在这里收敛为稳定错误码，Vue 组件只处理展示，不解析底层异常。
@@ -300,5 +311,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

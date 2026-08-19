@@ -5,6 +5,7 @@ import { cloneAdvancedKeySettings, createAdvancedKeySettings } from '@/domain/ad
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import KeyboardCanvas from './KeyboardCanvas.vue'
+import KeyCodeKeyboardDialog from './KeyCodeKeyboardDialog.vue'
 
 const props = defineProps<{
   profile: KeyboardProfile
@@ -12,6 +13,7 @@ const props = defineProps<{
   selectedPositionId?: string
   settings?: AdvancedKeySettings
   loading?: boolean
+  advancedKeyTypes?: Record<number, string>
   assignments: KeyAssignment[]
   keyOptions: readonly KeyDefinition[]
   keyLabels: Record<number, string>
@@ -27,6 +29,8 @@ const emit = defineEmits<{
 const draft = ref<AdvancedKeySettings>()
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
+type KeyPickerTarget = { kind: 'keyCodes'; index: number } | { kind: 'keyCode' } | { kind: 'pairedSourceCode' }
+const keyPickerTarget = ref<KeyPickerTarget>()
 const types: { id: Exclude<AdvancedKeyType, 'none'>; label: string; summary: string }[] = [
   { id: 'dks', label: 'DKS', summary: '按键行程的多个阶段触发不同键值' },
   { id: 'mpt', label: 'MPT', summary: '在三个指定行程点依次触发键值' },
@@ -39,6 +43,17 @@ const selectedPosition = computed(() => props.profile.positions.find((item) => i
 const selectedAssignment = computed(() => props.assignments.find((item) => item.positionId === props.selectedPositionId))
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
 const currentDescription = computed(() => types.find((item) => item.id === draft.value?.type)?.summary ?? '当前按键没有高级键设置')
+const keyboardBadges = computed(() => Object.fromEntries(props.profile.positions
+  .map((position) => [position.id, props.advancedKeyTypes?.[position.sourceCode]])
+  .filter((entry): entry is [string, string] => Boolean(entry[1]))))
+const keyLabel = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
+const keyPickerValue = computed(() => {
+  if (!draft.value || !keyPickerTarget.value) return 0
+  if (keyPickerTarget.value.kind === 'keyCode' && 'keyCode' in draft.value) return draft.value.keyCode
+  if (keyPickerTarget.value.kind === 'pairedSourceCode' && draft.value.type === 'socd') return draft.value.pairedSourceCode
+  if (keyPickerTarget.value.kind === 'keyCodes' && 'keyCodes' in draft.value) return draft.value.keyCodes[keyPickerTarget.value.index] ?? 0
+  return 0
+})
 const keyboardUnit = computed(() => {
   const widthUnit = viewportWidth.value <= 1250 ? 38 : viewportWidth.value <= 1450 ? 46 : viewportWidth.value <= 1650 ? 52 : viewportWidth.value <= 1850 ? 58 : 62
   const heightUnit = viewportHeight.value <= 800 ? 43 : viewportHeight.value <= 900 ? 50 : viewportHeight.value <= 1000 ? 57 : 62
@@ -61,17 +76,31 @@ function selectType(type: Exclude<AdvancedKeyType, 'none'>) {
   if (!selectedPosition.value) return
   draft.value = createAdvancedKeySettings(type, selectedPosition.value.sourceCode, selectedAssignment.value?.keyCode ?? selectedPosition.value.sourceCode)
 }
-function updateKey(index: number, value: string) {
-  if (!draft.value || !('keyCodes' in draft.value)) return
-  draft.value.keyCodes[index] = Number(value)
-}
 function updateTravel(index: number, value: string) {
   if (!draft.value || !('travels' in draft.value)) return
   draft.value.travels[index] = Number(value)
 }
-function updateTrigger(index: number, value: string) {
-  if (!draft.value || draft.value.type !== 'dks') return
-  draft.value.triggers[index] = Math.max(0, Math.min(255, Number(value)))
+function triggerState(row: number, phase: number) {
+  if (draft.value?.type !== 'dks') return 0
+  // 每个 TRPS 字节按四组 2 bit 保存四个阶段：00=关闭、01=单次、11=连续。
+  const state = (draft.value.triggers[row]! >> (phase * 2)) & 0x03
+  return state === 3 ? 3 : state === 0 ? 0 : 1
+}
+function cycleTrigger(row: number, phase: number) {
+  if (draft.value?.type !== 'dks') return
+  const current = triggerState(row, phase)
+  const next = current === 0 ? 1 : current === 1 ? 3 : 0
+  const shift = phase * 2
+  draft.value.triggers[row] = (draft.value.triggers[row]! & ~(0x03 << shift)) | (next << shift)
+}
+function openKeyPicker(target: KeyPickerTarget) { keyPickerTarget.value = target }
+function confirmKeyPicker(keyCode: number) {
+  if (!draft.value || !keyPickerTarget.value) return
+  const target = keyPickerTarget.value
+  if (target.kind === 'keyCode' && 'keyCode' in draft.value) draft.value.keyCode = keyCode
+  else if (target.kind === 'pairedSourceCode' && draft.value.type === 'socd') draft.value.pairedSourceCode = keyCode
+  else if (target.kind === 'keyCodes' && 'keyCodes' in draft.value) draft.value.keyCodes[target.index] = keyCode
+  keyPickerTarget.value = undefined
 }
 function save() {
   if (draft.value && draft.value.type !== 'none') emit('update', cloneAdvancedKeySettings(draft.value) as Exclude<AdvancedKeySettings, { type: 'none' }>)
@@ -85,7 +114,7 @@ function remove() {
 <template>
   <section class="advanced-workspace">
     <div class="panel advanced-keyboard-panel">
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="emit('select-position', $event)" />
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" :badges="keyboardBadges" @select="emit('select-position', $event)" />
     </div>
 
     <div class="panel advanced-editor">
@@ -104,35 +133,50 @@ function remove() {
 
         <div v-else class="advanced-fields">
           <template v-if="draft.type === 'dks'">
-            <div v-for="(_, index) in draft.keyCodes" :key="index" class="advanced-field-row three-columns"><label>阶段 {{ index + 1 }} 键值</label><select :value="draft.keyCodes[index]" @change="updateKey(index, ($event.target as HTMLSelectElement).value)"><option v-for="key in keyOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select><label class="inline-number">TRPS 掩码 <input type="number" min="0" max="255" :value="draft.triggers[index]" @input="updateTrigger(index, ($event.target as HTMLInputElement).value)" /></label></div>
-            <p class="field-help">TRPS 是 8 位触发掩码；暂以原始数值显示，便于和官方协议及抓包逐位核对。</p>
-            <div class="travel-grid"><label>按下行程（mm）<input type="number" min="0" max="4" step="0.1" :value="draft.travels[0]" @input="updateTravel(0, ($event.target as HTMLInputElement).value)" /></label><label>抬起行程（mm）<input type="number" min="0" max="4" step="0.1" :value="draft.travels[1]" @input="updateTravel(1, ($event.target as HTMLInputElement).value)" /></label></div>
+            <div class="dks-editor">
+              <div class="dks-matrix">
+                <span class="dks-corner">输出键值</span>
+                <div v-for="(phase, phaseIndex) in ['按下', '触底', '抬起', '复位']" :key="phase" class="dks-phase-heading">
+                  <strong>{{ phase }}</strong>
+                  <label v-if="phaseIndex === 0"><input type="number" min="0" max="4" step="0.1" :value="draft.travels[0]" @input="updateTravel(0, ($event.target as HTMLInputElement).value)" /> mm</label>
+                  <label v-else-if="phaseIndex === 2"><input type="number" min="0" max="4" step="0.1" :value="draft.travels[1]" @input="updateTravel(1, ($event.target as HTMLInputElement).value)" /> mm</label>
+                  <small v-else>{{ draft.travels[1].toFixed(2) }} mm</small>
+                </div>
+                <template v-for="(keyCode, row) in draft.keyCodes" :key="row">
+                  <button class="advanced-key-value compact" type="button" @click="openKeyPicker({ kind: 'keyCodes', index: row })"><span>{{ keyLabel(keyCode) }}</span><small>键值 {{ row + 1 }}</small></button>
+                  <button v-for="phase in 4" :key="phase" class="dks-trigger-cell" :class="{ single: triggerState(row, phase - 1) === 1, continuous: triggerState(row, phase - 1) === 3 }" type="button" :title="triggerState(row, phase - 1) === 0 ? '未触发' : triggerState(row, phase - 1) === 1 ? '单次触发' : '连续触发'" @click="cycleTrigger(row, phase - 1)">{{ triggerState(row, phase - 1) === 0 ? '+' : triggerState(row, phase - 1) === 1 ? '●' : '━' }}</button>
+                </template>
+              </div>
+              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”设为单次触发</p><p>再次单击切换为连续触发</p><p>第三次单击取消该阶段</p><p>每行可以选择不同的输出键值</p></aside>
+            </div>
           </template>
 
           <template v-else-if="draft.type === 'mpt'">
-            <div v-for="(_, index) in draft.keyCodes" :key="index" class="advanced-field-row three-columns"><label>阶段 {{ index + 1 }}</label><select :value="draft.keyCodes[index]" @change="updateKey(index, ($event.target as HTMLSelectElement).value)"><option v-for="key in keyOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select><label class="inline-number">行程 mm <input type="number" min="0" max="4" step="0.1" :value="draft.travels[index]" @input="updateTravel(index, ($event.target as HTMLInputElement).value)" /></label></div>
+            <div class="advanced-card-grid three">
+              <article v-for="(keyCode, index) in draft.keyCodes" :key="index" class="advanced-setting-card"><span>触发点 {{ index + 1 }}</span><button class="advanced-key-value" type="button" @click="openKeyPicker({ kind: 'keyCodes', index })"><strong>{{ keyLabel(keyCode) }}</strong><small>点击选择按键</small></button><label>触发行程<input type="number" min="0" max="4" step="0.1" :value="draft.travels[index]" @input="updateTravel(index, ($event.target as HTMLInputElement).value)" /><i>mm</i></label></article>
+            </div>
           </template>
 
           <template v-else-if="draft.type === 'mt'">
-            <div v-for="(name, index) in ['点按键值', '长按键值']" :key="name" class="advanced-field-row"><label>{{ name }}</label><select :value="draft.keyCodes[index]" @change="updateKey(index, ($event.target as HTMLSelectElement).value)"><option v-for="key in keyOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select></div>
-            <label class="standalone-field">判定延迟（ms）<input v-model.number="draft.delay" type="number" min="0" max="2550" step="10" /></label>
+            <div class="advanced-card-grid two"><article v-for="(name, index) in ['短按', '长按']" :key="name" class="advanced-setting-card"><span>{{ name }}输出</span><button class="advanced-key-value large" type="button" @click="openKeyPicker({ kind: 'keyCodes', index })"><strong>{{ keyLabel(draft.keyCodes[index]!) }}</strong><small>点击选择按键</small></button></article></div>
+            <label class="advanced-delay-field"><span>按住判定时间</span><input v-model.number="draft.delay" type="range" min="0" max="2550" step="10" /><output>{{ draft.delay }} ms</output></label>
           </template>
 
           <template v-else-if="draft.type === 'tgl' || draft.type === 'end'">
-            <div class="advanced-field-row"><label>输出键值</label><select v-model.number="draft.keyCode"><option v-for="key in keyOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select></div>
-            <label class="standalone-field">延迟（ms）<input v-model.number="draft.delay" type="number" min="0" :max="draft.type === 'tgl' ? 2550 : 65535" :step="draft.type === 'tgl' ? 10 : 1" /></label>
+            <div class="advanced-single-key"><span>{{ draft.type === 'tgl' ? '切换输出键值' : '松开时输出键值' }}</span><button class="advanced-key-value large" type="button" @click="openKeyPicker({ kind: 'keyCode' })"><strong>{{ keyLabel(draft.keyCode) }}</strong><small>点击选择按键</small></button></div>
+            <label class="advanced-delay-field"><span>触发延迟</span><input v-model.number="draft.delay" type="range" min="0" :max="draft.type === 'tgl' ? 2550 : 2000" :step="draft.type === 'tgl' ? 10 : 1" /><output>{{ draft.delay }} ms</output></label>
           </template>
 
           <template v-else-if="draft.type === 'socd'">
-            <div class="advanced-field-row"><label>配对物理键</label><select v-model.number="draft.pairedSourceCode"><option v-for="position in profile.positions" :key="position.id" :value="position.sourceCode">{{ position.label }}</option></select></div>
-            <div v-for="(name, index) in ['键 1 输出', '键 2 输出']" :key="name" class="advanced-field-row"><label>{{ name }}</label><select :value="draft.keyCodes[index]" @change="updateKey(index, ($event.target as HTMLSelectElement).value)"><option v-for="key in keyOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select></div>
+            <div class="advanced-card-grid three socd-cards"><article class="advanced-setting-card"><span>配对物理键</span><button class="advanced-key-value" type="button" @click="openKeyPicker({ kind: 'pairedSourceCode' })"><strong>{{ keyLabel(draft.pairedSourceCode) }}</strong><small>点击选择按键</small></button></article><article v-for="(name, index) in ['键 1 输出', '键 2 输出']" :key="name" class="advanced-setting-card"><span>{{ name }}</span><button class="advanced-key-value" type="button" @click="openKeyPicker({ kind: 'keyCodes', index })"><strong>{{ keyLabel(draft.keyCodes[index]!) }}</strong><small>点击选择按键</small></button></article></div>
             <div class="advanced-field-row"><label>冲突规则</label><select v-model.number="draft.mode"><option :value="0">后输入优先</option><option :value="1">键 1 优先</option><option :value="2">键 2 优先</option><option :value="3">中性（均不输出）</option></select></div>
-            <label class="standalone-field">延迟（ms）<input v-model.number="draft.delay" type="number" min="0" max="65535" /></label>
+            <label class="advanced-delay-field"><span>冲突延迟</span><input v-model.number="draft.delay" type="range" min="0" max="2000" step="1" /><output>{{ draft.delay }} ms</output></label>
           </template>
         </div>
 
         <footer><button class="ghost danger" :disabled="busy || !draft || draft.type === 'none'" @click="remove">清除高级键</button><button class="primary" :disabled="busy || !draft || draft.type === 'none'" @click="save">{{ status === 'writing' ? '正在写入…' : '写入并回读验证' }}</button></footer>
       </section>
     </div>
+    <KeyCodeKeyboardDialog :open="!!keyPickerTarget" :profile="profile" :model-value="keyPickerValue" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="keyPickerTarget = undefined" @confirm="confirmKeyPicker" />
   </section>
 </template>

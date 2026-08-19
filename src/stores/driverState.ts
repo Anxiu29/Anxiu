@@ -26,6 +26,8 @@ export const createDriverState = () => {
   const advancedKey = ref<AdvancedKeySettings>()
   /** 高级键是页面级按需读取，不占用全局 reading，避免读取期间锁死侧边导航。 */
   const advancedKeyLoading = ref(false)
+  /** 只记录本会话已读取或成功写入的高级键类型，用于在键盘上显示角标。 */
+  const advancedKeyTypes = ref<Record<number, string>>({})
   // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
   const activeSession = shallowRef<DeviceSession>()
 
@@ -39,7 +41,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
-    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }
