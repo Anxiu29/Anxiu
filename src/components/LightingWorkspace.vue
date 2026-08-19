@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import type { LightingModePresentation, LightingRangePresentation } from '@/ui/DevicePresentation'
 import { cloneLightingSettings, type LightingSettings } from '@/domain/lighting'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
+import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 
 const props = defineProps<{
   settings?: LightingSettings
@@ -21,18 +22,8 @@ const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.
 const luminanceDraft = ref(0)
 const speedDraft = ref(0)
 const colorFormat = ref<'hex' | 'rgb'>('rgb')
-const viewportWidth = ref(window.innerWidth)
-const viewportHeight = ref(window.innerHeight)
-
-// 键盘预览同时受可用宽度和高度约束：全屏时充分放大，矮屏时仍保证下方设置完整可见。
-const keyboardUnit = computed(() => {
-  const widthUnit = viewportWidth.value <= 1250 ? 38 : viewportWidth.value <= 1450 ? 46 : viewportWidth.value <= 1650 ? 52 : viewportWidth.value <= 1850 ? 58 : 62
-  const heightUnit = viewportHeight.value <= 800 ? 43 : viewportHeight.value <= 900 ? 50 : viewportHeight.value <= 1000 ? 57 : 62
-  return Math.min(widthUnit, heightUnit)
-})
-const updateViewportSize = () => { viewportWidth.value = window.innerWidth; viewportHeight.value = window.innerHeight }
-onMounted(() => window.addEventListener('resize', updateViewportSize))
-onBeforeUnmount(() => window.removeEventListener('resize', updateViewportSize))
+// 直接观察预览容器，侧栏展开、窗口缩放和不同配列都会触发重新适配。
+const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry)
 
 // 拖动时只更新本地显示，松手后再写入设备，避免一次拖动产生多次 HID 写入。
 watch(() => props.settings?.luminance, (value) => { if (value !== undefined) luminanceDraft.value = value }, { immediate: true })
@@ -131,7 +122,7 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
 <template>
   <section class="lighting-workspace">
     <template v-if="settings">
-      <section class="panel lighting-keyboard-preview" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }">
+      <section ref="keyboardContainer" class="panel lighting-keyboard-preview" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }">
         <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="keyboardUnit" />
       </section>
 

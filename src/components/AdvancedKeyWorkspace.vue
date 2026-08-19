@@ -4,6 +4,7 @@ import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
 import { cloneAdvancedKeySettings, createAdvancedKeySettings } from '@/domain/advancedKey'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
+import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import KeyboardCanvas from './KeyboardCanvas.vue'
 import KeyCodeKeyboardDialog from './KeyCodeKeyboardDialog.vue'
 import CompactKeyTest from './CompactKeyTest.vue'
@@ -27,8 +28,6 @@ const emit = defineEmits<{
 }>()
 
 const draft = ref<AdvancedKeySettings>()
-const viewportWidth = ref(window.innerWidth)
-const viewportHeight = ref(window.innerHeight)
 const triggerDrag = ref<{ row: number; startPhase: number; endPhase: number; moved: boolean }>()
 const ignoreTriggerClick = ref(false)
 type KeyPickerTarget = { kind: 'keyCodes'; index: number } | { kind: 'keyCode' } | { kind: 'pairedSourceCode' }
@@ -56,19 +55,12 @@ const keyPickerValue = computed(() => {
   if (keyPickerTarget.value.kind === 'keyCodes' && 'keyCodes' in draft.value) return draft.value.keyCodes[keyPickerTarget.value.index] ?? 0
   return 0
 })
-const keyboardUnit = computed(() => {
-  const widthUnit = viewportWidth.value <= 1250 ? 38 : viewportWidth.value <= 1450 ? 46 : viewportWidth.value <= 1650 ? 52 : viewportWidth.value <= 1850 ? 58 : 62
-  const heightUnit = viewportHeight.value <= 800 ? 43 : viewportHeight.value <= 900 ? 50 : viewportHeight.value <= 1000 ? 57 : 62
-  return Math.min(widthUnit, heightUnit)
-})
-const updateViewportSize = () => { viewportWidth.value = window.innerWidth; viewportHeight.value = window.innerHeight }
+const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry)
 onMounted(() => {
-  window.addEventListener('resize', updateViewportSize)
   window.addEventListener('pointerup', finishTriggerDrag)
   window.addEventListener('pointercancel', cancelTriggerDrag)
 })
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateViewportSize)
   window.removeEventListener('pointerup', finishTriggerDrag)
   window.removeEventListener('pointercancel', cancelTriggerDrag)
 })
@@ -160,7 +152,7 @@ function cancelEditing() {
 
 <template>
   <section class="advanced-workspace">
-    <div class="panel advanced-keyboard-panel">
+    <div ref="keyboardContainer" class="panel advanced-keyboard-panel">
       <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" :badges="keyboardBadges" @select="emit('select-position', $event)" />
     </div>
 
