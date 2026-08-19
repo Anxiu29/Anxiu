@@ -1,0 +1,53 @@
+.key-test-workspace {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 82px minmax(0, 1fr) 150px;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.key-test-heading { padding: 13px 18px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.key-test-heading h2 { margin: 2px 0; font-size: 20px; }
+.key-test-heading p { margin: 0; color: #76818e; font-size: 10px; }
+.key-test-stats { display: flex; align-items: center; gap: 18px; color: #7f8a97; font-size: 10px; }
+.key-test-stats span { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.key-test-stats strong { color: var(--cyan); font-size: 18px; }
+.key-test-stats button { padding: 9px 14px; }
+
+.key-test-keyboard { min-height: 0; padding: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.key-test-keyboard .keyboard-shell { width: 100%; height: 100%; min-height: 0; padding: 10px; justify-content: center; overflow: hidden; }
+.key-test-keyboard .keycap { position: absolute; }
+.key-test-keyboard .keycap.pressed {
+  color: #071310;
+  border-color: #a5fff2;
+  background: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(69, 230, 208, .28), 0 0 28px rgba(69, 230, 208, .55);
+  transform: translateY(2px);
+}
+.key-test-keyboard .keycap.pressed small { color: #17554d; }
+.key-test-keyboard .keycap-badge { color: #d9fff9; background: #1b756a; }
+.key-test-keyboard .keycap.pressed .keycap-badge { color: #eafffc; background: #082f2a; }
+
+.key-test-history { min-height: 0; padding: 13px 16px; overflow: hidden; }
+.key-test-history > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.key-test-history > header div { display: flex; align-items: baseline; gap: 12px; }
+.key-test-history > header strong { font-size: 13px; }
+.key-test-history > header small,
+.key-test-history > header span { color: #75808d; font-size: 9px; }
+.key-test-history > header span { color: var(--cyan); }
+.key-test-records { margin-top: 12px; display: flex; gap: 7px; overflow: hidden; }
+.key-test-records article { min-width: 104px; padding: 9px 10px; display: grid; gap: 3px; border: 1px solid #2a3440; border-radius: 6px; background: #0c1117; }
+.key-test-records article.unmatched { opacity: .55; }
+.key-test-records strong { color: #e5ebf0; font-size: 12px; }
+.key-test-records code { color: var(--cyan); font-size: 9px; }
+.key-test-records small { color: #66727f; font-size: 8px; }
+.key-test-empty { height: 88px; display: grid; place-items: center; color: #596573; font-size: 11px; }
+
+@media (max-height: 820px) {
+  .key-test-workspace { grid-template-rows: 68px minmax(0, 1fr) 126px; gap: 8px; }
+  .key-test-heading { padding-block: 9px; }
+  .key-test-history { padding-block: 10px; }
+  .key-test-records { margin-top: 8px; }
+}

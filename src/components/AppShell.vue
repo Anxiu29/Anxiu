@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 
-type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced'
+type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'key-test'
 
 const props = withDefaults(defineProps<{
   profile: KeyboardProfile
@@ -72,6 +72,10 @@ watch(() => [props.error, props.message], ([error, message], [previousError, pre
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13H11l-1 9 8.5-11H12z" /></svg>
           <span>高级键设置</span>
         </button>
+        <button :class="{ active: activeView === 'key-test' }" :disabled="navigationDisabled" title="按键测试" @click="navigate('key-test')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h2m2 0h2m2 0h2M7 13h3m2 0h5" /></svg>
+          <span>按键测试</span>
+        </button>
       </nav>
 
       <button class="sidebar-settings" type="button" :disabled="navigationDisabled" title="设置" @click="settingsOpen = true">
@@ -85,7 +89,8 @@ watch(() => [props.error, props.message], ([error, message], [previousError, pre
       <slot v-if="activeView === 'device'" name="device" :open-keymap="() => navigate('keymap')" />
       <slot v-else-if="activeView === 'keymap'" name="keymap" />
       <slot v-else-if="activeView === 'lighting'" name="lighting" />
-      <slot v-else name="advanced" />
+      <slot v-else-if="activeView === 'advanced'" name="advanced" />
+      <slot v-else name="key-test" />
     </div>
 
     <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error }" role="status">

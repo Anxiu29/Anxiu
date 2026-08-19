@@ -7,6 +7,7 @@ import DeviceOverview from '@/components/DeviceOverview.vue'
 import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
 import LightingWorkspace from '@/components/LightingWorkspace.vue'
 import AdvancedKeyWorkspace from '@/components/AdvancedKeyWorkspace.vue'
+import KeyTestWorkspace from '@/components/KeyTestWorkspace.vue'
 
 const store = useDriverStore()
 // storeToRefs 保留 Pinia 响应性；操作方法仍直接通过 store 调用。
@@ -52,6 +53,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </template>
       <template #lighting><LightingWorkspace :settings="lighting" :status="status" :profile="profile" :assignments="assignments" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" :lighting-modes="devicePresentation.lightingModes" :lighting-ranges="devicePresentation.lightingRanges" @update="store.updateLighting" @reload="store.reloadLighting" /></template>
       <template #advanced><AdvancedKeyWorkspace :profile="profile" :status="status" :selected-position-id="selectedPositionId" :settings="advancedKey" :loading="advancedKeyLoading" :advanced-key-types="advancedKeyTypes" :assignments="assignments" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-position="selectedPositionId = $event" @load="store.loadAdvancedKey" @update="store.updateAdvancedKey" /></template>
+      <template #key-test><KeyTestWorkspace :profile="profile" :assignments="assignments" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" /></template>
     </AppShell>
   </main>
 </template>
