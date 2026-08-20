@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { KeyboardMode, KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
+import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
 
@@ -35,12 +36,13 @@ const emit = defineEmits<{
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
 const keyContextMenu = ref<{ positionId: string; layer: number; x: number; y: number }>()
-// 同时受宽度和高度约束，避免宽屏但矮窗口把第二块键盘挤出首屏。
-const keyboardUnit = computed(() => {
-  const widthUnit = viewportWidth.value <= 1200 ? 32 : viewportWidth.value <= 1400 ? 39 : viewportWidth.value <= 1500 ? 42 : viewportWidth.value <= 1650 ? 49 : 58
-  const heightUnit = viewportHeight.value <= 820 ? 39 : viewportHeight.value <= 900 ? 48 : viewportHeight.value <= 1000 ? 53 : 58
-  return Math.min(widthUnit, heightUnit)
-})
+const { container: keyboardContainer, unit: fittedKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 58, horizontalPadding: 28, verticalPadding: 24 })
+// 窗口分档提供首次渲染的安全上限，容器测量再负责进一步缩小并保证横向完整显示。
+const keyboardUnit = computed(() => Math.min(
+  fittedKeyboardUnit.value,
+  viewportWidth.value <= 1200 ? 32 : viewportWidth.value <= 1400 ? 39 : viewportWidth.value <= 1500 ? 42 : viewportWidth.value <= 1650 ? 49 : 58,
+  viewportHeight.value <= 820 ? 39 : viewportHeight.value <= 900 ? 48 : viewportHeight.value <= 1000 ? 53 : 58,
+))
 const layerDefaults = computed(() => props.profile.defaultAssignments.filter((item) => item.layer === props.layer))
 // reading/writing 期间禁用切换和改键，保证没有两个 HID 命令事务交错执行。
 const busy = () => ['connecting', 'reading', 'writing'].includes(props.status)
@@ -94,7 +96,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="keymap-workspace">
     <section class="editor panel compact-keymap-editor">
-      <div class="current-keyboard-pane">
+      <div ref="keyboardContainer" class="current-keyboard-pane">
         <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :default-assignments="layerDefaults" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="emit('select-position', $event)" @contextmenu="openKeyContextMenu" />
       </div>
 

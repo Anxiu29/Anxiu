@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 
 type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'key-test'
@@ -22,10 +22,26 @@ const activeView = ref<WorkspaceView>('device')
 // 这些状态只影响应用壳外观，不进入全局 Store；切换工作区不会丢失设备会话和改键草稿。
 const feedbackVisible = ref(true)
 const sidebarCollapsed = ref(false)
+let sidebarAutoCollapsed = false
+let narrowScreen: MediaQueryList | undefined
 const settingsOpen = ref(false)
 const configurations: KeyboardConfiguration[] = [1, 2, 3, 4]
 const navigate = (view: WorkspaceView) => { activeView.value = view }
-const toggleSidebar = () => { sidebarCollapsed.value = !sidebarCollapsed.value }
+const toggleSidebar = () => {
+  // 用户手动操作后解除本轮自动状态，宽度恢复时不会擅自覆盖用户选择。
+  sidebarAutoCollapsed = false
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+const syncSidebarWithScreen = () => {
+  if (!narrowScreen) return
+  if (narrowScreen.matches && !sidebarCollapsed.value) {
+    sidebarCollapsed.value = true
+    sidebarAutoCollapsed = true
+  } else if (!narrowScreen.matches && sidebarAutoCollapsed) {
+    sidebarCollapsed.value = false
+    sidebarAutoCollapsed = false
+  }
+}
 const requestFactoryReset = () => {
   // 恢复出厂是不可逆设备操作，确认留在最靠近用户交互的 UI 层。
   const confirmed = window.confirm('恢复出厂设置会清除全部改键、灯光和宏配置，键盘随后需要重新连接。是否继续？')
@@ -37,6 +53,14 @@ watch(() => [props.error, props.message], ([error, message], [previousError, pre
   // 用户关闭旧提示后，新消息到来要重新显示；仅组件重渲染不应把旧提示弹回来。
   if ((error || message) && (error !== previousError || message !== previousMessage)) feedbackVisible.value = true
 })
+onMounted(() => {
+  // 1320px 以下展开侧栏会明显压缩各工作区；matchMedia 只在阈值跨越时触发，不产生持续监听开销。
+  if (typeof window.matchMedia !== 'function') return
+  narrowScreen = window.matchMedia('(max-width: 1320px)')
+  narrowScreen.addEventListener('change', syncSidebarWithScreen)
+  syncSidebarWithScreen()
+})
+onBeforeUnmount(() => narrowScreen?.removeEventListener('change', syncSidebarWithScreen))
 </script>
 
 <template>

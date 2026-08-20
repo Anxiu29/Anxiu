@@ -682,12 +682,15 @@ main {
 .current-keyboard-pane {
   min-width: 0;
   display: flex;
+  overflow: auto;
 }
 
 .current-keyboard-pane .keyboard-shell {
   width: 100%;
   min-height: 0;
   padding: 10px;
+  justify-content: safe center;
+  overflow: auto;
 }
 
 .keymap-side-controls {
