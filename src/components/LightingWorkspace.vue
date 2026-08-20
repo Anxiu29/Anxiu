@@ -6,6 +6,7 @@ import type { LightingModePresentation, LightingRangePresentation } from '@/ui/D
 import { cloneLightingSettings, type LightingSettings } from '@/domain/lighting'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
+import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 
 const props = defineProps<{
   settings?: LightingSettings
@@ -23,7 +24,8 @@ const luminanceDraft = ref(0)
 const speedDraft = ref(0)
 const colorFormat = ref<'hex' | 'rgb'>('rgb')
 // 直接观察预览容器，侧栏展开、窗口缩放和不同配列都会触发重新适配。
-const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry)
+const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
+useHorizontalKeyboardScroll(keyboardContainer)
 
 // 拖动时只更新本地显示，松手后再写入设备，避免一次拖动产生多次 HID 写入。
 watch(() => props.settings?.luminance, (value) => { if (value !== undefined) luminanceDraft.value = value }, { immediate: true })

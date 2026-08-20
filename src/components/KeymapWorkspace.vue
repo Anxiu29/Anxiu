@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { KeyboardMode, KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
+import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import KeyPicker from '@/components/KeyPicker.vue'
 
@@ -36,7 +37,8 @@ const emit = defineEmits<{
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
 const keyContextMenu = ref<{ positionId: string; layer: number; x: number; y: number }>()
-const { container: keyboardContainer, unit: fittedKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 58, horizontalPadding: 28, verticalPadding: 24 })
+const { container: keyboardContainer, unit: fittedKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 58, minUnit: 28, horizontalPadding: 28, verticalPadding: 24 })
+useHorizontalKeyboardScroll(keyboardContainer)
 // 窗口分档提供首次渲染的安全上限，容器测量再负责进一步缩小并保证横向完整显示。
 const keyboardUnit = computed(() => Math.min(
   fittedKeyboardUnit.value,

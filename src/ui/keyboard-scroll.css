@@ -1,0 +1,49 @@
+/* 键盘优先适配容器；达到最小可读尺寸后，仅由内部 shell 承担横向滚动。 */
+.keyboard-scroll-viewport {
+  position: relative;
+  overflow: hidden;
+}
+
+.keyboard-scroll-viewport .keyboard-shell {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #465260 transparent;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+}
+
+/* 项目可全局隐藏滚动条，这里的高优先级规则只恢复键盘所需的细横条。 */
+.keyboard-scroll-viewport .keyboard-shell::-webkit-scrollbar {
+  width: 0;
+  height: 6px;
+  display: block;
+}
+
+.keyboard-scroll-viewport .keyboard-shell::-webkit-scrollbar-track { background: transparent; }
+.keyboard-scroll-viewport .keyboard-shell::-webkit-scrollbar-thumb { border-radius: 999px; background: #465260; }
+.keyboard-scroll-viewport .keyboard-shell::-webkit-scrollbar-thumb:hover { background: #667584; }
+
+.keyboard-scroll-viewport::before,
+.keyboard-scroll-viewport::after {
+  position: absolute;
+  top: 8px;
+  bottom: 12px;
+  z-index: 5;
+  width: 34px;
+  opacity: 0;
+  pointer-events: none;
+  content: '';
+  transition: opacity 140ms ease;
+}
+
+.keyboard-scroll-viewport::before { left: 0; background: linear-gradient(90deg, rgba(8, 11, 16, .88), transparent); }
+.keyboard-scroll-viewport::after { right: 0; background: linear-gradient(270deg, rgba(8, 11, 16, .88), transparent); }
+.keyboard-scroll-viewport.keyboard-can-scroll-left::before,
+.keyboard-scroll-viewport.keyboard-can-scroll-right::after { opacity: 1; }
+.keyboard-scroll-viewport.keyboard-can-scroll { cursor: grab; }
+.keyboard-scroll-viewport.keyboard-is-dragging { cursor: grabbing; user-select: none; }
+
+/* 灯光键盘不响应键帽点击，但仍允许用户拖动和滚动查看完整预览。 */
+.lighting-keyboard-preview.keyboard-scroll-viewport .keyboard-shell { pointer-events: auto; }
+.lighting-keyboard-preview.keyboard-scroll-viewport .keycap { pointer-events: none; }

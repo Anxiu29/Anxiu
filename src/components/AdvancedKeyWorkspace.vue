@@ -5,6 +5,7 @@ import { cloneAdvancedKeySettings, createAdvancedKeySettings } from '@/domain/ad
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
+import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 import KeyboardCanvas from './KeyboardCanvas.vue'
 import KeyCodeKeyboardDialog from './KeyCodeKeyboardDialog.vue'
 import CompactKeyTest from './CompactKeyTest.vue'
@@ -55,7 +56,8 @@ const keyPickerValue = computed(() => {
   if (keyPickerTarget.value.kind === 'keyCodes' && 'keyCodes' in draft.value) return draft.value.keyCodes[keyPickerTarget.value.index] ?? 0
   return 0
 })
-const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry)
+const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
+useHorizontalKeyboardScroll(keyboardContainer)
 onMounted(() => {
   window.addEventListener('pointerup', finishTriggerDrag)
   window.addEventListener('pointercancel', cancelTriggerDrag)
