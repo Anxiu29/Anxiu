@@ -12,6 +12,10 @@ import { DEFAULT_LIGHTING_SETTINGS } from '@/domain/lighting'
 import { decodeMainLighting, encodeMainLighting } from './xsyd/lightingCodec'
 import type { AdvancedKeySettings, DksAdvancedKey } from '@/domain/advancedKey'
 import { advancedReadRequest, decodeEnd, decodeMpt, decodeSocd, decodeTgl, encodeDks, encodeEnd, encodeMpt, encodeMt, encodeSocd, encodeTgl } from './xsyd/advancedKeyCodec'
+import { DriverError } from '@/application/DriverError'
+import type { MacroSettings } from '@/domain/macro'
+import { createEmptyMacro, validateMacroSettings } from '@/domain/macro'
+import { decodeMacroData, decodeMacroMode, encodeMacroDataRead, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
 
 const ADVANCED_LAYOUT = {
   db1: 0x05, db3: 0x07, mode: 0x08,
@@ -20,7 +24,8 @@ const ADVANCED_LAYOUT = {
   delay: 0x13,
 } as const
 
-const ADVANCED_MODE = { dks: 1, mpt: 2, mt: 3, tgl: 4, end: 5, socd: 8 } as const
+// MODE=6 在 1.0.7 方案中保留给宏；7 为 RS，8 为 SOCD。
+const ADVANCED_MODE = { dks: 1, mpt: 2, mt: 3, tgl: 4, end: 5, macro: 6, socd: 8 } as const
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
@@ -49,6 +54,10 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode),
     setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings),
     deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode),
+  }
+  readonly macro = {
+    getMacro: (sourceCode: number) => this.getMacro(sourceCode),
+    setMacro: (settings: MacroSettings) => this.setMacro(settings),
   }
 
   constructor(
@@ -157,6 +166,38 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const modeValue = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
     // 高四位属于性能触发方式，删除高级键只能清除低四位，不能把另一项设置一并破坏。
     await this.writeLayoutValue(sourceCode, ADVANCED_LAYOUT.mode, modeValue & 0xf0)
+  }
+
+  async getMacro(sourceCode: number): Promise<MacroSettings> {
+    const modeData = await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeRead(sourceCode))
+    const mode = decodeMacroMode(modeData)
+    // 未绑定槽位用当前物理键构造可编辑空值，UI 不需要理解协议的 0xFF。
+    if (mode.sourceCode === 0xff || mode.index >= XSYD_MAX_MACRO_SLOTS) return createEmptyMacro(0, sourceCode)
+
+    const actionCount = modeData[4] ?? 0
+    const actions: MacroSettings['actions'] = []
+    for (let offset = 0; offset < actionCount; offset += MACRO_ACTIONS_PER_PACKET) {
+      const length = Math.min(MACRO_ACTIONS_PER_PACKET, actionCount - offset)
+      const page = decodeMacroData(await this.commands.request(XSYD_COMMANDS.macroData, encodeMacroDataRead(XSYD_MACRO_BUFFER_OFFSET + offset, length)))
+      actions.push(...page.actions)
+    }
+    return { ...mode, actions }
+  }
+
+  async setMacro(settings: MacroSettings) {
+    const errors = validateMacroSettings(settings)
+    if (settings.index >= XSYD_MAX_MACRO_SLOTS) errors.push(`当前方案最多支持 ${XSYD_MAX_MACRO_SLOTS} 个宏槽位`)
+    if (settings.actions.length > XSYD_MAX_MACRO_ACTIONS) errors.push(`当前方案每个宏最多支持 ${XSYD_MAX_MACRO_ACTIONS} 个动作`)
+    if (errors.length) throw new DriverError('INVALID_CONFIGURATION', errors.join('；'))
+
+    // 已发布 SDK 从 0x0100 暂存区开始覆盖写入；没有额外发送 Action 0x10。
+    for (let offset = 0; offset < settings.actions.length; offset += MACRO_ACTIONS_PER_PACKET) {
+      await this.commands.request(XSYD_COMMANDS.macroData, encodeMacroDataWrite(XSYD_MACRO_BUFFER_OFFSET + offset, settings.actions.slice(offset, offset + MACRO_ACTIONS_PER_PACKET)))
+    }
+    // MODE 层负责声明“该物理键是宏键”，0x21 再保存槽位、动作数和执行方式。
+    const currentMode = await this.readLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode)
+    await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, currentMode & 0xf0 | ADVANCED_MODE.macro)
+    await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeWrite(settings))
   }
   close() {
     this.removeNotificationListener()

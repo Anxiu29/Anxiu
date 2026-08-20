@@ -6,6 +6,7 @@ import { DriverError } from './DriverError'
 import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguration'
 import type { LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
+import type { MacroSettings } from '@/domain/macro'
 
 export class DeviceSession {
   // original 是最近一次已验证的设备状态；draft 是允许 UI 修改的工作副本。
@@ -126,6 +127,18 @@ export class DeviceSession {
     if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
     await this.device.advancedKey.deleteAdvancedKey(sourceCode)
     return this.device.advancedKey.getAdvancedKey(sourceCode)
+  }
+
+  async getMacro(sourceCode: number) {
+    if (!this.device.macro) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持宏设置', false, { details: { capability: 'macro' } })
+    return this.device.macro.getMacro(sourceCode)
+  }
+
+  /** 宏写入后按绑定物理键回读，保证动作序列和触发模式以设备实际值为准。 */
+  async updateMacro(settings: MacroSettings) {
+    if (!this.device.macro) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持宏设置', false, { details: { capability: 'macro' } })
+    await this.device.macro.setMacro(settings)
+    return this.device.macro.getMacro(settings.sourceCode)
   }
 
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {

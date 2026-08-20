@@ -24,6 +24,8 @@ export const XSYD_COMMANDS = {
   mpt: command('advanced-mpt', 0x27),
   end: command('advanced-end', 0x28),
   socd: command('advanced-socd', 0x2c),
+  macroData: command('macro-data', 0x20),
+  macroMode: command('macro-mode', 0x21),
 } as const
 
 export const XSYD_ACTIONS = {

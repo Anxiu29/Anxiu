@@ -56,6 +56,11 @@ export interface DeviceCapabilities {
   lighting?: boolean
   /** true 时设备提供 DKS、MPT、MT、TGL、END、SOCD 高级键能力。 */
   advancedKey?: boolean
+  /** true 时设备提供宏录制、槽位和物理键绑定能力。 */
+  macro?: boolean
+  /** 宏容量由设备层声明，公共 UI 不假定所有型号都有 16 个槽位。 */
+  macroSlots?: number
+  macroMaxActions?: number
   layoutRows: number
   layoutColumns: number
 }

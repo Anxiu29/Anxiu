@@ -7,6 +7,7 @@ import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type LightingSettings } from '@/domain/lighting'
 import { cloneAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
+import { cloneMacroSettings, createEmptyMacro, type MacroSettings } from '@/domain/macro'
 
 /**
  * 不访问 HID 的内存协议实现。它实现与真机相同的 KeyboardDevice 端口，
@@ -27,10 +28,12 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
   readonly lighting = { getLighting: () => this.getLighting(), setLighting: (settings: LightingSettings) => this.setLighting(settings) }
   readonly advancedKey = { getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode), setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings), deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode) }
+  readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings) }
   private readonly capabilities: DeviceCapabilities
   private currentMode: KeyboardMode = 'win'
   private lightingSettings = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS)
   private readonly advancedKeys = new Map<number, AdvancedKeySettings>()
+  private readonly macros = new Map<number, MacroSettings>()
   constructor(
     private readonly keyCatalog: KeyCatalog,
     demoKeys: readonly MatrixKeyInput[],
@@ -71,6 +74,13 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> { await this.wait(); return cloneAdvancedKeySettings(this.advancedKeys.get(sourceCode) ?? { type: 'none', sourceCode }) }
   async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) { await this.wait(); this.advancedKeys.set(settings.sourceCode, cloneAdvancedKeySettings(settings)) }
   async deleteAdvancedKey(sourceCode: number) { await this.wait(); this.advancedKeys.delete(sourceCode) }
+  async getMacro(sourceCode: number) { await this.wait(); return cloneMacroSettings(this.macros.get(sourceCode) ?? createEmptyMacro(0, sourceCode)) }
+  async setMacro(settings: MacroSettings) {
+    await this.wait()
+    // 同一个槽位只能绑定一个物理键，模拟固件保存新绑定时替换旧绑定。
+    for (const [sourceCode, macro] of this.macros) if (macro.index === settings.index && sourceCode !== settings.sourceCode) this.macros.delete(sourceCode)
+    this.macros.set(settings.sourceCode, cloneMacroSettings(settings))
+  }
   close() {}
 
   private defaultsFor(mode: KeyboardMode) {

@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 
-type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'key-test'
+type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'macro' | 'key-test'
 
 const props = withDefaults(defineProps<{
   profile: KeyboardProfile
@@ -96,6 +96,10 @@ onBeforeUnmount(() => narrowScreen?.removeEventListener('change', syncSidebarWit
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13H11l-1 9 8.5-11H12z" /></svg>
           <span>高级键设置</span>
         </button>
+        <button v-if="profile.capabilities.macro" :class="{ active: activeView === 'macro' }" :disabled="navigationDisabled" title="宏设置" @click="navigate('macro')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h5M8 15h8" /><circle cx="17" cy="12" r="1" /></svg>
+          <span>宏设置</span>
+        </button>
         <button :class="{ active: activeView === 'key-test' }" :disabled="navigationDisabled" title="按键测试" @click="navigate('key-test')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h2m2 0h2m2 0h2M7 13h3m2 0h5" /></svg>
           <span>按键测试</span>
@@ -114,6 +118,7 @@ onBeforeUnmount(() => narrowScreen?.removeEventListener('change', syncSidebarWit
       <slot v-else-if="activeView === 'keymap'" name="keymap" />
       <slot v-else-if="activeView === 'lighting'" name="lighting" />
       <slot v-else-if="activeView === 'advanced'" name="advanced" />
+      <slot v-else-if="activeView === 'macro'" name="macro" />
       <slot v-else name="key-test" />
     </div>
 

@@ -1,6 +1,7 @@
 import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import type { LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
+import type { MacroSettings } from '@/domain/macro'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -57,6 +58,11 @@ export interface AdvancedKeyCapability {
   deleteAdvancedKey(sourceCode: number): Promise<void>
 }
 
+export interface MacroCapability {
+  getMacro(sourceCode: number): Promise<MacroSettings>
+  setMacro(settings: MacroSettings): Promise<void>
+}
+
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */
 export interface KeyboardDevice {
   readonly profile: DeviceProfileCapability
@@ -67,5 +73,6 @@ export interface KeyboardDevice {
   readonly configurationSwitch?: ConfigurationSwitchCapability
   readonly lighting?: LightingCapability
   readonly advancedKey?: AdvancedKeyCapability
+  readonly macro?: MacroCapability
   close(): void
 }

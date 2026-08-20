@@ -5,6 +5,7 @@ import type { KeyboardConfiguration, KeyboardMode, KeyboardProfile, SessionStatu
 import type { DriverErrorCode } from '@/application/DriverError'
 import type { LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
+import type { MacroSettings } from '@/domain/macro'
 
 /** Driver Store 的响应式状态与派生查询；不执行连接、协议或写入操作。 */
 export const createDriverState = () => {
@@ -28,6 +29,9 @@ export const createDriverState = () => {
   const advancedKeyLoading = ref(false)
   /** 只记录本会话已读取或成功写入的高级键类型，用于在键盘上显示角标。 */
   const advancedKeyTypes = ref<Record<number, string>>({})
+  const macro = ref<MacroSettings>()
+  /** 宏读取和高级键读取一样按页面按需执行，不占用全局 reading 状态。 */
+  const macroLoading = ref(false)
   // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
   const activeSession = shallowRef<DeviceSession>()
 
@@ -41,7 +45,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
-    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }
