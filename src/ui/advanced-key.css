@@ -352,11 +352,3 @@
   .dks-matrix { --dks-column-gap: 9px; grid-template-columns: 96px repeat(4, minmax(64px, 1fr)); gap: 7px var(--dks-column-gap); }
   .advanced-card-grid.three { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
 }
-
-/* 全屏下键盘已经按容器完整缩放，隐藏舍入误差产生的无意义滚动条；小屏仍保留滚动提示。 */
-@media (min-width: 1400px) and (min-height: 800px) {
-  .advanced-keyboard-panel,
-  .advanced-keyboard-panel .keyboard-shell { scrollbar-width: none; }
-  .advanced-keyboard-panel::-webkit-scrollbar,
-  .advanced-keyboard-panel .keyboard-shell::-webkit-scrollbar { display: none; }
-}

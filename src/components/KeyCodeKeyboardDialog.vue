@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
+import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
+import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 import KeyboardCanvas from './KeyboardCanvas.vue'
 
 const props = defineProps<{
@@ -14,6 +16,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ close: []; confirm: [keyCode: number] }>()
 const pendingCode = ref(props.modelValue)
+const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 44, minUnit: 28, horizontalPadding: 34, verticalPadding: 28 })
+useHorizontalKeyboardScroll(keyboardContainer)
 
 watch(() => [props.open, props.modelValue] as const, ([open, value]) => { if (open) pendingCode.value = value }, { immediate: true })
 
@@ -39,8 +43,8 @@ const choosePosition = (positionId: string) => {
     <div v-if="open" class="key-code-dialog-backdrop" @click.self="emit('close')">
       <section class="key-code-dialog panel" role="dialog" aria-modal="true" aria-labelledby="key-code-dialog-title">
         <header><div><h3 id="key-code-dialog-title">选择按键</h3><p>点击键盘中的键帽，然后确认</p></div><button type="button" aria-label="关闭" @click="emit('close')">×</button></header>
-        <div class="key-code-dialog-keyboard">
-          <KeyboardCanvas :positions="profile.positions" :assignments="keyboardAssignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="38" :geometry="keyGeometry" @select="choosePosition" />
+        <div ref="keyboardContainer" class="key-code-dialog-keyboard">
+          <KeyboardCanvas :positions="profile.positions" :assignments="keyboardAssignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="choosePosition" />
         </div>
         <footer>
           <label>更多键值<select v-model.number="pendingCode"><option v-for="key in extraOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select></label>

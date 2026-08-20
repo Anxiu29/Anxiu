@@ -1,4 +1,4 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { KeyPosition } from '@/domain/keyboard'
 import { matrixKeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 
@@ -13,6 +13,7 @@ export function useFittedKeyboardUnit(
   const maxUnit = options.maxUnit ?? 64
   const minUnit = options.minUnit ?? 24
   let observer: ResizeObserver | undefined
+  let stopWatching: (() => void) | undefined
 
   const bounds = computed(() => {
     const resolve = geometry() ?? matrixKeyGeometry
@@ -33,15 +34,21 @@ export function useFittedKeyboardUnit(
     size.value = { width: container.value.clientWidth, height: container.value.clientHeight }
   }
 
-  onMounted(async () => {
-    await nextTick()
-    measure()
-    if (typeof ResizeObserver !== 'undefined' && container.value) {
-      observer = new ResizeObserver(measure)
-      observer.observe(container.value)
-    } else window.addEventListener('resize', measure)
+  onMounted(() => {
+    window.addEventListener('resize', measure)
+    stopWatching = watch(container, (element) => {
+      observer?.disconnect()
+      observer = undefined
+      if (!element) { size.value = { width: 0, height: 0 }; return }
+      measure()
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(measure)
+        observer.observe(element)
+      }
+    }, { immediate: true, flush: 'post' })
   })
   onBeforeUnmount(() => {
+    stopWatching?.()
     observer?.disconnect()
     window.removeEventListener('resize', measure)
   })

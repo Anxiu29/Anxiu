@@ -7,6 +7,21 @@ body,
   overflow: hidden;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #465260 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  display: block;
+}
+
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { border-radius: 999px; background: #465260; }
+*::-webkit-scrollbar-thumb:hover { background: #667584; }
+
 body {
   min-width: 0;
 }

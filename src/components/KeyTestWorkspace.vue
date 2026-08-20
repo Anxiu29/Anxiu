@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { keyboardEventCodeToHidUsage } from '@/ui/keyboardEventCode'
+import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
+import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 import KeyboardCanvas from './KeyboardCanvas.vue'
 
 const props = defineProps<{
@@ -19,12 +21,8 @@ const pressedPositionIds = ref<string[]>([])
 const counts = ref<Record<string, number>>({})
 const history = ref<TestRecord[]>([])
 const sequence = ref(0)
-const viewportWidth = ref(window.innerWidth)
-const viewportHeight = ref(window.innerHeight)
-const keyboardUnit = computed(() => Math.min(
-  viewportWidth.value <= 1250 ? 38 : viewportWidth.value <= 1450 ? 46 : viewportWidth.value <= 1650 ? 52 : viewportWidth.value <= 1850 ? 58 : 64,
-  viewportHeight.value <= 760 ? 44 : viewportHeight.value <= 900 ? 52 : viewportHeight.value <= 1050 ? 60 : 66,
-))
+const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 64, minUnit: 28 })
+useHorizontalKeyboardScroll(keyboardContainer)
 const totalPresses = computed(() => Object.values(counts.value).reduce((sum, count) => sum + count, 0))
 const testedKeys = computed(() => Object.keys(counts.value).length)
 const badges = computed(() => Object.fromEntries(Object.entries(counts.value).map(([positionId, count]) => [positionId, String(count)])))
@@ -62,20 +60,16 @@ function handleKeyUp(event: KeyboardEvent) {
 }
 function releaseAll() { pressedByCode.clear(); refreshPressedPositions() }
 function clearResults() { releaseAll(); counts.value = {}; history.value = [] }
-function updateViewport() { viewportWidth.value = window.innerWidth; viewportHeight.value = window.innerHeight }
-
 onMounted(() => {
   // 使用捕获阶段可阻止 F5、Tab 等测试按键触发浏览器默认动作；组件卸载后立即恢复正常行为。
   window.addEventListener('keydown', handleKeyDown, true)
   window.addEventListener('keyup', handleKeyUp, true)
   window.addEventListener('blur', releaseAll)
-  window.addEventListener('resize', updateViewport)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown, true)
   window.removeEventListener('keyup', handleKeyUp, true)
   window.removeEventListener('blur', releaseAll)
-  window.removeEventListener('resize', updateViewport)
 })
 </script>
 
@@ -86,7 +80,7 @@ onBeforeUnmount(() => {
       <div class="key-test-stats"><span><strong>{{ testedKeys }}</strong> 已测试按键</span><span><strong>{{ totalPresses }}</strong> 总触发次数</span><button class="ghost" type="button" @click="clearResults">清空记录</button></div>
     </header>
 
-    <div class="panel key-test-keyboard">
+    <div ref="keyboardContainer" class="panel key-test-keyboard">
       <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="keyboardUnit" :pressed="pressedPositionIds" :badges="badges" />
     </div>
 
