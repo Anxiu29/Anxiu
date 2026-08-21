@@ -58,6 +58,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly macro = {
     getMacro: (sourceCode: number) => this.getMacro(sourceCode),
     setMacro: (settings: MacroSettings) => this.setMacro(settings),
+    deleteMacroBinding: (sourceCode: number) => this.deleteMacroBinding(sourceCode),
   }
 
   constructor(
@@ -193,6 +194,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     // 不能保留旧性能模式；否则快速点击可能漏出 FN0 中原来的普通键值。
     await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, XSYD_MACRO_LAYOUT_MODE)
     await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeWrite(settings))
+  }
+  /** 解除绑定只清除 MODE 低四位；FN0 键值和性能触发方式仍属于该物理键。 */
+  async deleteMacroBinding(sourceCode: number) {
+    const modeValue = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
+    await this.writeLayoutValue(sourceCode, ADVANCED_LAYOUT.mode, modeValue & 0xf0)
   }
   close() {
     this.removeNotificationListener()

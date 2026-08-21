@@ -141,6 +141,11 @@ export class DeviceSession {
     return this.device.macro.getMacro(settings.sourceCode)
   }
 
+  async deleteMacroBinding(sourceCode: number) {
+    if (!this.device.macro) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持宏设置', false, { details: { capability: 'macro' } })
+    await this.device.macro.deleteMacroBinding(sourceCode)
+  }
+
   private applyKeyDefaults(matches: (item: KeyAssignment) => boolean) {
     if (!this.profile) throw new DriverError('INVALID_CONFIGURATION', '尚未读取设备配置')
     // 默认值按“层 + 物理位置”索引，同一个物理键在不同 Fn 层可以有不同默认功能。

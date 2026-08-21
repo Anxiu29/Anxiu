@@ -61,6 +61,7 @@ export interface AdvancedKeyCapability {
 export interface MacroCapability {
   getMacro(sourceCode: number): Promise<MacroSettings>
   setMacro(settings: MacroSettings): Promise<void>
+  deleteMacroBinding(sourceCode: number): Promise<void>
 }
 
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */

@@ -28,7 +28,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
   readonly lighting = { getLighting: () => this.getLighting(), setLighting: (settings: LightingSettings) => this.setLighting(settings) }
   readonly advancedKey = { getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode), setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings), deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode) }
-  readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings) }
+  readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings), deleteMacroBinding: (sourceCode: number) => this.deleteMacroBinding(sourceCode) }
   private readonly capabilities: DeviceCapabilities
   private currentMode: KeyboardMode = 'win'
   private lightingSettings = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS)
@@ -81,10 +81,11 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async setMacro(settings: MacroSettings) {
     await this.wait()
-    // 同一个槽位只能绑定一个物理键，模拟固件保存新绑定时替换旧绑定。
-    for (const [sourceCode, macro] of this.macros) if (macro.index === settings.index && sourceCode !== settings.sourceCode) this.macros.delete(sourceCode)
+    // 宏正文属于固定槽位；多个物理键可以保存同一个 index，并共享同一套动作。
+    for (const [sourceCode, macro] of this.macros) if (macro.index === settings.index) this.macros.set(sourceCode, cloneMacroSettings({ ...settings, sourceCode }))
     this.macros.set(settings.sourceCode, cloneMacroSettings(settings))
   }
+  async deleteMacroBinding(sourceCode: number) { await this.wait(); this.macros.delete(sourceCode) }
   close() {}
 
   private defaultsFor(mode: KeyboardMode) {

@@ -30,6 +30,8 @@ export const createDriverState = () => {
   /** 只记录本会话已读取或成功写入的高级键类型，用于在键盘上显示角标。 */
   const advancedKeyTypes = ref<Record<number, string>>({})
   const macro = ref<MacroSettings>()
+  /** 固定宏槽位的唯一正文；键位绑定不再复制一份宏内容。 */
+  const macroSlots = ref<Record<number, MacroSettings>>({})
   /** 已确认或由本驱动保存的宏绑定，用于在键盘上显示 M1~M16 角标。 */
   const macroBindings = ref<Record<number, string>>({})
   /** 宏读取和高级键读取一样按页面按需执行，不占用全局 reading 状态。 */
@@ -47,7 +49,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
-    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }
