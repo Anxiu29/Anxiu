@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import { cloneMacroSettings, createEmptyMacro, EMPTY_MACRO_SOURCE, type MacroMode, type MacroSettings } from '@/domain/macro'
-import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
+import { matrixKeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { keyboardEventCodeToHidUsage } from '@/ui/keyboardEventCode'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
@@ -31,6 +31,9 @@ const bindingDialogOpen = ref(false)
 const SLOT_LIST_COLLAPSED_KEY = 'anxiu:macro-slot-list-collapsed'
 const slotListCollapsed = ref(readSlotListCollapsed())
 const draggedActionIndex = ref<number>()
+// 数组下标会在拖动时变化，稳定键值才能让 TransitionGroup 正确计算位移动画。
+const actionRenderKeys = new WeakMap<object, number>()
+let nextActionRenderKey = 0
 let previousEventTime = 0
 
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
@@ -43,6 +46,14 @@ const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.m
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
 // 宏列表收缩和执行模式压缩后，允许矩阵继续利用新增空间放大，而不是停在原来的 30px 上限。
 const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 42, minUnit: 10, horizontalPadding: 8, verticalPadding: 8 })
+const bindingKeyboardHeight = computed(() => {
+  const resolve = props.keyGeometry ?? matrixKeyGeometry
+  const rowUnits = Math.max(...props.profile.positions.map((position) => {
+    const key = resolve(position)
+    return key.y + key.height
+  }), 1)
+  return Math.ceil(rowUnits * bindingKeyboardUnit.value + 18)
+})
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
   { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
@@ -97,13 +108,23 @@ function adjustMacroNumber(field: 'repeatCount' | 'repeatDelay', delta: number) 
   draft.value[field] = Math.min(maximum, Math.max(0, draft.value[field] + delta))
 }
 function clearActions() { stopRecording(); if (draft.value) draft.value.actions = [] }
-function startDraggingAction(index: number) { draggedActionIndex.value = index }
-function dropAction(targetIndex: number) {
+function actionRenderKey(action: object) {
+  if (!actionRenderKeys.has(action)) actionRenderKeys.set(action, nextActionRenderKey++)
+  return actionRenderKeys.get(action)!
+}
+function startDraggingAction(index: number, event: DragEvent) {
+  draggedActionIndex.value = index
+  event.dataTransfer?.setData('text/plain', String(index))
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+function previewActionOrder(targetIndex: number) {
   if (!draft.value || draggedActionIndex.value === undefined || draggedActionIndex.value === targetIndex) return
   const [action] = draft.value.actions.splice(draggedActionIndex.value, 1)
   if (action) draft.value.actions.splice(targetIndex, 0, action)
-  draggedActionIndex.value = undefined
+  // 每经过一个动作就同步当前位置，因此拖动过程中能直接看到最终顺序。
+  draggedActionIndex.value = targetIndex
 }
+function finishDraggingAction() { draggedActionIndex.value = undefined }
 function startRecording() {
   if (!draft.value || busy.value) return
   recording.value = true
@@ -165,7 +186,7 @@ onBeforeUnmount(stopRecording)
       </div>
       <section class="macro-bindings">
         <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
-        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard">
+        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard" :style="{ '--macro-binding-keyboard-height': `${bindingKeyboardHeight}px` }">
           <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :pressed="boundPositionIds" :badges="bindingBadges" :unit="bindingKeyboardUnit" :geometry="keyGeometry" @select="toggleBindingPosition" />
         </div>
       </section>
@@ -178,11 +199,11 @@ onBeforeUnmount(stopRecording)
       <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || !draft?.actions.length" @click="clearActions">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length || !bindingCodes.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
       <div v-if="unavailableActionCount" class="macro-placeholder macro-unavailable"><strong>设备中有 {{ unavailableActionCount }} 个动作</strong><span>当前方案只回读宏元数据；若宏不是由本网页保存，动作正文无法还原，可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
-      <ol v-else class="macro-action-list">
-        <li v-for="(action, index) in draft.actions" :key="index" draggable="true" @dragstart="startDraggingAction(index)" @dragover.prevent @drop="dropAction(index)">
+      <TransitionGroup v-else tag="ol" name="macro-action" class="macro-action-list">
+        <li v-for="(action, index) in draft.actions" :key="actionRenderKey(action)" :class="{ dragging: draggedActionIndex === index }" draggable="true" @dragstart="startDraggingAction(index, $event)" @dragenter.prevent="previewActionOrder(index)" @dragover.prevent @drop.prevent="finishDraggingAction" @dragend="finishDraggingAction">
           <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerIndex = index">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><div class="macro-action-time"><button title="减少 1 ms" @click="adjustActionDelay(index, -1)">−</button><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /><span>ms</span><button title="增加 1 ms" @click="adjustActionDelay(index, 1)">+</button></div><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
         </li>
-      </ol>
+      </TransitionGroup>
       <footer class="macro-add-footer"><button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="addKeyPair"><span>＋</span>添加按键</button></footer>
     </section>
 
