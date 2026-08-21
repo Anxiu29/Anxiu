@@ -166,9 +166,10 @@
   transition: border-color .16s ease, background .16s ease;
 }
 .compact-key-event > span { color: #78838f; font-size: 10px; }
-.compact-key-event > strong { margin: auto; max-width: 100%; overflow: hidden; color: #e2e8ed; font-size: 21px; text-overflow: ellipsis; white-space: nowrap; }
 .compact-key-event.active { border-color: rgba(69, 230, 208, .55); background: rgba(69, 230, 208, .07); }
-.compact-key-event.active > strong { color: var(--cyan); }
+.compact-key-values { margin: auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; overflow: auto; }
+.compact-key-values strong { min-width: 38px; padding: 7px 10px; overflow: hidden; border: 1px solid #39434e; border-radius: 6px; color: #e2e8ed; background: #11171e; font-size: 15px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.compact-key-event.active .compact-key-values strong { border-color: rgba(69, 230, 208, .5); color: var(--cyan); background: rgba(69, 230, 208, .08); }
 .compact-key-test-empty { margin: auto; display: grid; justify-items: center; gap: 7px; color: #6f7985; }
 .compact-key-test-empty svg { width: 31px; height: 31px; fill: #555f6a; stroke: #555f6a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .compact-key-test-empty small { font-size: 10px; white-space: nowrap; }
