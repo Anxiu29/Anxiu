@@ -59,7 +59,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
-  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults) }
+  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear() }
   async switchMode(mode: KeyboardMode) {
     await this.wait()
     this.currentMode = mode
@@ -76,7 +76,8 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async deleteAdvancedKey(sourceCode: number) { await this.wait(); this.advancedKeys.delete(sourceCode) }
   async getMacro(sourceCode: number) {
     await this.wait()
-    const value = cloneMacroSettings(this.macros.get(sourceCode) ?? createEmptyMacro(0, sourceCode))
+    const stored = this.macros.get(sourceCode)
+    const value = cloneMacroSettings(stored ?? createEmptyMacro(0))
     return { ...value, storedActionCount: value.actions.length, actionsAvailable: true }
   }
   async setMacro(settings: MacroSettings) {

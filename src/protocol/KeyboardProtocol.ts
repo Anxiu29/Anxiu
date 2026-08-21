@@ -172,13 +172,13 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   async getMacro(sourceCode: number): Promise<MacroSettings> {
     const modeData = await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeRead(sourceCode))
     const mode = decodeMacroMode(modeData)
-    // 未绑定槽位用当前物理键构造可编辑空值，UI 不需要理解协议的 0xFF。
-    if (mode.sourceCode === 0xff || mode.index >= XSYD_MAX_MACRO_SLOTS) return createEmptyMacro(0, sourceCode)
+    // 未绑定键统一返回 0xFF；状态层据此区分“空键”和真实宏绑定。
+    if (mode.sourceCode === 0xff || mode.index >= XSYD_MAX_MACRO_SLOTS) return createEmptyMacro(0)
 
     const storedActionCount = modeData[4] ?? 0
     // 真机抓包确认：0x21 写响应会回显动作数，但随后主动查询时该字段返回 0；
     // 因此查询只能验证槽位、模式、重复次数和间隔，不能用 len 判断已保存动作正文。
-    return { ...mode, actions: [], storedActionCount, actionsAvailable: storedActionCount === 0 }
+    return { ...mode, boundSourceCodes: [mode.sourceCode], actions: [], storedActionCount, actionsAvailable: false }
   }
 
   async setMacro(settings: MacroSettings) {

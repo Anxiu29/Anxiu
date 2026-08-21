@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import { cloneMacroSettings, createEmptyMacro, EMPTY_MACRO_SOURCE, type MacroMode, type MacroSettings } from '@/domain/macro'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
@@ -21,7 +21,7 @@ const props = defineProps<{
   keyLabels: Record<number, string>
   keyGeometry?: KeyGeometryResolver
 }>()
-const emit = defineEmits<{ 'select-slot': [index: number]; update: [settings: MacroSettings] }>()
+const emit = defineEmits<{ 'select-slot': [index: number]; update: [settings: MacroSettings]; load: [] }>()
 
 const draft = ref<MacroSettings>()
 const recording = ref(false)
@@ -44,7 +44,7 @@ const keyLabel = (code: number) => props.keyLabels[code] ?? `0x${code.toString(1
 const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
-const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
+const actionsUnavailable = computed(() => draft.value?.actionsAvailable === false)
 // 宏列表收缩和执行模式压缩后，允许矩阵继续利用新增空间放大，而不是停在原来的 30px 上限。
 const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, {
   maxUnit: 42,
@@ -163,6 +163,7 @@ function save() {
   emit('update', cloneMacroSettings(draft.value))
 }
 onBeforeUnmount(stopRecording)
+onMounted(() => emit('load'))
 </script>
 
 <template>
@@ -176,7 +177,7 @@ onBeforeUnmount(stopRecording)
       </header>
       <div class="macro-slot-list">
         <button v-for="index in macroSlotCount" :key="index" :class="{ active: selectedSlot === index - 1 }" @click="selectSlot(index - 1)">
-          <b>M{{ index }}</b><small>{{ macroSlots?.[index - 1]?.actions.length ?? macroSlots?.[index - 1]?.storedActionCount ?? 0 }} 个动作</small>
+          <b>M{{ index }}</b><small>{{ macroSlots?.[index - 1]?.actionsAvailable === false ? '设备宏' : `${macroSlots?.[index - 1]?.actions.length ?? macroSlots?.[index - 1]?.storedActionCount ?? 0} 个动作` }}</small>
         </button>
       </div>
     </aside>
@@ -192,7 +193,7 @@ onBeforeUnmount(stopRecording)
         <label>重复间隔<div class="macro-number-control"><button @click="adjustMacroNumber('repeatDelay', -1)"><span class="macro-control-symbol">−</span></button><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /><span class="macro-number-unit">ms</span><button @click="adjustMacroNumber('repeatDelay', 1)"><span class="macro-control-symbol">+</span></button></div></label>
       </div>
       <section class="macro-bindings">
-        <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
+        <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键；每个键只能绑定一个宏` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
         <div ref="bindingKeyboardContainer" class="macro-binding-keyboard">
           <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :pressed="boundPositionIds" :badges="bindingBadges" :unit="bindingKeyboardUnit" :geometry="keyGeometry" @select="toggleBindingPosition" />
         </div>
@@ -204,7 +205,7 @@ onBeforeUnmount(stopRecording)
         <div><h2>宏录制</h2><small>{{ draft?.actions.length ?? 0 }} / {{ maxMacroActions }} 个动作</small></div>
       </header>
       <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || !draft?.actions.length" @click="clearActions">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length || !bindingCodes.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
-      <div v-if="unavailableActionCount" class="macro-placeholder macro-unavailable"><strong>设备中有 {{ unavailableActionCount }} 个动作</strong><span>当前方案只回读宏元数据；若宏不是由本网页保存，动作正文无法还原，可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
+      <div v-if="actionsUnavailable" class="macro-placeholder macro-unavailable"><strong>已从键盘读取到该宏</strong><span>当前方案只能回读绑定、槽位和执行参数，不能还原动作正文；可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
       <TransitionGroup v-else tag="ol" name="macro-action" class="macro-action-list">
         <li v-for="(action, index) in draft.actions" :key="actionRenderKey(action)" :class="{ dragging: draggedActionIndex === index }" draggable="true" @dragstart="startDraggingAction(index, $event)" @dragenter.prevent="previewActionOrder(index)" @dragover.prevent @drop.prevent="finishDraggingAction" @dragend="finishDraggingAction">
