@@ -73,6 +73,15 @@
   outline-offset: 1px;
 }
 
+/* 静态彩色模式用七个协议颜色槽模拟设备分区预览，实际效果以固件回读为准。 */
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 1) { --light-color: #ff4d5f; }
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 2) { --light-color: #ff9f43; }
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 3) { --light-color: #ffe66d; }
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 4) { --light-color: #43e97b; }
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 5) { --light-color: #38c8ff; }
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 6) { --light-color: #6574ff; }
+.lighting-keyboard-preview.rainbow-mode .keycap:nth-child(7n + 7) { --light-color: #d66efd; }
+
 .custom-lighting-selection-box {
   position: absolute;
   z-index: 8;
@@ -354,6 +363,23 @@
   border-color: #fff;
   box-shadow: 0 0 0 2px rgba(69, 214, 255, 0.45);
 }
+
+.lighting-rainbow-option {
+  min-width: 58px;
+  height: 30px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 6px;
+  color: #cbd4de;
+  background: rgba(255, 255, 255, .05);
+  font-size: 10px;
+}
+.lighting-rainbow-option i { width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(#ff4d5f, #ffe66d, #43e97b, #38c8ff, #6574ff, #d66efd, #ff4d5f); }
+.lighting-rainbow-option.active { border-color: #fff; color: #fff; box-shadow: 0 0 0 2px rgba(69, 214, 255, .45); }
+.lighting-rainbow-option:disabled { opacity: .35; cursor: not-allowed; }
 
 .lighting-color-format {
   margin-top: 20px;

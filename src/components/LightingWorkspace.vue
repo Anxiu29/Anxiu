@@ -28,6 +28,7 @@ const colorFormat = ref<'hex' | 'rgb'>('rgb')
 const selectedCustomPositionIds = ref<string[]>([])
 const customDraft = ref<Record<number, string>>({})
 const isCustomMode = computed(() => props.settings?.type === 'custom' || props.settings?.mode === 21)
+const isStaticRainbow = computed(() => props.settings?.type === 'static' && props.settings.staticColor === 7)
 const canEditColor = computed(() => !!props.settings?.open && (props.settings.type === 'static' || isCustomMode.value))
 const selectionBox = ref<{ left: number; top: number; width: number; height: number }>()
 let selectionDrag: { pointerId: number; mode: 'sweep' | 'box'; startX: number; startY: number } | undefined
@@ -77,8 +78,36 @@ const updatePrimaryColor = (color: string) => {
     return
   }
   const colors = [...props.settings.colors]
-  colors[0] = color.toUpperCase()
-  update({ colors, staticColor: 0 })
+  // staticColor 0～6 对应协议中的七个颜色槽；调色盘修改当前选中的槽位。
+  const colorIndex = Math.max(0, Math.min(6, props.settings.staticColor))
+  colors[colorIndex] = color.toUpperCase()
+  update({ colors, staticColor: colorIndex })
+}
+
+const selectPaletteColor = (color: string, index: number) => {
+  if (!props.settings || busy.value || !canEditColor.value) return
+  if (isCustomMode.value) updatePrimaryColor(color)
+  else update({ staticColor: index })
+}
+
+const selectRainbowColor = () => {
+  if (!props.settings || busy.value || !canEditColor.value) return
+  if (!isCustomMode.value) {
+    // 静态灯通过第八种颜色模式试用固件彩色效果；设备回读值仍是最终状态。
+    update({ staticColor: 7 })
+    return
+  }
+  const selected = new Set(selectedCustomPositionIds.value)
+  const palette = props.settings.colors.filter((color) => /^#[0-9a-f]{6}$/i.test(color))
+  if (!selected.size || !palette.length) return
+  let colorIndex = 0
+  const changed = props.profile.positions.filter((position) => selected.has(position.id)).map((position) => ({
+    sourceCode: position.sourceCode,
+    color: palette[colorIndex++ % palette.length]!.toUpperCase(),
+  }))
+  customDraft.value = { ...customDraft.value, ...Object.fromEntries(changed.map((item) => [item.sourceCode, item.color])) }
+  // 自定义协议没有“彩色模式”字段，因此把调色板循环写到选区中的各个物理键。
+  emit('update-custom', changed)
 }
 
 const selectedCustomPositions = computed(() => {
@@ -88,7 +117,8 @@ const selectedCustomPositions = computed(() => {
 const activeColor = computed(() => {
   const first = selectedCustomPositions.value[0]
   if (isCustomMode.value && first) return customDraft.value[first.sourceCode] ?? '#000000'
-  return props.settings?.colors[0] ?? '#FFFFFF'
+  const colorIndex = Math.max(0, Math.min(6, props.settings?.staticColor ?? 0))
+  return props.settings?.colors[colorIndex] ?? props.settings?.colors[0] ?? '#FFFFFF'
 })
 const customKeyColors = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, customDraft.value[position.sourceCode] ?? '#000000'])))
 const addSelectedPosition = (positionId: string) => {
@@ -213,7 +243,7 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
 <template>
   <section class="lighting-workspace">
     <template v-if="settings">
-      <section ref="keyboardContainer" class="panel lighting-keyboard-preview" :class="{ 'custom-mode': isCustomMode }" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }" @pointerdown="beginCustomSelection" @pointermove="moveCustomSelection" @pointerup="finishCustomSelection" @pointercancel="finishCustomSelection">
+      <section ref="keyboardContainer" class="panel lighting-keyboard-preview" :class="{ 'custom-mode': isCustomMode, 'rainbow-mode': isStaticRainbow }" :style="{ '--light-color': activeColor, '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }" @pointerdown="beginCustomSelection" @pointermove="moveCustomSelection" @pointerup="finishCustomSelection" @pointercancel="finishCustomSelection">
         <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="keyboardUnit" :pressed="isCustomMode ? selectedCustomPositionIds : []" :key-colors="isCustomMode ? customKeyColors : {}" />
         <span v-if="selectionBox" class="custom-lighting-selection-box" :style="{ left: `${selectionBox.left}px`, top: `${selectionBox.top}px`, width: `${selectionBox.width}px`, height: `${selectionBox.height}px` }"></span>
       </section>
@@ -258,7 +288,8 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
               <span class="lighting-color-wheel-selection" :style="wheelSelectionStyle"></span>
             </div>
             <div class="lighting-palette">
-              <button v-for="(color, index) in settings.colors" :key="`${color}-${index}`" class="lighting-swatch" type="button" :class="{ active: index === 0 }" :style="{ '--swatch-color': color }" :title="color" :disabled="busy || !canEditColor" @click="updatePrimaryColor(color)"></button>
+              <button v-for="(color, index) in settings.colors" :key="`${color}-${index}`" class="lighting-swatch" type="button" :class="{ active: !isCustomMode && settings.staticColor === index }" :style="{ '--swatch-color': color }" :title="isCustomMode ? `应用 ${color}` : `静态颜色 ${index + 1} · ${color}`" :disabled="busy || !canEditColor" @click="selectPaletteColor(color, index)"></button>
+              <button class="lighting-rainbow-option" type="button" :class="{ active: isStaticRainbow }" :disabled="busy || !canEditColor" :title="isCustomMode ? '把七色调色板循环应用到当前选区' : '使用静态彩色模式'" @click="selectRainbowColor"><i></i><span>彩色</span></button>
             </div>
           </div>
           <div class="lighting-color-format">
