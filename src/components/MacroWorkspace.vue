@@ -133,7 +133,7 @@ onBeforeUnmount(stopRecording)
           <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="slotListCollapsed ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'" /></svg>
         </button>
       </header>
-      <div v-if="!slotListCollapsed" class="macro-slot-list">
+      <div class="macro-slot-list">
         <button v-for="index in macroSlotCount" :key="index" :class="{ active: selectedSlot === index - 1 }" @click="selectSlot(index - 1)">
           <b>M{{ index }}</b><small>{{ macroSlots?.[index - 1]?.actions.length ?? macroSlots?.[index - 1]?.storedActionCount ?? 0 }} 个动作</small>
         </button>
