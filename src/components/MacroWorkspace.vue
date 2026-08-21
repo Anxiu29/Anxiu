@@ -38,7 +38,7 @@ const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
-const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 20, minUnit: 10, horizontalPadding: 12, verticalPadding: 12 })
+const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 25, minUnit: 13, horizontalPadding: 12, verticalPadding: 12 })
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
   { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
@@ -58,6 +58,11 @@ function applyBindings(sourceCodes: number[]) {
   draft.value.boundSourceCodes = [...new Set(sourceCodes)]
   draft.value.sourceCode = draft.value.boundSourceCodes[0] ?? EMPTY_MACRO_SOURCE
   bindingDialogOpen.value = false
+}
+function toggleBindingPosition(positionId: string) {
+  const sourceCode = props.profile.positions.find((position) => position.id === positionId)?.sourceCode
+  if (sourceCode === undefined) return
+  applyBindings(bindingCodes.value.includes(sourceCode) ? bindingCodes.value.filter((code) => code !== sourceCode) : [...bindingCodes.value, sourceCode])
 }
 function addKeyPair() {
   if (!draft.value || draft.value.actions.length + 2 > maxMacroActions.value) return
@@ -133,9 +138,9 @@ onBeforeUnmount(stopRecording)
         <label>重复间隔<span><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /> ms</span></label>
       </div>
       <section class="macro-bindings">
-        <div><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '点击键盘选择绑定键' }}</small></div>
-        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard" role="button" tabindex="0" @click="bindingDialogOpen = true" @keydown.enter="bindingDialogOpen = true">
-          <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :pressed="boundPositionIds" :badges="bindingBadges" :unit="bindingKeyboardUnit" :geometry="keyGeometry" />
+        <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
+        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard">
+          <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :pressed="boundPositionIds" :badges="bindingBadges" :unit="bindingKeyboardUnit" :geometry="keyGeometry" @select="toggleBindingPosition" />
         </div>
       </section>
     </section>
