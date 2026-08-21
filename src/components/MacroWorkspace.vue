@@ -55,7 +55,7 @@ const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFi
 })
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
-  { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
+  { value: 0, title: '点击执行', description: '按下一次，执行一次宏序列' },
   { value: 1, title: '点击循环', description: '再次按下绑定键时停止循环' },
   { value: 2, title: '按住循环', description: '松开绑定键后立即停止' },
   { value: 3, title: '按住完成本轮', description: '松开后完成本轮再停止' },
@@ -101,10 +101,9 @@ function adjustActionDelay(index: number, delta: number) {
   const action = draft.value?.actions[index]
   if (action) action.delay = Math.min(0xffffff, Math.max(0, action.delay + delta))
 }
-function adjustMacroNumber(field: 'repeatCount' | 'repeatDelay', delta: number) {
+function adjustRepeatDelay(delta: number) {
   if (!draft.value) return
-  const maximum = field === 'repeatCount' ? 0xffff : 0xffffff
-  draft.value[field] = Math.min(maximum, Math.max(0, draft.value[field] + delta))
+  draft.value.repeatDelay = Math.min(0xffffff, Math.max(0, draft.value.repeatDelay + delta))
 }
 function clearActions() { stopRecording(); if (draft.value) draft.value.actions = [] }
 function actionRenderKey(action: object) {
@@ -160,7 +159,9 @@ function confirmKeyPicker(keyCode: number) {
 }
 function save() {
   if (!draft.value?.actions.length || !bindingCodes.value.length) return
-  emit('update', cloneMacroSettings(draft.value))
+  // 当前设备固件会回读 num 字段，但官方驱动同样不提供次数调节，实际执行也固定一次。
+  // 统一写 1 可避免历史草稿中的无效数值继续误导用户或污染回读校验。
+  emit('update', { ...cloneMacroSettings(draft.value), repeatCount: 1 })
 }
 onBeforeUnmount(stopRecording)
 onMounted(() => emit('load'))
@@ -189,8 +190,7 @@ onMounted(() => emit('load'))
         <button v-for="option in modeOptions" :key="option.value" class="macro-mode-card" :class="{ active: draft?.mode === option.value }" @click="draft && (draft.mode = option.value)"><i></i><span><b>{{ option.title }}</b><small>{{ option.description }}</small></span></button>
       </div>
       <div class="macro-repeat-settings">
-        <label>重复次数<div class="macro-number-control"><button @click="adjustMacroNumber('repeatCount', -1)"><span class="macro-control-symbol">−</span></button><input v-if="draft" v-model.number="draft.repeatCount" type="number" min="0" max="65535" /><button @click="adjustMacroNumber('repeatCount', 1)"><span class="macro-control-symbol">+</span></button></div></label>
-        <label>重复间隔<div class="macro-number-control"><button @click="adjustMacroNumber('repeatDelay', -1)"><span class="macro-control-symbol">−</span></button><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /><span class="macro-number-unit">ms</span><button @click="adjustMacroNumber('repeatDelay', 1)"><span class="macro-control-symbol">+</span></button></div></label>
+        <label>重复间隔<div class="macro-number-control"><button @click="adjustRepeatDelay(-1)"><span class="macro-control-symbol">−</span></button><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /><span class="macro-number-unit">ms</span><button @click="adjustRepeatDelay(1)"><span class="macro-control-symbol">+</span></button></div></label>
       </div>
       <section class="macro-bindings">
         <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键；每个键只能绑定一个宏` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
