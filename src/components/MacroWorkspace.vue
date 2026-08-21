@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import { cloneMacroSettings, createEmptyMacro, EMPTY_MACRO_SOURCE, type MacroMode, type MacroSettings } from '@/domain/macro'
-import { matrixKeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
+import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { keyboardEventCodeToHidUsage } from '@/ui/keyboardEventCode'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
@@ -51,14 +51,6 @@ const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFi
   // 画布自身还有间距、内边距和边框；预留完整空间可避免刚好多出几像素而出现滚动条。
   horizontalPadding: 28,
   verticalPadding: 24,
-})
-const bindingKeyboardHeight = computed(() => {
-  const resolve = props.keyGeometry ?? matrixKeyGeometry
-  const rowUnits = Math.max(...props.profile.positions.map((position) => {
-    const key = resolve(position)
-    return key.y + key.height
-  }), 1)
-  return Math.ceil(rowUnits * bindingKeyboardUnit.value + 18)
 })
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
@@ -192,7 +184,7 @@ onBeforeUnmount(stopRecording)
       </div>
       <section class="macro-bindings">
         <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
-        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard" :style="{ '--macro-binding-keyboard-height': `${bindingKeyboardHeight}px` }">
+        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard">
           <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :pressed="boundPositionIds" :badges="bindingBadges" :unit="bindingKeyboardUnit" :geometry="keyGeometry" @select="toggleBindingPosition" />
         </div>
       </section>
