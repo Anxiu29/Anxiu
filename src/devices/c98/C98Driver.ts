@@ -5,7 +5,7 @@ import { WebHidTransport } from '@/transport/HidTransport'
 import type { DeviceDriver } from '@/application/DeviceDriverRegistry'
 import { XSYD_KEY_CATALOG } from '@/protocol/xsyd/keyCatalog'
 import { DriverError } from '@/application/DriverError'
-import { C98_DEMO_KEYS } from './layout'
+import { C98_DEMO_KEYS, resolveC98PhysicalLayout } from './layout'
 import { C98_CAPABILITIES } from './capabilities'
 import { resolveC98DefaultKeymap } from './factoryKeymap'
 import { C98_DEMO_DEVICE, C98_DEVICE } from './device'
@@ -54,6 +54,13 @@ export class C98Driver implements DeviceDriver {
 
   private createSession(transport: WebHidTransport) {
     // 设备层是具体实现相遇的位置：传输、协议、能力和 C98 默认数据都在这里注入。
-    return new DeviceSession(new XsydKeyboardProtocol(transport, XSYD_KEY_CATALOG, C98_CAPABILITIES, resolveC98DefaultKeymap), XSYD_KEY_CATALOG, transport)
+    return new DeviceSession(new XsydKeyboardProtocol(
+      transport,
+      XSYD_KEY_CATALOG,
+      C98_CAPABILITIES,
+      resolveC98DefaultKeymap,
+      undefined,
+      resolveC98PhysicalLayout,
+    ), XSYD_KEY_CATALOG, transport)
   }
 }

@@ -59,8 +59,8 @@ MatrixAddress                  UI KeyGeometry
 以前把 `row`、`column` 同时当协议地址和页面坐标，会导致页面外观绑死协议矩阵。现在：
 
 - `domain/layout.ts` 只定义物理地址；`KeyPosition` 不再携带视觉宽高。
-- `protocol/KeyboardProtocol.ts` 只返回 `0x2B` 实读的键值和矩阵行列。
-- `devices/c98/layout.ts` 只保存恢复出厂后读取到的 101 个物理矩阵键，供演示和校验使用。
+- `protocol/KeyboardProtocol.ts` 读取 `0x2B` 返回的键值和矩阵行列，并通过可选的公共契约把结果交给设备层校验。
+- `devices/c98/layout.ts` 保存恢复出厂后读取到的 101 个物理矩阵键，供演示、校验，以及修复固件在恢复出厂后首次重连时偶发缺失的矩阵行。
 - `devices/c98/presentation.ts` 保存该设备的页面坐标、键帽大小、图片和方案名称，设备目录把它作为 `DevicePresentation` 交给组合根；通用组件只保留矩阵坐标回退实现。
 
 因此，修改键帽间距、宽高或分区只会改动 UI；不会污染协议读取结果或出厂层数据。

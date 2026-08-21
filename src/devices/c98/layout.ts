@@ -1,4 +1,4 @@
-import type { MatrixKeyInput } from '@/domain/layout'
+import type { MatrixKeyInput, PhysicalLayoutResolver } from '@/domain/layout'
 
 /** C98 恢复出厂后由 0x2B 读取到的物理矩阵；不包含任何 UI 宽高。 */
 export const C98_PHYSICAL_KEY_ROWS: readonly (readonly (number | null)[])[] = [
@@ -16,3 +16,18 @@ export const C98_DEMO_KEYS: MatrixKeyInput[] = C98_PHYSICAL_KEY_ROWS.flatMap((ro
   label: '',
   address: { kind: 'matrix' as const, row: rowIndex, column },
 }]))
+
+/**
+ * C98 的物理矩阵不会随 WIN/Mac 模式和用户改键变化。
+ *
+ * 某些固件在恢复出厂后的首次重连中，0x2B 偶尔只上传前四行。这里优先采用
+ * 完整且与出厂矩阵一致的实读位置；缺失或损坏的位置才使用设备层快照补齐。
+ * 返回顺序固定为矩阵顺序，也避免异常行号制造重复 positionId 干扰 Vue 渲染。
+ */
+export const resolveC98PhysicalLayout: PhysicalLayoutResolver = (positions) => {
+  const capturedById = new Map(positions.map((position) => [position.id, position]))
+  return C98_DEMO_KEYS.map((expected) => {
+    const captured = capturedById.get(expected.id)
+    return captured?.sourceCode === expected.sourceCode ? captured : { ...expected }
+  })
+}

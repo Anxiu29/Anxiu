@@ -1,7 +1,7 @@
 import type { DeviceTransport, KeyboardDevice } from '@/application/ports'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { DeviceInfo, KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyPosition, KeyboardProfile } from '@/domain/keyboard'
-import type { MatrixKeyInput } from '@/domain/layout'
+import type { MatrixKeyInput, PhysicalLayoutResolver } from '@/domain/layout'
 import { readUint16le, uint16le, type CrcStrategy } from './codec'
 import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
@@ -67,6 +67,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     private readonly capabilityDescriptor: CapabilityDescriptor,
     private readonly resolveDefaultKeymap: DefaultKeymapResolver,
     crc?: CrcStrategy,
+    private readonly resolvePhysicalLayout?: PhysicalLayoutResolver,
   ) {
     this.commands = new XsydCommandClient(transport, crc)
     this.removeNotificationListener = this.commands.onNotification((packet) => this.handleNotification(packet.command, packet.data))
@@ -79,7 +80,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     this.currentMode = mode
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })
     // 0x2B 只告诉我们有哪些物理键；每个 Fn 层的实际键值还要通过 0x23 单独读取。
-    const positions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
+    const capturedPositions = await this.readDefaultLayout(capabilities.layoutRows, capabilities.layoutColumns)
+    // 设备可选择修复固件在特殊启动阶段返回的不完整矩阵；协议本身不认识任何型号。
+    const positions = (this.resolvePhysicalLayout?.(capturedPositions) ?? capturedPositions) as KeyPosition[]
     const assignments: KeyAssignment[] = []
     for (let layer = 0; layer < capabilities.layers; layer++) assignments.push(...await this.readLayer(layer, positions))
     // 协议需要默认值来组装 Profile，但默认表由设备层注入，协议不知道任何具体型号。
