@@ -14,6 +14,7 @@ const props = defineProps<{
   status: SessionStatus
   selectedPositionId?: string
   settings?: MacroSettings
+  macroBindings?: Record<number, string>
   loading?: boolean
   assignments: KeyAssignment[]
   keyOptions: readonly KeyDefinition[]
@@ -23,6 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'select-position': [positionId: string]
   load: [positionId: string]
+  reload: [positionId: string]
   update: [settings: MacroSettings]
 }>()
 
@@ -36,6 +38,9 @@ const macroSlotCount = computed(() => props.profile.capabilities.macroSlots ?? 1
 const maxMacroActions = computed(() => props.profile.capabilities.macroMaxActions ?? 1)
 const keyLabel = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
+const keyboardBadges = computed(() => Object.fromEntries(props.profile.positions
+  .map((position) => [position.id, props.macroBindings?.[position.sourceCode]])
+  .filter((entry): entry is [string, string] => Boolean(entry[1]))))
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
 
@@ -105,13 +110,13 @@ onBeforeUnmount(stopRecording)
 <template>
   <section class="macro-workspace">
     <div ref="keyboardContainer" class="panel macro-keyboard-panel">
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="emit('select-position', $event)" />
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" :badges="keyboardBadges" @select="emit('select-position', $event)" />
     </div>
 
     <div class="panel macro-editor">
       <header class="macro-heading">
         <div><span class="eyebrow">MACRO</span><h2>宏设置</h2><p>查看已保存宏：点击上方绑定的物理键；编辑后按“确认”写入</p></div>
-        <div class="macro-heading-actions"><button class="ghost" :disabled="busy || !draft" @click="cancelEditing">取消</button><button class="primary" :disabled="busy || !draft?.actions.length" @click="save">{{ status === 'writing' ? '正在确认…' : '确认' }}</button></div>
+        <div class="macro-heading-actions"><button class="ghost" :disabled="busy || !selectedPosition" @click="selectedPosition && emit('reload', selectedPosition.id)">重新读取当前键</button><button class="ghost" :disabled="busy || !draft" @click="cancelEditing">取消</button><button class="primary" :disabled="busy || !draft?.actions.length" @click="save">{{ status === 'writing' ? '正在确认…' : '确认' }}</button></div>
       </header>
 
       <aside class="macro-slots">

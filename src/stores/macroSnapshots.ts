@@ -45,3 +45,24 @@ export function restoreMacroSnapshot(context: MacroSnapshotContext, deviceSettin
     return deviceSettings
   }
 }
+
+/**
+ * 列出当前设备/配置/系统模式下由本驱动保存过的宏。
+ * 这份索引只用于 UI 角标和快速定位；点击键帽后仍以设备 0x21 回读结果校验。
+ */
+export function listMacroSnapshots(context: MacroSnapshotContext): MacroSettings[] {
+  if (typeof localStorage === 'undefined') return []
+  const snapshots: MacroSettings[] = []
+  for (const position of context.profile.positions) {
+    try {
+      const raw = localStorage.getItem(snapshotKey(context, position.sourceCode))
+      if (!raw) continue
+      const snapshot = JSON.parse(raw) as MacroSettings
+      if (snapshot.sourceCode !== position.sourceCode || validateMacroSettings(snapshot).length || !snapshot.actions.length) continue
+      snapshots.push(cloneMacroSettings(snapshot))
+    } catch {
+      // 单条旧快照损坏时忽略该条，不能让整个宏页面无法打开。
+    }
+  }
+  return snapshots
+}

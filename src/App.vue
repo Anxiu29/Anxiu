@@ -12,7 +12,7 @@ import MacroWorkspace from '@/components/MacroWorkspace.vue'
 
 const store = useDriverStore()
 // storeToRefs 保留 Pinia 响应性；操作方法仍直接通过 store 调用。
-const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroLoading, demo, driverId } = storeToRefs(store)
+const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, dirty, assignments, selectedAssignment, keyOptions, keyLabels, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroBindings, macroLoading, demo, driverId } = storeToRefs(store)
 // 当前驱动决定设备表现；共享 App 不包含型号名称、图片或配列判断。
 const devicePresentation = computed(() => getDevicePresentation(driverId.value))
 // 切换真机/演示或重新连接时重建工作区壳，清理旧页面内部的导航与弹窗状态。
@@ -54,7 +54,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </template>
       <template #lighting><LightingWorkspace :settings="lighting" :status="status" :profile="profile" :assignments="assignments" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" :lighting-modes="devicePresentation.lightingModes" :lighting-ranges="devicePresentation.lightingRanges" @update="store.updateLighting" @reload="store.reloadLighting" /></template>
       <template #advanced><AdvancedKeyWorkspace :profile="profile" :status="status" :selected-position-id="selectedPositionId" :settings="advancedKey" :loading="advancedKeyLoading" :advanced-key-types="advancedKeyTypes" :assignments="assignments" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-position="selectedPositionId = $event" @load="store.loadAdvancedKey" @update="store.updateAdvancedKey" /></template>
-      <template #macro><MacroWorkspace :profile="profile" :status="status" :selected-position-id="selectedPositionId" :settings="macro" :loading="macroLoading" :assignments="assignments" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-position="selectedPositionId = $event" @load="store.loadMacro" @update="store.updateMacro" /></template>
+      <template #macro><MacroWorkspace :profile="profile" :status="status" :selected-position-id="selectedPositionId" :settings="macro" :macro-bindings="macroBindings" :loading="macroLoading" :assignments="assignments" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-position="selectedPositionId = $event" @load="store.loadMacro" @reload="store.loadMacro($event, true)" @update="store.updateMacro" /></template>
       <template #key-test><KeyTestWorkspace :profile="profile" :assignments="assignments" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" /></template>
     </AppShell>
   </main>

@@ -6,12 +6,12 @@ import { createDriverState } from './driverState'
 import type { LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
-import { restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
+import { listMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -52,6 +52,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
     invalidateAdvancedKeyCache()
     mode.value = profile.value.mode ?? mode.value
+    refreshMacroBindingsFromSnapshots()
     revision.value++
     status.value = 'ready'
     // 默认选中第一个真实物理键，避免 UI 初次进入时出现无键位上下文。
@@ -128,6 +129,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
       revision.value++
       mode.value = profile.value.mode ?? targetMode
+      refreshMacroBindingsFromSnapshots()
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
       status.value = 'ready'
@@ -144,6 +146,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
       revision.value++
       activeConfiguration.value = configuration
+      refreshMacroBindingsFromSnapshots()
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
       status.value = 'ready'
@@ -222,11 +225,11 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     catch (cause) { fail(cause) }
   }
 
-  async function loadMacro(positionId = selectedPositionId.value) {
+  async function loadMacro(positionId = selectedPositionId.value, force = false) {
     if (!state.session || !profile.value?.capabilities.macro || !positionId || ['connecting', 'writing'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
     if (!position) return
-    if (macro.value?.sourceCode === position.sourceCode || macroLoading.value && loadingMacroSourceCode === position.sourceCode) return
+    if (!force && (macro.value?.sourceCode === position.sourceCode || macroLoading.value && loadingMacroSourceCode === position.sourceCode)) return
     const observedSession = state.session
     const readRevision = ++macroReadRevision
     loadingMacroSourceCode = position.sourceCode
@@ -234,7 +237,10 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback()
     try {
       const result = await observedSession.getMacro(position.sourceCode)
-      if (state.session === observedSession && readRevision === macroReadRevision) macro.value = restoreMacroSnapshot(macroSnapshotContext(), result)
+      if (state.session === observedSession && readRevision === macroReadRevision) {
+        macro.value = restoreMacroSnapshot(macroSnapshotContext(), result)
+        rememberMacroBinding(macro.value)
+      }
     } catch (cause) {
       if (state.session === observedSession && readRevision === macroReadRevision) fail(cause)
     } finally {
@@ -250,6 +256,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       // 只有设备确认元数据后才保存动作快照，写入失败不会留下“看似已保存”的本地记录。
       saveMacroSnapshot(macroSnapshotContext(), settings)
       macro.value = restoreMacroSnapshot(macroSnapshotContext(), verified)
+      rememberMacroBinding(macro.value)
       status.value = 'ready'; message.value = '宏已写入，槽位和动作数量已通过设备回读验证'
     }
     catch (cause) { fail(cause) }
@@ -299,6 +306,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
       if (state.session !== observedSession) return
       mode.value = profile.value.mode ?? targetMode
+      refreshMacroBindingsFromSnapshots()
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
       revision.value++
@@ -320,6 +328,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
       if (state.session !== observedSession) return
       layer.value = 0
+      refreshMacroBindingsFromSnapshots()
       selectedPositionId.value = profile.value.positions[0]?.id
       revision.value++
       status.value = 'ready'
@@ -341,10 +350,23 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     macro.value = undefined
     macroLoading.value = false
     loadingMacroSourceCode = undefined
+    macroBindings.value = {}
   }
   function macroSnapshotContext(): MacroSnapshotContext {
     if (!profile.value) throw new Error('尚未读取设备配置')
     return { driverId: driverId.value, profile: profile.value, configuration: activeConfiguration.value, mode: mode.value }
+  }
+  function refreshMacroBindingsFromSnapshots() {
+    if (!profile.value) return
+    macroBindings.value = Object.fromEntries(listMacroSnapshots(macroSnapshotContext()).map((settings) => [settings.sourceCode, `M${settings.index + 1}`]))
+  }
+  /** 设备回读为空时移除过期角标；有宏时记录真实槽位。 */
+  function rememberMacroBinding(settings: MacroSettings) {
+    const next = { ...macroBindings.value }
+    const actionCount = settings.storedActionCount ?? settings.actions.length
+    if (settings.sourceCode === 0xff || actionCount === 0) delete next[settings.sourceCode]
+    else next[settings.sourceCode] = `M${settings.index + 1}`
+    macroBindings.value = next
   }
   /** 角标只依据设备回读结果更新，未保存的 UI 草稿不会污染键盘状态。 */
   function rememberAdvancedKeyType(settings: AdvancedKeySettings) {
@@ -359,5 +381,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, updateMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, updateMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })
