@@ -26,6 +26,7 @@ const emit = defineEmits<{
   'select-position': [positionId: string]
   load: [positionId: string]
   update: [settings: Exclude<AdvancedKeySettings, { type: 'none' }>]
+  delete: [sourceCode: number]
 }>()
 
 const draft = ref<AdvancedKeySettings>()
@@ -44,6 +45,9 @@ const types: { id: Exclude<AdvancedKeyType, 'none'>; label: string; summary: str
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
 const selectedAssignment = computed(() => props.assignments.find((item) => item.positionId === props.selectedPositionId))
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
+// 删除针对设备中已经保存的配置；刚选择类型但尚未确认的草稿不属于可删除数据。
+const canDelete = computed(() => props.settings?.type !== 'none'
+  && props.settings?.sourceCode === selectedPosition.value?.sourceCode)
 const currentDescription = computed(() => types.find((item) => item.id === draft.value?.type)?.summary ?? '当前按键没有高级键设置')
 const keyboardBadges = computed(() => Object.fromEntries(props.profile.positions
   .map((position) => [position.id, props.advancedKeyTypes?.[position.sourceCode]])
@@ -144,11 +148,11 @@ function save() {
   if (draft.value && draft.value.type !== 'none') emit('update', cloneAdvancedKeySettings(draft.value) as Exclude<AdvancedKeySettings, { type: 'none' }>)
 }
 
-// “取消”只丢弃尚未确认的表单修改，并恢复最近一次从设备读到的配置，避免误删设备数据。
-function cancelEditing() {
+function deleteCurrentAdvancedKey() {
+  if (!canDelete.value || !props.settings) return
   keyPickerTarget.value = undefined
-  const saved = props.settings
-  draft.value = saved && saved.sourceCode === selectedPosition.value?.sourceCode ? cloneAdvancedKeySettings(saved) : undefined
+  // Store 会发送删除命令并回读；回读到 none 后，表单和键盘上的高级键角标会一并清除。
+  emit('delete', props.settings.sourceCode)
 }
 </script>
 
@@ -165,7 +169,7 @@ function cancelEditing() {
           <p>先在上方选择物理键，再选择高级键类型并配置触发逻辑</p>
         </div>
         <div class="advanced-heading-actions">
-          <button class="ghost" type="button" :disabled="busy || !draft || draft.type === 'none'" @click="cancelEditing">取消</button>
+          <button class="ghost danger" type="button" :disabled="busy || !canDelete" @click="deleteCurrentAdvancedKey">删除</button>
           <button class="primary" type="button" :disabled="busy || !draft || draft.type === 'none'" @click="save">{{ status === 'writing' ? '正在确认…' : '确认' }}</button>
         </div>
       </header>

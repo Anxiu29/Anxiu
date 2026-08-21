@@ -253,7 +253,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function deleteAdvancedKey(sourceCode: number) {
     if (!state.session || !profile.value?.capabilities.advancedKey || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'
-    try { advancedKey.value = await state.session.deleteAdvancedKey(sourceCode); rememberAdvancedKeyType(advancedKey.value); status.value = 'ready'; message.value = '已清除当前按键的高级键设置' }
+    try { advancedKey.value = await state.session.deleteAdvancedKey(sourceCode); rememberAdvancedKeyType(advancedKey.value); status.value = 'ready'; message.value = '已删除当前按键的高级键设置' }
     catch (cause) { fail(cause) }
   }
 
