@@ -21,6 +21,9 @@ const emit = defineEmits<{
 const activeView = ref<WorkspaceView>('device')
 // 这些状态只影响应用壳外观，不进入全局 Store；切换工作区不会丢失设备会话和改键草稿。
 const feedbackVisible = ref(true)
+const FEEDBACK_AUTO_CLOSE_MS = 5000
+// 明确使用浏览器计时器编号，避免项目中的 Node Timeout 类型参与推导。
+let feedbackTimer: number | undefined
 const sidebarCollapsed = ref(false)
 let sidebarAutoCollapsed = false
 let narrowScreen: MediaQueryList | undefined
@@ -49,18 +52,38 @@ const requestFactoryReset = () => {
   settingsOpen.value = false
   emit('restore-factory')
 }
+const closeFeedback = () => {
+  feedbackVisible.value = false
+  if (feedbackTimer !== undefined) window.clearTimeout(feedbackTimer)
+  feedbackTimer = undefined
+}
+const scheduleFeedbackClose = () => {
+  if (feedbackTimer !== undefined) window.clearTimeout(feedbackTimer)
+  feedbackTimer = window.setTimeout(() => {
+    feedbackVisible.value = false
+    feedbackTimer = undefined
+  }, FEEDBACK_AUTO_CLOSE_MS)
+}
 watch(() => [props.error, props.message], ([error, message], [previousError, previousMessage]) => {
-  // 用户关闭旧提示后，新消息到来要重新显示；仅组件重渲染不应把旧提示弹回来。
-  if ((error || message) && (error !== previousError || message !== previousMessage)) feedbackVisible.value = true
+  // 新消息到来后重新显示并独立计时，旧消息的计时器不能提前关闭新提示。
+  if ((error || message) && (error !== previousError || message !== previousMessage)) {
+    feedbackVisible.value = true
+    scheduleFeedbackClose()
+  }
 })
 onMounted(() => {
+  // AppShell 通常在“连接成功”消息产生后才挂载，初始提示也必须启动自动关闭计时。
+  if (props.error || props.message) scheduleFeedbackClose()
   // 1320px 以下展开侧栏会明显压缩各工作区；matchMedia 只在阈值跨越时触发，不产生持续监听开销。
   if (typeof window.matchMedia !== 'function') return
   narrowScreen = window.matchMedia('(max-width: 1320px)')
   narrowScreen.addEventListener('change', syncSidebarWithScreen)
   syncSidebarWithScreen()
 })
-onBeforeUnmount(() => narrowScreen?.removeEventListener('change', syncSidebarWithScreen))
+onBeforeUnmount(() => {
+  if (feedbackTimer !== undefined) window.clearTimeout(feedbackTimer)
+  narrowScreen?.removeEventListener('change', syncSidebarWithScreen)
+})
 </script>
 
 <template>
@@ -124,7 +147,7 @@ onBeforeUnmount(() => narrowScreen?.removeEventListener('change', syncSidebarWit
 
     <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error }" role="status">
       <span>{{ error || message }}</span>
-      <button aria-label="关闭提示" title="关闭提示" @click="feedbackVisible = false">×</button>
+      <button aria-label="关闭提示" title="关闭提示" @click="closeFeedback">×</button>
     </div>
 
     <div v-if="settingsOpen" class="settings-backdrop" @click.self="settingsOpen = false">
