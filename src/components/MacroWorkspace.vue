@@ -21,7 +21,7 @@ const props = defineProps<{
   keyLabels: Record<number, string>
   keyGeometry?: KeyGeometryResolver
 }>()
-const emit = defineEmits<{ 'select-slot': [index: number]; update: [settings: MacroSettings]; load: [] }>()
+const emit = defineEmits<{ 'select-slot': [index: number]; update: [settings: MacroSettings]; clear: [index: number]; load: [] }>()
 
 const draft = ref<MacroSettings>()
 const recording = ref(false)
@@ -105,7 +105,7 @@ function adjustRepeatDelay(delta: number) {
   if (!draft.value) return
   draft.value.repeatDelay = Math.min(0xffffff, Math.max(0, draft.value.repeatDelay + delta))
 }
-function clearActions() { stopRecording(); if (draft.value) draft.value.actions = [] }
+function clearMacro() { stopRecording(); emit('clear', props.selectedSlot) }
 function actionRenderKey(action: object) {
   if (!actionRenderKeys.has(action)) actionRenderKeys.set(action, nextActionRenderKey++)
   return actionRenderKeys.get(action)!
@@ -158,10 +158,10 @@ function confirmKeyPicker(keyCode: number) {
   keyPickerIndex.value = undefined
 }
 function save() {
-  if (!draft.value?.actions.length || !bindingCodes.value.length) return
-  // 当前设备固件会回读 num 字段，但官方驱动同样不提供次数调节，实际执行也固定一次。
-  // 统一写 1 可避免历史草稿中的无效数值继续误导用户或污染回读校验。
-  emit('update', { ...cloneMacroSettings(draft.value), repeatCount: 1 })
+  if (!draft.value?.actions.length) return
+  // 官方网页驱动：单次模式写 num=1，三种循环模式写 65530，由模式本身决定点击/松键停止。
+  // 该值是固件循环哨兵而不是用户可调次数，因此 UI 不再暴露无效的次数输入框。
+  emit('update', { ...cloneMacroSettings(draft.value), repeatCount: draft.value.mode === 0 ? 1 : 65530 })
 }
 onBeforeUnmount(stopRecording)
 onMounted(() => emit('load'))
@@ -204,7 +204,7 @@ onMounted(() => emit('load'))
       <header class="macro-sequence-heading">
         <div><h2>宏录制</h2><small>{{ draft?.actions.length ?? 0 }} / {{ maxMacroActions }} 个动作</small></div>
       </header>
-      <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || !draft?.actions.length" @click="clearActions">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length || !bindingCodes.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
+      <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || (!draft?.actions.length && !bindingCodes.length)" @click="clearMacro">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
       <div v-if="actionsUnavailable" class="macro-placeholder macro-unavailable"><strong>已从键盘读取到该宏</strong><span>当前方案只能回读绑定、槽位和执行参数，不能还原动作正文；可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
       <TransitionGroup v-else tag="ol" name="macro-action" class="macro-action-list">

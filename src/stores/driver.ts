@@ -6,7 +6,7 @@ import { createDriverState } from './driverState'
 import type { LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
-import { clearDeviceMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
+import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
@@ -257,14 +257,14 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'writing'
     try {
       const bindings = [...new Set(settings.boundSourceCodes ?? [])]
-      if (!bindings.length) throw new Error('请至少绑定一个物理按键')
       const previous = macroSlots.value[settings.index]
       const removedBindings = (previous?.boundSourceCodes ?? []).filter((sourceCode) => !bindings.includes(sourceCode))
       for (const sourceCode of removedBindings) await state.session.deleteMacroBinding(sourceCode)
       let verified: MacroSettings | undefined
       // 同一 index 是同一套宏正文；逐键发送 0x21 只是建立多份“物理键 → 槽位”绑定。
       for (const sourceCode of bindings) verified = await state.session.updateMacro({ ...settings, sourceCode, boundSourceCodes: bindings })
-      const saved = { ...(verified ?? settings), sourceCode: bindings[0]!, boundSourceCodes: bindings, actions: settings.actions, storedActionCount: settings.actions.length, actionsAvailable: true }
+      // 没有绑定键时固件没有可寻址入口，先保存为网页草稿；首次绑定时再写入设备。
+      const saved = { ...(verified ?? settings), sourceCode: bindings[0] ?? 0xff, boundSourceCodes: bindings, actions: settings.actions, storedActionCount: settings.actions.length, actionsAvailable: true }
       saveMacroSnapshot(macroSnapshotContext(), saved)
       // 一个物理键只能指向一个宏槽位，从其他槽位的本地绑定索引中移除它。
       const nextSlots = { ...macroSlots.value, [settings.index]: saved }
@@ -278,9 +278,26 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       macroSlots.value = nextSlots
       macro.value = saved
       rebuildMacroBindings()
-      status.value = 'ready'; message.value = '宏已写入，槽位和动作数量已通过设备回读验证'
+      status.value = 'ready'; message.value = bindings.length ? '宏已写入，槽位和执行参数已通过设备回读验证' : '宏已保存为未绑定草稿，选择物理键后可写入键盘'
     }
     catch (cause) { fail(cause) }
+  }
+
+  /** 清除当前槽位：先解除真机上的全部入口，再删除网页保存的动作正文。 */
+  async function deleteMacro(index: number) {
+    if (!state.session || !profile.value?.capabilities.macro || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try {
+      const settings = macroSlots.value[index]
+      for (const sourceCode of settings?.boundSourceCodes ?? []) await state.session.deleteMacroBinding(sourceCode)
+      deleteMacroSnapshot(macroSnapshotContext(), index)
+      const nextSlots = { ...macroSlots.value }
+      delete nextSlots[index]
+      macroSlots.value = nextSlots
+      if (selectedMacroSlot.value === index) macro.value = undefined
+      rebuildMacroBindings()
+      status.value = 'ready'; message.value = `已清除 M${index + 1} 的动作和全部按键绑定`
+    } catch (cause) { fail(cause) }
   }
 
   function handleDisconnect() {
@@ -387,6 +404,8 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     const observedSession = state.session
     const observedProfile = profile.value
     const context = macroSnapshotContext()
+    // 未绑定宏在固件中没有物理键入口，只能作为网页草稿保留；有绑定的旧快照必须由设备确认。
+    const localUnbound = listMacroSnapshots(context).filter((settings) => !(settings.boundSourceCodes?.length))
     const readRevision = ++macroReadRevision
     macroLoading.value = true
     try {
@@ -406,6 +425,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
           boundSourceCodes: [...new Set([...(existing.boundSourceCodes ?? []), restored.sourceCode])],
         }
       }
+      for (const draft of localUnbound) if (!nextSlots[draft.index]) nextSlots[draft.index] = draft
       macroSlots.value = nextSlots
       replaceMacroSnapshots(context, Object.values(nextSlots))
       rebuildMacroBindings()
@@ -447,5 +467,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

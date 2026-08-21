@@ -32,6 +32,20 @@ export function saveMacroSnapshot(context: MacroSnapshotContext, settings: Macro
   catch { /* 浏览器拒绝存储不能让已经成功的设备写入被误报为失败。 */ }
 }
 
+/** 删除单个宏槽位的网页正文；设备绑定由应用层通过协议逐键解除。 */
+export function deleteMacroSnapshot(context: MacroSnapshotContext, index: number) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.removeItem(slotKey(context, index))
+    // 旧版快照按物理键保存，删除槽位时也要清理同 index 的遗留记录。
+    for (const position of context.profile.positions) {
+      const key = legacyKey(context, position.sourceCode)
+      const raw = localStorage.getItem(key)
+      if (raw && (JSON.parse(raw) as MacroSettings).index === index) localStorage.removeItem(key)
+    }
+  } catch { /* 缓存清理失败不影响已经完成的设备解绑。 */ }
+}
+
 export function restoreMacroSnapshot(context: MacroSnapshotContext, deviceSettings: MacroSettings): MacroSettings {
   if (typeof localStorage === 'undefined' || deviceSettings.sourceCode === EMPTY_MACRO_SOURCE) return deviceSettings
   try {
