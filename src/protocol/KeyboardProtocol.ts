@@ -170,6 +170,10 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async getMacro(sourceCode: number): Promise<MacroSettings> {
+    // 0x21 的空查询也会回显传入的物理键，因此不能用 response.key 判断是否绑定宏。
+    // Layout_Mode 低四位为 6 才是固件真实的宏键标记，先读它可避免把全部按键归到 M1。
+    const layoutMode = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
+    if ((layoutMode & 0x0f) !== ADVANCED_MODE.macro) return createEmptyMacro(0)
     const modeData = await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeRead(sourceCode))
     const mode = decodeMacroMode(modeData)
     // 未绑定键统一返回 0xFF；状态层据此区分“空键”和真实宏绑定。
@@ -195,9 +199,6 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     // 不能保留旧性能模式；否则快速点击可能漏出 FN0 中原来的普通键值。
     await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, XSYD_MACRO_LAYOUT_MODE)
     await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeWrite(settings))
-    // 当前网页驱动抓包显示 0x21 能回读新 repeatCount，但此前的“保存”没有提交方案参数。
-    // Action 0x02 来自本地方案协议的 save 定义；宏保存必须完成落盘，不能只写暂存区和元数据。
-    await this.save()
   }
   /** 解除绑定只清除 MODE 低四位；FN0 键值和性能触发方式仍属于该物理键。 */
   async deleteMacroBinding(sourceCode: number) {
