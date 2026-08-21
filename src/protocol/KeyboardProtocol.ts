@@ -176,7 +176,8 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     if (mode.sourceCode === 0xff || mode.index >= XSYD_MAX_MACRO_SLOTS) return createEmptyMacro(0, sourceCode)
 
     const storedActionCount = modeData[4] ?? 0
-    // 官方旧版 SDK 的 getMacro 也只读取 0x21 元数据；0x20 Slave 格式没有动作正文字段。
+    // 真机抓包确认：0x21 写响应会回显动作数，但随后主动查询时该字段返回 0；
+    // 因此查询只能验证槽位、模式、重复次数和间隔，不能用 len 判断已保存动作正文。
     return { ...mode, actions: [], storedActionCount, actionsAvailable: storedActionCount === 0 }
   }
 
