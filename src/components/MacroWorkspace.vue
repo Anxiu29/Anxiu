@@ -28,7 +28,8 @@ const recording = ref(false)
 const keyPickerIndex = ref<number>()
 const bindingDialogOpen = ref(false)
 // 宏槽位较多时允许收起列表，把横向空间让给设置和录制区域。
-const slotListCollapsed = ref(false)
+const SLOT_LIST_COLLAPSED_KEY = 'anxiu:macro-slot-list-collapsed'
+const slotListCollapsed = ref(readSlotListCollapsed())
 const draggedActionIndex = ref<number>()
 let previousEventTime = 0
 
@@ -55,6 +56,17 @@ watch([() => props.selectedSlot, () => props.macroSlots], ([index]) => {
 }, { immediate: true, deep: true })
 
 function selectSlot(index: number) { emit('select-slot', index) }
+function readSlotListCollapsed() {
+  if (typeof localStorage === 'undefined') return true
+  try {
+    // 尚未保存过偏好时默认收缩；之后沿用用户最后一次手动选择。
+    return localStorage.getItem(SLOT_LIST_COLLAPSED_KEY) !== 'false'
+  } catch { return true }
+}
+function toggleSlotList() {
+  slotListCollapsed.value = !slotListCollapsed.value
+  try { localStorage.setItem(SLOT_LIST_COLLAPSED_KEY, String(slotListCollapsed.value)) } catch { /* 隐私模式下保持本次会话状态即可。 */ }
+}
 function applyBindings(sourceCodes: number[]) {
   if (!draft.value) return
   draft.value.boundSourceCodes = [...new Set(sourceCodes)]
@@ -129,7 +141,7 @@ onBeforeUnmount(stopRecording)
     <aside class="macro-slots" :class="{ collapsed: slotListCollapsed }">
       <header class="macro-slots-header">
         <div v-if="!slotListCollapsed"><span class="eyebrow">MACRO</span><h2>宏列表</h2></div>
-        <button class="macro-slot-collapse" :title="slotListCollapsed ? '展开宏列表' : '折叠宏列表'" :aria-label="slotListCollapsed ? '展开宏列表' : '折叠宏列表'" @click="slotListCollapsed = !slotListCollapsed">
+        <button class="macro-slot-collapse" :title="slotListCollapsed ? '展开宏列表' : '折叠宏列表'" :aria-label="slotListCollapsed ? '展开宏列表' : '折叠宏列表'" @click="toggleSlotList">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="slotListCollapsed ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'" /></svg>
         </button>
       </header>
@@ -143,7 +155,9 @@ onBeforeUnmount(stopRecording)
     <section class="macro-options">
       <header><h2>宏设置</h2></header>
       <strong>执行模式</strong>
-      <button v-for="option in modeOptions" :key="option.value" class="macro-mode-card" :class="{ active: draft?.mode === option.value }" @click="draft && (draft.mode = option.value)"><i></i><span><b>{{ option.title }}</b><small>{{ option.description }}</small></span></button>
+      <div class="macro-mode-grid">
+        <button v-for="option in modeOptions" :key="option.value" class="macro-mode-card" :class="{ active: draft?.mode === option.value }" @click="draft && (draft.mode = option.value)"><i></i><span><b>{{ option.title }}</b><small>{{ option.description }}</small></span></button>
+      </div>
       <div class="macro-repeat-settings">
         <label>重复次数<div class="macro-number-control"><button @click="adjustMacroNumber('repeatCount', -1)">−</button><input v-if="draft" v-model.number="draft.repeatCount" type="number" min="0" max="65535" /><button @click="adjustMacroNumber('repeatCount', 1)">+</button></div></label>
         <label>重复间隔<div class="macro-number-control"><button @click="adjustMacroNumber('repeatDelay', -1)">−</button><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /><span>ms</span><button @click="adjustMacroNumber('repeatDelay', 1)">+</button></div></label>
