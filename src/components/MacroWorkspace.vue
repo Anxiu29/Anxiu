@@ -27,6 +27,8 @@ const draft = ref<MacroSettings>()
 const recording = ref(false)
 const keyPickerIndex = ref<number>()
 const bindingDialogOpen = ref(false)
+// 宏槽位较多时允许收起列表，把横向空间让给设置和录制区域。
+const slotListCollapsed = ref(false)
 const draggedActionIndex = ref<number>()
 let previousEventTime = 0
 
@@ -123,10 +125,15 @@ onBeforeUnmount(stopRecording)
 </script>
 
 <template>
-  <section class="macro-workspace panel">
-    <aside class="macro-slots">
-      <header><span class="eyebrow">MACRO</span><h2>宏列表</h2></header>
-      <div class="macro-slot-list">
+  <section class="macro-workspace panel" :class="{ 'slot-list-collapsed': slotListCollapsed }">
+    <aside class="macro-slots" :class="{ collapsed: slotListCollapsed }">
+      <header class="macro-slots-header">
+        <div v-if="!slotListCollapsed"><span class="eyebrow">MACRO</span><h2>宏列表</h2></div>
+        <button class="macro-slot-collapse" :title="slotListCollapsed ? '展开宏列表' : '折叠宏列表'" :aria-label="slotListCollapsed ? '展开宏列表' : '折叠宏列表'" @click="slotListCollapsed = !slotListCollapsed">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="slotListCollapsed ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'" /></svg>
+        </button>
+      </header>
+      <div v-if="!slotListCollapsed" class="macro-slot-list">
         <button v-for="index in macroSlotCount" :key="index" :class="{ active: selectedSlot === index - 1 }" @click="selectSlot(index - 1)">
           <b>M{{ index }}</b><small>{{ macroSlots?.[index - 1]?.actions.length ?? macroSlots?.[index - 1]?.storedActionCount ?? 0 }} 个动作</small>
         </button>
@@ -134,7 +141,7 @@ onBeforeUnmount(stopRecording)
     </aside>
 
     <section class="macro-options">
-      <header><h2>宏设置</h2><p>M{{ selectedSlot + 1 }} 的动作只保存一套，可同时绑定多个物理键。</p></header>
+      <header><h2>宏设置</h2></header>
       <strong>执行模式</strong>
       <button v-for="option in modeOptions" :key="option.value" class="macro-mode-card" :class="{ active: draft?.mode === option.value }" @click="draft && (draft.mode = option.value)"><i></i><span><b>{{ option.title }}</b><small>{{ option.description }}</small></span></button>
       <div class="macro-repeat-settings">
