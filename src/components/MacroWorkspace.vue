@@ -35,6 +35,7 @@ const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'
 const macroSlotCount = computed(() => props.profile.capabilities.macroSlots ?? 1)
 const maxMacroActions = computed(() => props.profile.capabilities.macroMaxActions ?? 1)
 const keyLabel = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
+const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
 
@@ -126,6 +127,7 @@ onBeforeUnmount(stopRecording)
           <button class="ghost" :disabled="busy || !selectedPosition || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="addKeyPair">添加按键</button>
         </div>
         <div v-if="loading && !draft" class="macro-placeholder">正在读取当前按键的宏设置…</div>
+        <div v-else-if="unavailableActionCount" class="macro-placeholder macro-unavailable"><strong>检测到已保存 {{ unavailableActionCount }} 个动作</strong><span>当前固件只允许回读宏槽位和动作数量，无法取回由其他驱动写入的动作正文。重新录制并由本驱动保存后即可再次查看。</span></div>
         <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，网页会依次记录按下、松开和动作间隔。</div>
         <ol v-else class="macro-action-list">
           <li v-for="(action, index) in draft.actions" :key="index">

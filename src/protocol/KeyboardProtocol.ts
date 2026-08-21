@@ -15,7 +15,7 @@ import { advancedReadRequest, decodeEnd, decodeMpt, decodeSocd, decodeTgl, encod
 import { DriverError } from '@/application/DriverError'
 import type { MacroSettings } from '@/domain/macro'
 import { createEmptyMacro, validateMacroSettings } from '@/domain/macro'
-import { decodeMacroData, decodeMacroMode, encodeMacroDataRead, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
+import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
 
 const ADVANCED_LAYOUT = {
   db1: 0x05, db3: 0x07, mode: 0x08,
@@ -174,14 +174,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     // 未绑定槽位用当前物理键构造可编辑空值，UI 不需要理解协议的 0xFF。
     if (mode.sourceCode === 0xff || mode.index >= XSYD_MAX_MACRO_SLOTS) return createEmptyMacro(0, sourceCode)
 
-    const actionCount = modeData[4] ?? 0
-    const actions: MacroSettings['actions'] = []
-    for (let offset = 0; offset < actionCount; offset += MACRO_ACTIONS_PER_PACKET) {
-      const length = Math.min(MACRO_ACTIONS_PER_PACKET, actionCount - offset)
-      const page = decodeMacroData(await this.commands.request(XSYD_COMMANDS.macroData, encodeMacroDataRead(XSYD_MACRO_BUFFER_OFFSET + offset, length)))
-      actions.push(...page.actions)
-    }
-    return { ...mode, actions }
+    const storedActionCount = modeData[4] ?? 0
+    // 官方旧版 SDK 的 getMacro 也只读取 0x21 元数据；0x20 Slave 格式没有动作正文字段。
+    return { ...mode, actions: [], storedActionCount, actionsAvailable: storedActionCount === 0 }
   }
 
   async setMacro(settings: MacroSettings) {

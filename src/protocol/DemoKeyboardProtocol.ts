@@ -74,7 +74,11 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> { await this.wait(); return cloneAdvancedKeySettings(this.advancedKeys.get(sourceCode) ?? { type: 'none', sourceCode }) }
   async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) { await this.wait(); this.advancedKeys.set(settings.sourceCode, cloneAdvancedKeySettings(settings)) }
   async deleteAdvancedKey(sourceCode: number) { await this.wait(); this.advancedKeys.delete(sourceCode) }
-  async getMacro(sourceCode: number) { await this.wait(); return cloneMacroSettings(this.macros.get(sourceCode) ?? createEmptyMacro(0, sourceCode)) }
+  async getMacro(sourceCode: number) {
+    await this.wait()
+    const value = cloneMacroSettings(this.macros.get(sourceCode) ?? createEmptyMacro(0, sourceCode))
+    return { ...value, storedActionCount: value.actions.length, actionsAvailable: true }
+  }
   async setMacro(settings: MacroSettings) {
     await this.wait()
     // 同一个槽位只能绑定一个物理键，模拟固件保存新绑定时替换旧绑定。

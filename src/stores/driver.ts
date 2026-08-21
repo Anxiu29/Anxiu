@@ -6,6 +6,7 @@ import { createDriverState } from './driverState'
 import type { LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
+import { restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
@@ -233,7 +234,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback()
     try {
       const result = await observedSession.getMacro(position.sourceCode)
-      if (state.session === observedSession && readRevision === macroReadRevision) macro.value = result
+      if (state.session === observedSession && readRevision === macroReadRevision) macro.value = restoreMacroSnapshot(macroSnapshotContext(), result)
     } catch (cause) {
       if (state.session === observedSession && readRevision === macroReadRevision) fail(cause)
     } finally {
@@ -244,7 +245,13 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function updateMacro(settings: MacroSettings) {
     if (!state.session || !profile.value?.capabilities.macro || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'
-    try { macro.value = await state.session.updateMacro(settings); status.value = 'ready'; message.value = '宏已写入并通过回读验证' }
+    try {
+      const verified = await state.session.updateMacro(settings)
+      // 只有设备确认元数据后才保存动作快照，写入失败不会留下“看似已保存”的本地记录。
+      saveMacroSnapshot(macroSnapshotContext(), settings)
+      macro.value = restoreMacroSnapshot(macroSnapshotContext(), verified)
+      status.value = 'ready'; message.value = '宏已写入，槽位和动作数量已通过设备回读验证'
+    }
     catch (cause) { fail(cause) }
   }
 
@@ -334,6 +341,10 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     macro.value = undefined
     macroLoading.value = false
     loadingMacroSourceCode = undefined
+  }
+  function macroSnapshotContext(): MacroSnapshotContext {
+    if (!profile.value) throw new Error('尚未读取设备配置')
+    return { driverId: driverId.value, profile: profile.value, configuration: activeConfiguration.value, mode: mode.value }
   }
   /** 角标只依据设备回读结果更新，未保存的 UI 草稿不会污染键盘状态。 */
   function rememberAdvancedKeyType(settings: AdvancedKeySettings) {

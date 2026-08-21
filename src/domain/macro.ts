@@ -18,12 +18,16 @@ export interface MacroSettings {
   repeatCount: number
   repeatDelay: number
   actions: MacroAction[]
+  /** 设备元数据声明的动作数；动作正文无法回读时仍可告诉 UI 宏确实存在。 */
+  storedActionCount?: number
+  /** true 表示 actions 是已保存正文，false 表示设备只返回了宏元数据。 */
+  actionsAvailable?: boolean
 }
 
 export const EMPTY_MACRO_SOURCE = 0xff
 
 export function createEmptyMacro(index = 0, sourceCode = EMPTY_MACRO_SOURCE): MacroSettings {
-  return { index, sourceCode, mode: 0, repeatCount: 1, repeatDelay: 0, actions: [] }
+  return { index, sourceCode, mode: 0, repeatCount: 1, repeatDelay: 0, actions: [], storedActionCount: 0, actionsAvailable: true }
 }
 
 export function cloneMacroSettings(value: MacroSettings): MacroSettings {
