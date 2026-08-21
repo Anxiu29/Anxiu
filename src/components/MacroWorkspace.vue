@@ -41,7 +41,8 @@ const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
-const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 30, minUnit: 10, horizontalPadding: 8, verticalPadding: 8 })
+// 宏列表收缩和执行模式压缩后，允许矩阵继续利用新增空间放大，而不是停在原来的 30px 上限。
+const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 42, minUnit: 10, horizontalPadding: 8, verticalPadding: 8 })
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
   { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
