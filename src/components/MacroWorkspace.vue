@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import { cloneMacroSettings, createEmptyMacro, EMPTY_MACRO_SOURCE, type MacroMode, type MacroSettings } from '@/domain/macro'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
@@ -27,6 +27,7 @@ const draft = ref<MacroSettings>()
 const recording = ref(false)
 const keyPickerIndex = ref<number>()
 const bindingDialogOpen = ref(false)
+const macroSequence = ref<HTMLElement>()
 // 宏槽位较多时允许收起列表，把横向空间让给设置和录制区域。
 const SLOT_LIST_COLLAPSED_KEY = 'anxiu:macro-slot-list-collapsed'
 const slotListCollapsed = ref(readSlotListCollapsed())
@@ -130,6 +131,13 @@ function startRecording() {
   window.addEventListener('keydown', captureKeyEvent, true)
   window.addEventListener('keyup', captureKeyEvent, true)
 }
+function revealLatestRecordedAction() {
+  // 等待 v-for 生成最新动作行后再滚动；只由录制事件调用，不干扰手动编辑时的视角。
+  void nextTick(() => requestAnimationFrame(() => {
+    const list = macroSequence.value?.querySelector<HTMLElement>('.macro-action-list')
+    list?.scrollTo({ top: list.scrollHeight, behavior: 'smooth' })
+  }))
+}
 function stopRecording() {
   recording.value = false
   window.removeEventListener('keydown', captureKeyEvent, true)
@@ -144,6 +152,7 @@ function captureKeyEvent(event: KeyboardEvent) {
   const now = performance.now()
   draft.value.actions.push({ keyCode, pressed: event.type === 'keydown', delay: Math.max(0, Math.round(now - previousEventTime)) })
   previousEventTime = now
+  revealLatestRecordedAction()
 }
 function confirmKeyPicker(keyCode: number) {
   if (draft.value && keyPickerIndex.value !== undefined && draft.value.actions[keyPickerIndex.value]) draft.value.actions[keyPickerIndex.value]!.keyCode = keyCode
@@ -190,7 +199,7 @@ onBeforeUnmount(stopRecording)
       </section>
     </section>
 
-    <section class="macro-sequence">
+    <section ref="macroSequence" class="macro-sequence">
       <header class="macro-sequence-heading">
         <div><h2>宏录制</h2><small>{{ draft?.actions.length ?? 0 }} / {{ maxMacroActions }} 个动作</small></div>
       </header>
