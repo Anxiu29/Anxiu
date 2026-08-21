@@ -4,6 +4,10 @@ import type { KeyAssignment, KeyDefinition, KeyboardProfile, SessionStatus } fro
 import { cloneMacroSettings, createEmptyMacro, EMPTY_MACRO_SOURCE, type MacroMode, type MacroSettings } from '@/domain/macro'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { keyboardEventCodeToHidUsage } from '@/ui/keyboardEventCode'
+import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
+import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
+import KeyboardCanvas from './KeyboardCanvas.vue'
+import MacroBindingDialog from './MacroBindingDialog.vue'
 import KeyCodeKeyboardDialog from './KeyCodeKeyboardDialog.vue'
 
 const props = defineProps<{
@@ -22,7 +26,8 @@ const selectedSlot = ref(0)
 const draft = ref<MacroSettings>()
 const recording = ref(false)
 const keyPickerIndex = ref<number>()
-const bindingCandidate = ref<number | ''>('')
+const bindingDialogOpen = ref(false)
+const draggedActionIndex = ref<number>()
 let previousEventTime = 0
 
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
@@ -30,8 +35,11 @@ const macroSlotCount = computed(() => props.profile.capabilities.macroSlots ?? 1
 const maxMacroActions = computed(() => props.profile.capabilities.macroMaxActions ?? 1)
 const keyLabel = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
 const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
-const availablePositions = computed(() => props.profile.positions.filter((position) => !bindingCodes.value.includes(position.sourceCode)))
+const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
+const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
+const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 20, minUnit: 10, horizontalPadding: 12, verticalPadding: 12 })
+useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
   { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
   { value: 1, title: '点击循环', description: '再次按下绑定键时停止循环' },
@@ -42,20 +50,14 @@ const modeOptions: { value: MacroMode; title: string; description: string }[] = 
 watch([selectedSlot, () => props.macroSlots], ([index]) => {
   stopRecording()
   draft.value = cloneMacroSettings(props.macroSlots?.[Number(index)] ?? createEmptyMacro(Number(index), EMPTY_MACRO_SOURCE))
-  bindingCandidate.value = ''
 }, { immediate: true, deep: true })
 
 function selectSlot(index: number) { selectedSlot.value = index }
-function addBinding() {
-  if (!draft.value || bindingCandidate.value === '') return
-  draft.value.boundSourceCodes = [...new Set([...(draft.value.boundSourceCodes ?? []), bindingCandidate.value])]
-  draft.value.sourceCode = draft.value.boundSourceCodes[0] ?? EMPTY_MACRO_SOURCE
-  bindingCandidate.value = ''
-}
-function removeBinding(sourceCode: number) {
+function applyBindings(sourceCodes: number[]) {
   if (!draft.value) return
-  draft.value.boundSourceCodes = (draft.value.boundSourceCodes ?? []).filter((code) => code !== sourceCode)
+  draft.value.boundSourceCodes = [...new Set(sourceCodes)]
   draft.value.sourceCode = draft.value.boundSourceCodes[0] ?? EMPTY_MACRO_SOURCE
+  bindingDialogOpen.value = false
 }
 function addKeyPair() {
   if (!draft.value || draft.value.actions.length + 2 > maxMacroActions.value) return
@@ -65,6 +67,14 @@ function addKeyPair() {
   draft.value.actions.push({ keyCode: fallback, pressed: true, delay: 0 }, { keyCode: fallback, pressed: false, delay: 50 })
 }
 function removeAction(index: number) { draft.value?.actions.splice(index, 1) }
+function clearActions() { stopRecording(); if (draft.value) draft.value.actions = [] }
+function startDraggingAction(index: number) { draggedActionIndex.value = index }
+function dropAction(targetIndex: number) {
+  if (!draft.value || draggedActionIndex.value === undefined || draggedActionIndex.value === targetIndex) return
+  const [action] = draft.value.actions.splice(draggedActionIndex.value, 1)
+  if (action) draft.value.actions.splice(targetIndex, 0, action)
+  draggedActionIndex.value = undefined
+}
 function startRecording() {
   if (!draft.value || busy.value) return
   draft.value.actions = []
@@ -96,7 +106,6 @@ function save() {
   if (!draft.value?.actions.length || !bindingCodes.value.length) return
   emit('update', cloneMacroSettings(draft.value))
 }
-function cancelEditing() { draft.value = cloneMacroSettings(props.macroSlots?.[selectedSlot.value] ?? createEmptyMacro(selectedSlot.value, EMPTY_MACRO_SOURCE)) }
 onBeforeUnmount(stopRecording)
 </script>
 
@@ -109,12 +118,6 @@ onBeforeUnmount(stopRecording)
           <b>M{{ index }}</b><small>{{ macroSlots?.[index - 1]?.actions.length ?? macroSlots?.[index - 1]?.storedActionCount ?? 0 }} 个动作</small>
         </button>
       </div>
-      <section class="macro-bindings">
-        <strong>当前绑定按键</strong>
-        <div v-if="bindingCodes.length" class="macro-binding-chips"><button v-for="sourceCode in bindingCodes" :key="sourceCode" title="点击解除绑定" @click="removeBinding(sourceCode)">{{ profile.positions.find((position) => position.sourceCode === sourceCode)?.label ?? sourceCode }}<span>×</span></button></div>
-        <small v-else>尚未绑定物理按键</small>
-        <div class="macro-binding-add"><select v-model="bindingCandidate"><option value="">选择按键</option><option v-for="position in availablePositions" :key="position.id" :value="position.sourceCode">{{ position.label }}</option></select><button class="ghost" :disabled="bindingCandidate === ''" @click="addBinding">添加</button></div>
-      </section>
     </aside>
 
     <section class="macro-options">
@@ -125,6 +128,12 @@ onBeforeUnmount(stopRecording)
         <label>重复次数<input v-if="draft" v-model.number="draft.repeatCount" type="number" min="0" max="65535" /></label>
         <label>重复间隔<span><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /> ms</span></label>
       </div>
+      <section class="macro-bindings">
+        <div><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '点击键盘选择绑定键' }}</small></div>
+        <div ref="bindingKeyboardContainer" class="macro-binding-keyboard" role="button" tabindex="0" @click="bindingDialogOpen = true" @keydown.enter="bindingDialogOpen = true">
+          <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :pressed="boundPositionIds" :badges="bindingBadges" :unit="bindingKeyboardUnit" :geometry="keyGeometry" />
+        </div>
+      </section>
     </section>
 
     <section class="macro-sequence">
@@ -132,18 +141,19 @@ onBeforeUnmount(stopRecording)
         <div><h2>宏录制</h2><small>{{ draft?.actions.length ?? 0 }} / {{ maxMacroActions }} 个动作</small></div>
         <button class="ghost" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()">{{ recording ? '停止录制' : '开始录制' }}</button>
         <button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="addKeyPair">添加按键</button>
-        <button class="ghost" :disabled="busy" @click="cancelEditing">取消</button>
+        <button class="ghost" :disabled="busy || !draft?.actions.length" @click="clearActions">清除数据</button>
         <button class="primary" :disabled="busy || !draft?.actions.length || !bindingCodes.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button>
       </header>
       <div v-if="unavailableActionCount" class="macro-placeholder macro-unavailable"><strong>设备中有 {{ unavailableActionCount }} 个动作</strong><span>当前方案只回读宏元数据；若宏不是由本网页保存，动作正文无法还原，可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
       <ol v-else class="macro-action-list">
-        <li v-for="(action, index) in draft.actions" :key="index">
-          <span class="macro-drag">⠿</span><button class="macro-action-key" @click="keyPickerIndex = index">{{ keyLabel(action.keyCode) }}</button><button class="macro-action-state" :class="{ pressed: action.pressed }" @click="action.pressed = !action.pressed">{{ action.pressed ? '按下' : '松开' }}</button><label><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /> ms</label><button class="macro-remove" title="删除动作" @click="removeAction(index)">×</button>
+        <li v-for="(action, index) in draft.actions" :key="index" draggable="true" @dragstart="startDraggingAction(index)" @dragover.prevent @drop="dropAction(index)">
+          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerIndex = index">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><label><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /> ms</label><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
         </li>
       </ol>
     </section>
 
+    <MacroBindingDialog :open="bindingDialogOpen" :profile="profile" :assignments="assignments" :model-value="bindingCodes" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="bindingDialogOpen = false" @confirm="applyBindings" />
     <KeyCodeKeyboardDialog :open="keyPickerIndex !== undefined" :profile="profile" :model-value="keyPickerIndex === undefined ? 0 : draft?.actions[keyPickerIndex]?.keyCode ?? 0" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="keyPickerIndex = undefined" @confirm="confirmKeyPicker" />
   </section>
 </template>
