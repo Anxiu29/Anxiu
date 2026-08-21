@@ -38,7 +38,7 @@ const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
-const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 40, minUnit: 18, horizontalPadding: 12, verticalPadding: 12 })
+const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 32, minUnit: 14, horizontalPadding: 16, verticalPadding: 16 })
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
   { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
