@@ -205,9 +205,13 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     if (!state.session || !profile.value?.capabilities.customLighting || !['ready', 'error'].includes(status.value)) return
     clearFeedback(); status.value = 'writing'
     try {
-      customLighting.value = await state.session.updateCustomLighting(items)
+      const verified = await state.session.updateCustomLighting(items)
+      // 自动保存只回读本次变化的键，必须合并进完整颜色表，不能用局部结果覆盖其余键。
+      const merged = new Map(customLighting.value.map((item) => [item.sourceCode, item]))
+      verified.forEach((item) => merged.set(item.sourceCode, item))
+      customLighting.value = [...merged.values()]
       status.value = 'ready'
-      message.value = `已保存并回读验证 ${items.length} 个按键的自定义颜色`
+      message.value = `已自动保存并回读验证 ${items.length} 个按键的自定义颜色`
     } catch (cause) { fail(cause) }
   }
 

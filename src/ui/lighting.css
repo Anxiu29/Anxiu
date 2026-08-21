@@ -439,19 +439,6 @@
   color: var(--lighting-text-muted);
 }
 
-.custom-lighting-save {
-  width: 100%;
-  min-height: 36px;
-  margin-top: 12px;
-  border-radius: 6px;
-  color: #071318;
-  background: #a9efff;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.custom-lighting-save:disabled { cursor: not-allowed; opacity: .42; }
-
 .custom-lighting-hint {
   margin: 9px 0 0;
   color: #8d9aac;

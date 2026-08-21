@@ -65,8 +65,15 @@ const updatePrimaryColor = (color: string) => {
     const selected = new Set(selectedCustomPositionIds.value)
     if (!selected.size) return
     const next = { ...customDraft.value }
-    props.profile.positions.forEach((position) => { if (selected.has(position.id)) next[position.sourceCode] = color.toUpperCase() })
+    const changed: CustomKeyLighting[] = []
+    props.profile.positions.forEach((position) => {
+      if (!selected.has(position.id)) return
+      next[position.sourceCode] = color.toUpperCase()
+      changed.push({ sourceCode: position.sourceCode, color: color.toUpperCase() })
+    })
     customDraft.value = next
+    // 单次改色只提交当前选区；应用层会立即保存并回读，不重写未变化的全部键。
+    emit('update-custom', changed)
     return
   }
   const colors = [...props.settings.colors]
@@ -84,14 +91,9 @@ const activeColor = computed(() => {
   return props.settings?.colors[0] ?? '#FFFFFF'
 })
 const customKeyColors = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, customDraft.value[position.sourceCode] ?? '#000000'])))
-const customDirty = computed(() => props.profile.positions.some((position) => {
-  const original = props.customLighting.find((item) => item.sourceCode === position.sourceCode)?.color.toUpperCase() ?? '#000000'
-  return (customDraft.value[position.sourceCode] ?? '#000000') !== original
-}))
 const addSelectedPosition = (positionId: string) => {
   if (!selectedCustomPositionIds.value.includes(positionId)) selectedCustomPositionIds.value = [...selectedCustomPositionIds.value, positionId]
 }
-const saveCustomLighting = () => emit('update-custom', props.profile.positions.map((position) => ({ sourceCode: position.sourceCode, color: customDraft.value[position.sourceCode] ?? '#000000' })))
 
 const positionIdAt = (clientX: number, clientY: number) => document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-position-id]')?.dataset.positionId
 const beginCustomSelection = (event: PointerEvent) => {
@@ -271,8 +273,7 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
               <label>B <input type="number" min="0" max="255" :value="primaryRgb.b" :disabled="busy || !canEditColor" @change="updateRgbChannel('b', Number(($event.target as HTMLInputElement).value))" /></label>
             </div>
           </div>
-          <p v-if="isCustomMode" class="custom-lighting-hint">左键点击选择；按住左键滑过键帽，或在键盘空白处拖框，可批量选择按键。</p>
-          <button v-if="isCustomMode" class="custom-lighting-save" type="button" :disabled="busy || customLightingLoading || !customDirty" @click="saveCustomLighting">保存自定义灯光</button>
+          <p v-if="isCustomMode" class="custom-lighting-hint">左键点击选择；按住左键滑过键帽，或在键盘空白处拖框，可批量选择。改色后会自动保存并回读验证。</p>
         </div>
       </section>
     </template>
