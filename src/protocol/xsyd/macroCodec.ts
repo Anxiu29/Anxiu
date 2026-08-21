@@ -6,6 +6,12 @@ export const XSYD_MAX_MACRO_ACTIONS = 42
 export const XSYD_MAX_MACRO_SLOTS = 16
 /** 官方 SDK 使用 0x0100 作为宏动作暂存区的起始地址。 */
 export const XSYD_MACRO_BUFFER_OFFSET = 0x0100
+/**
+ * 宏键在 Layout_Mode 中使用“单触发(1) + 宏功能(6)”。
+ * 官方 SDK 的 setMacro(..., 'single') 同样写入 0x16；不能沿用该键此前的
+ * 高四位性能模式，否则快速点击时可能继续走原普通键的触发路径。
+ */
+export const XSYD_MACRO_LAYOUT_MODE = 0x16
 const MACRO_PRESS = 0x01
 const MACRO_RELEASE = 0x08
 

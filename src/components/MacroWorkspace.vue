@@ -110,7 +110,7 @@ onBeforeUnmount(stopRecording)
 
     <div class="panel macro-editor">
       <header class="macro-heading">
-        <div><span class="eyebrow">MACRO</span><h2>宏设置</h2><p>先在上方选择触发键，再选择宏槽位并录制动作</p></div>
+        <div><span class="eyebrow">MACRO</span><h2>宏设置</h2><p>查看已保存宏：点击上方绑定的物理键；编辑后按“确认”写入</p></div>
         <div class="macro-heading-actions"><button class="ghost" :disabled="busy || !draft" @click="cancelEditing">取消</button><button class="primary" :disabled="busy || !draft?.actions.length" @click="save">{{ status === 'writing' ? '正在确认…' : '确认' }}</button></div>
       </header>
 
@@ -145,7 +145,7 @@ onBeforeUnmount(stopRecording)
         <label>触发模式<select v-if="draft" v-model.number="draft.mode"><option :value="0">点击执行一次</option><option :value="1">点击循环，再次点击停止</option><option :value="2">按住循环，松开立即停止</option><option :value="3">按住循环，完成本轮后停止</option></select></label>
         <label>重复次数<input v-if="draft" v-model.number="draft.repeatCount" type="number" min="0" max="65535" /></label>
         <label>重复间隔<input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /><span>ms</span></label>
-        <p>宏名称仅存在网页里会造成重连后丢失，因此此处直接使用设备的 M1~M16 槽位编号。</p>
+        <p>宏会直接接管当前物理键；M1~M16 是设备槽位。循环模式由固件根据按下/松开状态停止。</p>
       </aside>
     </div>
 

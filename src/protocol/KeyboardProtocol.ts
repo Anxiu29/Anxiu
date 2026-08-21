@@ -15,7 +15,7 @@ import { advancedReadRequest, decodeEnd, decodeMpt, decodeSocd, decodeTgl, encod
 import { DriverError } from '@/application/DriverError'
 import type { MacroSettings } from '@/domain/macro'
 import { createEmptyMacro, validateMacroSettings } from '@/domain/macro'
-import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
+import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MACRO_LAYOUT_MODE, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
 
 const ADVANCED_LAYOUT = {
   db1: 0x05, db3: 0x07, mode: 0x08,
@@ -189,9 +189,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     for (let offset = 0; offset < settings.actions.length; offset += MACRO_ACTIONS_PER_PACKET) {
       await this.commands.request(XSYD_COMMANDS.macroData, encodeMacroDataWrite(XSYD_MACRO_BUFFER_OFFSET + offset, settings.actions.slice(offset, offset + MACRO_ACTIONS_PER_PACKET)))
     }
-    // MODE 层负责声明“该物理键是宏键”，0x21 再保存槽位、动作数和执行方式。
-    const currentMode = await this.readLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode)
-    await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, currentMode & 0xf0 | ADVANCED_MODE.macro)
+    // MODE 层就是协议里的“宏键映射”。官方 SDK 明确写 single(1) + macro(6)，
+    // 不能保留旧性能模式；否则快速点击可能漏出 FN0 中原来的普通键值。
+    await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, XSYD_MACRO_LAYOUT_MODE)
     await this.commands.request(XSYD_COMMANDS.macroMode, encodeMacroModeWrite(settings))
   }
   close() {
