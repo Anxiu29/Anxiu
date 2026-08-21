@@ -11,7 +11,7 @@ import { listMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type Macro
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -383,6 +383,10 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   function rebuildMacroBindings() {
     macroBindings.value = Object.fromEntries(Object.values(macroSlots.value).flatMap((settings) => (settings.boundSourceCodes ?? []).map((sourceCode) => [sourceCode, `M${settings.index + 1}`])))
   }
+  function selectMacroSlot(index: number) {
+    const slotCount = profile.value?.capabilities.macroSlots ?? 0
+    if (Number.isInteger(index) && index >= 0 && index < slotCount) selectedMacroSlot.value = index
+  }
   /** 设备回读为空时移除过期角标；有宏时记录真实槽位。 */
   function rememberMacroBinding(settings: MacroSettings) {
     const actionCount = settings.storedActionCount ?? settings.actions.length
@@ -409,5 +413,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, updateMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, updateMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

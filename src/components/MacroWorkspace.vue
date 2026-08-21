@@ -13,6 +13,7 @@ import KeyCodeKeyboardDialog from './KeyCodeKeyboardDialog.vue'
 const props = defineProps<{
   profile: KeyboardProfile
   status: SessionStatus
+  selectedSlot: number
   macroSlots?: Record<number, MacroSettings>
   loading?: boolean
   assignments: KeyAssignment[]
@@ -20,9 +21,8 @@ const props = defineProps<{
   keyLabels: Record<number, string>
   keyGeometry?: KeyGeometryResolver
 }>()
-const emit = defineEmits<{ update: [settings: MacroSettings] }>()
+const emit = defineEmits<{ 'select-slot': [index: number]; update: [settings: MacroSettings] }>()
 
-const selectedSlot = ref(0)
 const draft = ref<MacroSettings>()
 const recording = ref(false)
 const keyPickerIndex = ref<number>()
@@ -38,7 +38,7 @@ const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
-const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 25, minUnit: 13, horizontalPadding: 12, verticalPadding: 12 })
+const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 28, minUnit: 15, horizontalPadding: 12, verticalPadding: 12 })
 useHorizontalKeyboardScroll(bindingKeyboardContainer)
 const modeOptions: { value: MacroMode; title: string; description: string }[] = [
   { value: 0, title: '点击执行', description: '按下一次，执行设定的重复次数' },
@@ -47,12 +47,12 @@ const modeOptions: { value: MacroMode; title: string; description: string }[] = 
   { value: 3, title: '按住完成本轮', description: '松开后完成本轮再停止' },
 ]
 
-watch([selectedSlot, () => props.macroSlots], ([index]) => {
+watch([() => props.selectedSlot, () => props.macroSlots], ([index]) => {
   stopRecording()
   draft.value = cloneMacroSettings(props.macroSlots?.[Number(index)] ?? createEmptyMacro(Number(index), EMPTY_MACRO_SOURCE))
 }, { immediate: true, deep: true })
 
-function selectSlot(index: number) { selectedSlot.value = index }
+function selectSlot(index: number) { emit('select-slot', index) }
 function applyBindings(sourceCodes: number[]) {
   if (!draft.value) return
   draft.value.boundSourceCodes = [...new Set(sourceCodes)]
@@ -76,6 +76,11 @@ function adjustActionDelay(index: number, delta: number) {
   const action = draft.value?.actions[index]
   if (action) action.delay = Math.min(0xffffff, Math.max(0, action.delay + delta))
 }
+function adjustMacroNumber(field: 'repeatCount' | 'repeatDelay', delta: number) {
+  if (!draft.value) return
+  const maximum = field === 'repeatCount' ? 0xffff : 0xffffff
+  draft.value[field] = Math.min(maximum, Math.max(0, draft.value[field] + delta))
+}
 function clearActions() { stopRecording(); if (draft.value) draft.value.actions = [] }
 function startDraggingAction(index: number) { draggedActionIndex.value = index }
 function dropAction(targetIndex: number) {
@@ -86,7 +91,6 @@ function dropAction(targetIndex: number) {
 }
 function startRecording() {
   if (!draft.value || busy.value) return
-  draft.value.actions = []
   recording.value = true
   previousEventTime = performance.now()
   window.addEventListener('keydown', captureKeyEvent, true)
@@ -134,8 +138,8 @@ onBeforeUnmount(stopRecording)
       <strong>执行模式</strong>
       <button v-for="option in modeOptions" :key="option.value" class="macro-mode-card" :class="{ active: draft?.mode === option.value }" @click="draft && (draft.mode = option.value)"><i></i><span><b>{{ option.title }}</b><small>{{ option.description }}</small></span></button>
       <div class="macro-repeat-settings">
-        <label>重复次数<input v-if="draft" v-model.number="draft.repeatCount" type="number" min="0" max="65535" /></label>
-        <label>重复间隔<span><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /> ms</span></label>
+        <label>重复次数<div class="macro-number-control"><button @click="adjustMacroNumber('repeatCount', -1)">−</button><input v-if="draft" v-model.number="draft.repeatCount" type="number" min="0" max="65535" /><button @click="adjustMacroNumber('repeatCount', 1)">+</button></div></label>
+        <label>重复间隔<div class="macro-number-control"><button @click="adjustMacroNumber('repeatDelay', -1)">−</button><input v-if="draft" v-model.number="draft.repeatDelay" type="number" min="0" max="16777215" /><span>ms</span><button @click="adjustMacroNumber('repeatDelay', 1)">+</button></div></label>
       </div>
       <section class="macro-bindings">
         <div><span><strong>当前绑定按键</strong><small>{{ bindingCodes.length ? `已选择 ${bindingCodes.length} 个按键` : '直接点击下方键帽进行绑定' }}</small></span><button class="macro-binding-zoom" title="放大选择键盘" aria-label="放大选择键盘" @click="bindingDialogOpen = true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5M8 11h6m-3-3v6"/></svg></button></div>
