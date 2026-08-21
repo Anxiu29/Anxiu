@@ -40,7 +40,7 @@ const keyStyle = (key: RenderedKey) => ({
 <template>
   <div class="keyboard-shell">
     <div class="keyboard-layout" :style="canvasStyle">
-      <button v-for="key in renderedPositions" :key="key.id" class="keycap" :class="{ selected: selected === key.id, changed: isChanged(key.id), pressed: pressed.includes(key.id), 'custom-lit': !!keyColors[key.id] }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
+      <button v-for="key in renderedPositions" :key="key.id" class="keycap" :data-position-id="key.id" :class="{ selected: selected === key.id, changed: isChanged(key.id), pressed: pressed.includes(key.id), 'custom-lit': !!keyColors[key.id] }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
         <b v-if="badges[key.id]" class="keycap-badge">{{ badges[key.id] }}</b>
         <span>{{ labelFor(assignment(key.id)?.keyCode ?? key.sourceCode) }}</span>
         <small>{{ key.label }}</small>

@@ -4,7 +4,7 @@ import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
  * 为响应式键盘补充横向浏览能力：细滚动条、边缘提示、空白区拖动和 Shift+滚轮。
  * 只操作 UI 容器，不感知键码、设备型号或协议。
  */
-export function useHorizontalKeyboardScroll(container: Ref<HTMLElement | undefined>) {
+export function useHorizontalKeyboardScroll(container: Ref<HTMLElement | undefined>, allowBlankDrag: () => boolean = () => true) {
   let host: HTMLElement | undefined
   let scroller: HTMLElement | undefined
   let resizeObserver: ResizeObserver | undefined
@@ -28,7 +28,7 @@ export function useHorizontalKeyboardScroll(container: Ref<HTMLElement | undefin
     scroller.scrollLeft = dragStartScrollLeft - (event.clientX - dragStartX)
   }
   const handlePointerDown = (event: PointerEvent) => {
-    if (!scroller || event.button !== 0 || (event.target as HTMLElement).closest('button, input, select, textarea, a')) return
+    if (!scroller || !allowBlankDrag() || event.button !== 0 || (event.target as HTMLElement).closest('button, input, select, textarea, a')) return
     dragStartX = event.clientX
     dragStartScrollLeft = scroller.scrollLeft
     dragging = true

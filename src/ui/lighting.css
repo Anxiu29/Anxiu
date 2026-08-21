@@ -17,6 +17,7 @@
 .lighting-section-title h3 { margin: 0; }
 
 .lighting-keyboard-preview {
+  position: relative;
   min-height: 0;
   padding: 10px;
   display: flex;
@@ -28,6 +29,7 @@
   background:
     radial-gradient(circle at 50% 100%, rgba(69, 214, 255, 0.06), transparent 48%),
     var(--lighting-panel);
+  user-select: none;
 }
 
 /* 预览只负责展示灯光状态，避免误触改键交互。 */
@@ -62,6 +64,22 @@
   box-shadow:
     0 0 calc(12px * var(--light-strength)) color-mix(in srgb, var(--key-light-color) 72%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.lighting-keyboard-preview.custom-mode .keycap.pressed {
+  z-index: 2;
+  border-color: #f4fbff;
+  outline: 2px solid #63ddf8;
+  outline-offset: 1px;
+}
+
+.custom-lighting-selection-box {
+  position: absolute;
+  z-index: 8;
+  border: 1px solid #72e8ff;
+  background: rgba(79, 213, 243, .16);
+  box-shadow: 0 0 0 1px rgba(79, 213, 243, .12) inset;
+  pointer-events: none;
 }
 
 .lighting-keyboard-preview .keycap-label {
@@ -433,6 +451,13 @@
 }
 
 .custom-lighting-save:disabled { cursor: not-allowed; opacity: .42; }
+
+.custom-lighting-hint {
+  margin: 9px 0 0;
+  color: #8d9aac;
+  font-size: 10px;
+  line-height: 1.45;
+}
 
 @media (max-width: 1240px) {
   .lighting-dashboard {
