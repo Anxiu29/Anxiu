@@ -97,7 +97,7 @@ onBeforeUnmount(() => narrowScreen?.removeEventListener('change', syncSidebarWit
           <span>高级键设置</span>
         </button>
         <button v-if="profile.capabilities.macro" :class="{ active: activeView === 'macro' }" :disabled="navigationDisabled" title="宏设置" @click="navigate('macro')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h5M8 15h8" /><circle cx="17" cy="12" r="1" /></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="m7 8 4 4-4 4m6 0h4" /></svg>
           <span>宏设置</span>
         </button>
         <button :class="{ active: activeView === 'key-test' }" :disabled="navigationDisabled" title="按键测试" @click="navigate('key-test')">
