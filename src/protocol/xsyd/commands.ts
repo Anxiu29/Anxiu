@@ -18,6 +18,7 @@ export const XSYD_COMMANDS = {
   keymap: command('keymap', 0x23),
   defaultKeymap: command('default-keymap', 0x2b),
   lighting: command('main-lighting', 0x18),
+  customLighting: command('custom-key-lighting', 0x2a),
   mt: command('advanced-mt', 0x24),
   tgl: command('advanced-tgl', 0x25),
   dks: command('advanced-dks', 0x26),

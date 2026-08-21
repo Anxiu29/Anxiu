@@ -54,6 +54,8 @@ export interface DeviceCapabilities {
   restoreFactory: boolean
   /** 可选以兼容只实现改键的设备；true 时设备必须提供 LightingCapability。 */
   lighting?: boolean
+  /** true 时设备支持逐物理键 RGB 读取、写入和持久化。 */
+  customLighting?: boolean
   /** true 时设备提供 DKS、MPT、MT、TGL、END、SOCD 高级键能力。 */
   advancedKey?: boolean
   /** true 时设备提供宏录制、槽位和物理键绑定能力。 */

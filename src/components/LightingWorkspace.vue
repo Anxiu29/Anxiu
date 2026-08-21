@@ -3,13 +3,15 @@ import { computed, ref, watch } from 'vue'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import type { LightingModePresentation, LightingRangePresentation } from '@/ui/DevicePresentation'
-import { cloneLightingSettings, type LightingSettings } from '@/domain/lighting'
+import { cloneLightingSettings, type CustomKeyLighting, type LightingSettings } from '@/domain/lighting'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 
 const props = defineProps<{
   settings?: LightingSettings
+  customLighting: CustomKeyLighting[]
+  customLightingLoading: boolean
   status: SessionStatus
   profile: KeyboardProfile
   assignments: KeyAssignment[]
@@ -18,11 +20,14 @@ const props = defineProps<{
   lightingModes: readonly LightingModePresentation[]
   lightingRanges: { luminance: LightingRangePresentation; speed: LightingRangePresentation }
 }>()
-const emit = defineEmits<{ update: [settings: LightingSettings]; reload: [] }>()
+const emit = defineEmits<{ update: [settings: LightingSettings]; reload: []; 'load-custom': []; 'update-custom': [items: CustomKeyLighting[]] }>()
 const busy = computed(() => ['connecting', 'reading', 'writing'].includes(props.status))
 const luminanceDraft = ref(0)
 const speedDraft = ref(0)
 const colorFormat = ref<'hex' | 'rgb'>('rgb')
+const selectedCustomPositionId = ref<string>()
+const customDraft = ref<Record<number, string>>({})
+const isCustomMode = computed(() => props.settings?.type === 'custom' || props.settings?.mode === 21)
 // 直接观察预览容器，侧栏展开、窗口缩放和不同配列都会触发重新适配。
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
@@ -30,6 +35,14 @@ useHorizontalKeyboardScroll(keyboardContainer)
 // 拖动时只更新本地显示，松手后再写入设备，避免一次拖动产生多次 HID 写入。
 watch(() => props.settings?.luminance, (value) => { if (value !== undefined) luminanceDraft.value = value }, { immediate: true })
 watch(() => props.settings?.speed, (value) => { if (value !== undefined) speedDraft.value = value }, { immediate: true })
+watch(() => props.customLighting, (items) => {
+  customDraft.value = Object.fromEntries(items.map((item) => [item.sourceCode, item.color.toUpperCase()]))
+}, { immediate: true, deep: true })
+watch(isCustomMode, (custom) => {
+  if (!custom || !props.profile.capabilities.customLighting) return
+  selectedCustomPositionId.value ??= props.profile.positions[0]?.id
+  if (!props.customLighting.length) emit('load-custom')
+}, { immediate: true })
 
 const rangeProgress = (value: number, range: LightingRangePresentation) => ({
   '--range-progress': `${Math.max(0, Math.min(100, ((value - range.min) / Math.max(1, range.max - range.min)) * 100))}%`,
@@ -44,14 +57,35 @@ const update = (patch: Partial<LightingSettings>) => {
 }
 const updatePrimaryColor = (color: string) => {
   if (!props.settings) return
+  if (isCustomMode.value) {
+    const position = props.profile.positions.find((item) => item.id === selectedCustomPositionId.value)
+    if (!position) return
+    customDraft.value = { ...customDraft.value, [position.sourceCode]: color.toUpperCase() }
+    return
+  }
   const colors = [...props.settings.colors]
   colors[0] = color.toUpperCase()
   update({ colors, staticColor: 0 })
 }
 
+const selectedCustomPosition = computed(() => props.profile.positions.find((item) => item.id === selectedCustomPositionId.value))
+const activeColor = computed(() => {
+  if (isCustomMode.value && selectedCustomPosition.value) return customDraft.value[selectedCustomPosition.value.sourceCode] ?? '#000000'
+  return props.settings?.colors[0] ?? '#FFFFFF'
+})
+const customKeyColors = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, customDraft.value[position.sourceCode] ?? '#000000'])))
+const customDirty = computed(() => props.profile.positions.some((position) => {
+  const original = props.customLighting.find((item) => item.sourceCode === position.sourceCode)?.color.toUpperCase() ?? '#000000'
+  return (customDraft.value[position.sourceCode] ?? '#000000') !== original
+}))
+const selectCustomPosition = (positionId: string) => {
+  if (isCustomMode.value && !busy.value) selectedCustomPositionId.value = positionId
+}
+const saveCustomLighting = () => emit('update-custom', props.profile.positions.map((position) => ({ sourceCode: position.sourceCode, color: customDraft.value[position.sourceCode] ?? '#000000' })))
+
 type RgbChannel = 'r' | 'g' | 'b'
 const primaryRgb = computed(() => {
-  const hex = (props.settings?.colors[0] ?? '#FFFFFF').replace('#', '')
+  const hex = activeColor.value.replace('#', '')
   const normalized = /^[0-9A-Fa-f]{6}$/.test(hex) ? hex : 'FFFFFF'
   return {
     r: Number.parseInt(normalized.slice(0, 2), 16),
@@ -82,7 +116,7 @@ const wheelSelectionStyle = computed(() => {
   const angle = primaryHsv.value.hue * Math.PI / 180
   const radius = primaryHsv.value.saturation * 47
   return {
-    '--selected-color': props.settings?.colors[0] ?? '#FFFFFF',
+    '--selected-color': activeColor.value,
     left: `${50 + Math.sin(angle) * radius}%`,
     top: `${50 - Math.cos(angle) * radius}%`,
   }
@@ -124,8 +158,8 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
 <template>
   <section class="lighting-workspace">
     <template v-if="settings">
-      <section ref="keyboardContainer" class="panel lighting-keyboard-preview" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }">
-        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="keyboardUnit" />
+      <section ref="keyboardContainer" class="panel lighting-keyboard-preview" :class="{ 'custom-mode': isCustomMode }" :style="{ '--light-color': settings.colors[0] ?? '#FFFFFF', '--light-strength': settings.open ? Math.max(.2, Math.min(1, settings.luminance / lightingRanges.luminance.max)) : 0 }">
+        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :geometry="keyGeometry" :unit="keyboardUnit" :selected="isCustomMode ? selectedCustomPositionId : undefined" :key-colors="isCustomMode ? customKeyColors : {}" @select="selectCustomPosition" />
       </section>
 
       <section class="panel lighting-dashboard">
@@ -145,11 +179,11 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
             </div>
             <div class="lighting-control">
               <div class="lighting-control-value"><label for="lighting-speed">速度</label><output>{{ speedDraft }} / {{ lightingRanges.speed.max }}</output></div>
-              <input id="lighting-speed" class="lighting-range" type="range" :min="lightingRanges.speed.min" :max="lightingRanges.speed.max" :step="lightingRanges.speed.step" :value="speedDraft" :style="rangeProgress(speedDraft, lightingRanges.speed)" :disabled="busy || !settings.open || settings.mode === 0" @input="speedDraft = rangeValue($event)" @change="update({ speed: speedDraft })" />
+              <input id="lighting-speed" class="lighting-range" type="range" :min="lightingRanges.speed.min" :max="lightingRanges.speed.max" :step="lightingRanges.speed.step" :value="speedDraft" :style="rangeProgress(speedDraft, lightingRanges.speed)" :disabled="busy || !settings.open || settings.type !== 'dynamic'" @input="speedDraft = rangeValue($event)" @change="update({ speed: speedDraft })" />
             </div>
             <div class="lighting-inline-setting">
               <label class="lighting-toggle-label" for="lighting-direction">灯效方向 · {{ settings.direction ? '正向' : '反向' }}</label>
-              <label class="lighting-switch"><input id="lighting-direction" type="checkbox" :checked="settings.direction" :disabled="busy || !settings.open || settings.mode === 0" @change="update({ direction: ($event.target as HTMLInputElement).checked })" /><span></span></label>
+              <label class="lighting-switch"><input id="lighting-direction" type="checkbox" :checked="settings.direction" :disabled="busy || !settings.open || settings.type !== 'dynamic'" @change="update({ direction: ($event.target as HTMLInputElement).checked })" /><span></span></label>
             </div>
             <div class="lighting-inline-setting">
               <label for="lighting-sleep">休眠参数</label>
@@ -160,7 +194,7 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
 
         <div class="lighting-panel-section lighting-colors">
           <div class="lighting-section-title">
-            <h3>颜色设置</h3>
+            <div><h3>{{ isCustomMode ? '逐键颜色' : '颜色设置' }}</h3><small v-if="isCustomMode">{{ customLightingLoading ? '正在读取…' : `当前按键：${selectedCustomPosition?.label ?? '请选择'}` }}</small></div>
             <div class="lighting-inline-setting"><label for="lighting-master">主灯</label><label class="lighting-switch"><input id="lighting-master" type="checkbox" :checked="settings.open" :disabled="busy" @change="update({ open: ($event.target as HTMLInputElement).checked })" /><span></span></label></div>
           </div>
           <div class="lighting-color-body">
@@ -176,13 +210,14 @@ const updateRgbChannel = (channel: RgbChannel, value: number) => {
               <button type="button" :class="{ active: colorFormat === 'hex' }" :aria-pressed="colorFormat === 'hex'" @click="colorFormat = 'hex'">HEX</button>
               <button type="button" :class="{ active: colorFormat === 'rgb' }" :aria-pressed="colorFormat === 'rgb'" @click="colorFormat = 'rgb'">RGB</button>
             </div>
-            <code v-if="colorFormat === 'hex'" class="lighting-hex-value">{{ settings.colors[0] ?? '#FFFFFF' }}</code>
+            <code v-if="colorFormat === 'hex'" class="lighting-hex-value">{{ activeColor }}</code>
             <div v-else class="lighting-rgb-fields">
               <label>R <input type="number" min="0" max="255" :value="primaryRgb.r" :disabled="busy || !settings.open" @change="updateRgbChannel('r', Number(($event.target as HTMLInputElement).value))" /></label>
               <label>G <input type="number" min="0" max="255" :value="primaryRgb.g" :disabled="busy || !settings.open" @change="updateRgbChannel('g', Number(($event.target as HTMLInputElement).value))" /></label>
               <label>B <input type="number" min="0" max="255" :value="primaryRgb.b" :disabled="busy || !settings.open" @change="updateRgbChannel('b', Number(($event.target as HTMLInputElement).value))" /></label>
             </div>
           </div>
+          <button v-if="isCustomMode" class="custom-lighting-save" type="button" :disabled="busy || customLightingLoading || !customDirty" @click="saveCustomLighting">保存自定义灯光</button>
         </div>
       </section>
     </template>

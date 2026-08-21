@@ -1,5 +1,5 @@
 import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
-import type { LightingSettings } from '@/domain/lighting'
+import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 
@@ -52,6 +52,12 @@ export interface LightingCapability {
   setLighting(settings: LightingSettings): Promise<void>
 }
 
+export interface CustomLightingCapability {
+  getCustomLighting(sourceCodes: number[]): Promise<CustomKeyLighting[]>
+  setCustomLighting(items: CustomKeyLighting[]): Promise<void>
+  saveCustomLighting(): Promise<void>
+}
+
 export interface AdvancedKeyCapability {
   getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings>
   setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>): Promise<void>
@@ -73,6 +79,7 @@ export interface KeyboardDevice {
   readonly systemMode?: SystemModeCapability
   readonly configurationSwitch?: ConfigurationSwitchCapability
   readonly lighting?: LightingCapability
+  readonly customLighting?: CustomLightingCapability
   readonly advancedKey?: AdvancedKeyCapability
   readonly macro?: MacroCapability
   close(): void

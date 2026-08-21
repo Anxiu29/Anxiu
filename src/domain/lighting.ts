@@ -15,6 +15,12 @@ export interface LightingSettings {
   dynamicColorId: number
 }
 
+/** 单个物理键的自定义 RGB；sourceCode 来自 0x2B 物理矩阵，不是改键后的功能键码。 */
+export interface CustomKeyLighting {
+  sourceCode: number
+  color: string
+}
+
 export const DEFAULT_LIGHTING_SETTINGS: LightingSettings = {
   open: true,
   direction: true,

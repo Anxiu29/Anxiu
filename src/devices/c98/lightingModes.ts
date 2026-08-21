@@ -26,4 +26,5 @@ export const C98_LIGHTING_MODES: readonly LightingModePresentation[] = [
   { value: 18, label: '踏雪寻梅' },
   { value: 19, label: '镭射穿云' },
   { value: 20, label: '水波荡漾' },
+  { value: 21, label: '自定义' },
 ]

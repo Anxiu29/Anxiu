@@ -3,7 +3,7 @@ import type { DeviceSession } from '@/application/DeviceSession'
 import type { SaveProgress } from '@/application/SaveConfiguration'
 import type { KeyboardConfiguration, KeyboardMode, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { DriverErrorCode } from '@/application/DriverError'
-import type { LightingSettings } from '@/domain/lighting'
+import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 
@@ -24,6 +24,8 @@ export const createDriverState = () => {
   const revision = ref(0)
   const saveProgress = ref<SaveProgress>()
   const lighting = ref<LightingSettings>()
+  const customLighting = ref<CustomKeyLighting[]>([])
+  const customLightingLoading = ref(false)
   const advancedKey = ref<AdvancedKeySettings>()
   /** 高级键是页面级按需读取，不占用全局 reading，避免读取期间锁死侧边导航。 */
   const advancedKeyLoading = ref(false)
@@ -51,7 +53,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
-    demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }

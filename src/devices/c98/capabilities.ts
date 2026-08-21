@@ -6,6 +6,7 @@ export const C98_CAPABILITIES = new StaticCapabilityDescriptor('rk-c98-v1', {
   remap: true,
   restoreFactory: true,
   lighting: true,
+  customLighting: true,
   advancedKey: true,
   macro: true,
   macroSlots: 16,

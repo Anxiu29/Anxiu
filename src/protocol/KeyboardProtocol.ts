@@ -7,9 +7,10 @@ import { XSYD_ACTIONS, XSYD_COMMANDS } from './xsyd/commands'
 import { XsydCommandClient } from './xsyd/XsydCommandClient'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
-import type { LightingSettings } from '@/domain/lighting'
+import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import { DEFAULT_LIGHTING_SETTINGS } from '@/domain/lighting'
 import { decodeMainLighting, encodeMainLighting } from './xsyd/lightingCodec'
+import { decodeCustomLighting, encodeCustomLightingRead, encodeCustomLightingSave, encodeCustomLightingWrite, XSYD_CUSTOM_LIGHTING_KEYS_PER_PACKET } from './xsyd/customLightingCodec'
 import type { AdvancedKeySettings, DksAdvancedKey } from '@/domain/advancedKey'
 import { advancedReadRequest, decodeEnd, decodeMpt, decodeSocd, decodeTgl, encodeDks, encodeEnd, encodeMpt, encodeMt, encodeSocd, encodeTgl } from './xsyd/advancedKeyCodec'
 import { DriverError } from '@/application/DriverError'
@@ -49,6 +50,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly lighting = {
     getLighting: () => this.getLighting(),
     setLighting: (settings: LightingSettings) => this.setLighting(settings),
+  }
+  readonly customLighting = {
+    getCustomLighting: (sourceCodes: number[]) => this.getCustomLighting(sourceCodes),
+    setCustomLighting: (items: CustomKeyLighting[]) => this.setCustomLighting(items),
+    saveCustomLighting: () => this.saveCustomLighting(),
   }
   readonly advancedKey = {
     getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode),
@@ -131,6 +137,25 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
   async setLighting(settings: LightingSettings) {
     await this.commands.request(XSYD_COMMANDS.lighting, encodeMainLighting(settings, true, this.supportsDynamicColorId()))
+  }
+
+  async getCustomLighting(sourceCodes: number[]) {
+    const result: CustomKeyLighting[] = []
+    for (let offset = 0; offset < sourceCodes.length; offset += XSYD_CUSTOM_LIGHTING_KEYS_PER_PACKET) {
+      const batch = sourceCodes.slice(offset, offset + XSYD_CUSTOM_LIGHTING_KEYS_PER_PACKET)
+      result.push(...decodeCustomLighting(await this.commands.request(XSYD_COMMANDS.customLighting, encodeCustomLightingRead(batch))))
+    }
+    return result
+  }
+
+  async setCustomLighting(items: CustomKeyLighting[]) {
+    for (let offset = 0; offset < items.length; offset += XSYD_CUSTOM_LIGHTING_KEYS_PER_PACKET) {
+      await this.commands.request(XSYD_COMMANDS.customLighting, encodeCustomLightingWrite(items.slice(offset, offset + XSYD_CUSTOM_LIGHTING_KEYS_PER_PACKET)))
+    }
+  }
+
+  saveCustomLighting() {
+    return this.commands.request(XSYD_COMMANDS.customLighting, encodeCustomLightingSave()).then(() => undefined)
   }
 
   async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> {

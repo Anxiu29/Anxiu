@@ -3,7 +3,7 @@ import type { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardConfiguration, KeyboardMode } from '@/domain/keyboard'
 import { toDriverError } from '@/application/DriverError'
 import { createDriverState } from './driverState'
-import type { LightingSettings } from '@/domain/lighting'
+import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
@@ -11,7 +11,7 @@ import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, rep
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -50,6 +50,8 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'reading'
     profile.value = await state.session.load()
     lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
+    // 逐键颜色属于当前设备配置，Profile/模式/配置槽变化后必须按需重新读取。
+    customLighting.value = []
     invalidateAdvancedKeyCache()
     mode.value = profile.value.mode ?? mode.value
     revision.value++
@@ -80,7 +82,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function reload() {
     if (!state.session) return
     clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
-    try { profile.value = await state.session.reload(); lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined; revision.value++; status.value = 'ready'; message.value = '已重新读取设备配置' }
+    try { profile.value = await state.session.reload(); lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined; customLighting.value = []; revision.value++; status.value = 'ready'; message.value = '已重新读取设备配置' }
     catch (cause) { fail(cause) }
   }
 
@@ -110,6 +112,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       state.session = undefined
       driverId.value = undefined
       profile.value = undefined
+      customLighting.value = []
       selectedPositionId.value = undefined
       revision.value++
       status.value = 'idle'
@@ -130,6 +133,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       profile.value = await state.session.switchMode(targetMode)
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
+      customLighting.value = []
       revision.value++
       mode.value = profile.value.mode ?? targetMode
       await loadMacrosFromDevice()
@@ -147,6 +151,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       profile.value = await state.session.switchConfiguration(configuration)
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
+      customLighting.value = []
       revision.value++
       activeConfiguration.value = configuration
       await loadMacrosFromDevice()
@@ -184,6 +189,26 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'reading'
     try { lighting.value = await state.session.getLighting(); status.value = 'ready'; message.value = '已重新读取灯光设置' }
     catch (cause) { fail(cause) }
+  }
+
+  async function loadCustomLighting() {
+    if (!state.session || !profile.value?.capabilities.customLighting || customLightingLoading.value) return
+    customLightingLoading.value = true
+    clearFeedback()
+    try {
+      customLighting.value = await state.session.getCustomLighting(profile.value.positions.map((position) => position.sourceCode))
+    } catch (cause) { fail(cause) }
+    finally { customLightingLoading.value = false }
+  }
+
+  async function updateCustomLighting(items: CustomKeyLighting[]) {
+    if (!state.session || !profile.value?.capabilities.customLighting || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try {
+      customLighting.value = await state.session.updateCustomLighting(items)
+      status.value = 'ready'
+      message.value = `已保存并回读验证 ${items.length} 个按键的自定义颜色`
+    } catch (cause) { fail(cause) }
   }
 
   async function loadAdvancedKey(positionId = selectedPositionId.value) {
@@ -342,6 +367,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       profile.value = await observedSession.load()
       lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
+      customLighting.value = []
       if (state.session !== observedSession) return
       mode.value = profile.value.mode ?? targetMode
       await loadMacrosFromDevice()
@@ -364,6 +390,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     try {
       profile.value = await observedSession.load()
       lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
+      customLighting.value = []
       if (state.session !== observedSession) return
       layer.value = 0
       await loadMacrosFromDevice()
@@ -467,5 +494,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

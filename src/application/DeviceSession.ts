@@ -4,7 +4,7 @@ import { assignmentsEqual, cloneAssignments } from '@/domain/keyboard'
 import type { KeyCatalog } from '@/domain/KeyCatalog'
 import { DriverError } from './DriverError'
 import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguration'
-import type { LightingSettings } from '@/domain/lighting'
+import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 
@@ -109,6 +109,23 @@ export class DeviceSession {
     if (!this.device.lighting) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持灯光设置', false, { details: { capability: 'lighting' } })
     await this.device.lighting.setLighting(settings)
     return this.device.lighting.getLighting()
+  }
+
+  async getCustomLighting(sourceCodes: number[]) {
+    if (!this.device.customLighting) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持逐键自定义灯光', false, { details: { capability: 'custom-lighting' } })
+    return this.device.customLighting.getCustomLighting(sourceCodes)
+  }
+
+  /** 逐键颜色先分批写入 RAM，全部完成后只保存一次，再全量回读验证。 */
+  async updateCustomLighting(items: CustomKeyLighting[]) {
+    if (!this.device.customLighting) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持逐键自定义灯光', false, { details: { capability: 'custom-lighting' } })
+    await this.device.customLighting.setCustomLighting(items)
+    await this.device.customLighting.saveCustomLighting()
+    const verified = await this.device.customLighting.getCustomLighting(items.map((item) => item.sourceCode))
+    const actual = new Map(verified.map((item) => [item.sourceCode, item.color.toUpperCase()]))
+    const failed = items.find((item) => actual.get(item.sourceCode) !== item.color.toUpperCase())
+    if (failed) throw new DriverError('VERIFY_FAILED', `按键 0x${failed.sourceCode.toString(16).toUpperCase()} 的自定义颜色回读不一致`, true)
+    return verified
   }
 
   async getAdvancedKey(sourceCode: number) {

@@ -5,7 +5,7 @@ import type { KeyCatalog } from '@/domain/KeyCatalog'
 import type { MatrixKeyInput } from '@/domain/layout'
 import type { CapabilityDescriptor } from '@/domain/capabilities'
 import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
-import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type LightingSettings } from '@/domain/lighting'
+import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type CustomKeyLighting, type LightingSettings } from '@/domain/lighting'
 import { cloneAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
 import { cloneMacroSettings, createEmptyMacro, type MacroSettings } from '@/domain/macro'
 
@@ -27,11 +27,13 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly systemMode = { switchMode: (mode: KeyboardMode) => this.switchMode(mode) }
   readonly configurationSwitch = { switchConfiguration: (configuration: KeyboardConfiguration) => this.switchConfiguration(configuration) }
   readonly lighting = { getLighting: () => this.getLighting(), setLighting: (settings: LightingSettings) => this.setLighting(settings) }
+  readonly customLighting = { getCustomLighting: (sourceCodes: number[]) => this.getCustomLighting(sourceCodes), setCustomLighting: (items: CustomKeyLighting[]) => this.setCustomLighting(items), saveCustomLighting: () => this.saveCustomLighting() }
   readonly advancedKey = { getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode), setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings), deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode) }
   readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings), deleteMacroBinding: (sourceCode: number) => this.deleteMacroBinding(sourceCode) }
   private readonly capabilities: DeviceCapabilities
   private currentMode: KeyboardMode = 'win'
   private lightingSettings = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS)
+  private readonly customLightingColors = new Map<number, string>()
   private readonly advancedKeys = new Map<number, AdvancedKeySettings>()
   private readonly macros = new Map<number, MacroSettings>()
   constructor(
@@ -59,7 +61,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
-  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear() }
+  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear(); this.customLightingColors.clear() }
   async switchMode(mode: KeyboardMode) {
     await this.wait()
     this.currentMode = mode
@@ -71,6 +73,9 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async switchConfiguration(_configuration: KeyboardConfiguration) { await this.wait() }
   async getLighting() { await this.wait(); return cloneLightingSettings(this.lightingSettings) }
   async setLighting(settings: LightingSettings) { await this.wait(); this.lightingSettings = cloneLightingSettings(settings) }
+  async getCustomLighting(sourceCodes: number[]) { await this.wait(); return sourceCodes.map((sourceCode) => ({ sourceCode, color: this.customLightingColors.get(sourceCode) ?? '#000000' })) }
+  async setCustomLighting(items: CustomKeyLighting[]) { await this.wait(); items.forEach((item) => this.customLightingColors.set(item.sourceCode, item.color.toUpperCase())) }
+  async saveCustomLighting() { await this.wait() }
   async getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings> { await this.wait(); return cloneAdvancedKeySettings(this.advancedKeys.get(sourceCode) ?? { type: 'none', sourceCode }) }
   async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) { await this.wait(); this.advancedKeys.set(settings.sourceCode, cloneAdvancedKeySettings(settings)) }
   async deleteAdvancedKey(sourceCode: number) { await this.wait(); this.advancedKeys.delete(sourceCode) }
