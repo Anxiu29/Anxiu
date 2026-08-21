@@ -67,6 +67,10 @@ function addKeyPair() {
   draft.value.actions.push({ keyCode: fallback, pressed: true, delay: 0 }, { keyCode: fallback, pressed: false, delay: 50 })
 }
 function removeAction(index: number) { draft.value?.actions.splice(index, 1) }
+function adjustActionDelay(index: number, delta: number) {
+  const action = draft.value?.actions[index]
+  if (action) action.delay = Math.min(0xffffff, Math.max(0, action.delay + delta))
+}
 function clearActions() { stopRecording(); if (draft.value) draft.value.actions = [] }
 function startDraggingAction(index: number) { draggedActionIndex.value = index }
 function dropAction(targetIndex: number) {
@@ -137,20 +141,18 @@ onBeforeUnmount(stopRecording)
     </section>
 
     <section class="macro-sequence">
-      <header class="macro-toolbar">
+      <header class="macro-sequence-heading">
         <div><h2>宏录制</h2><small>{{ draft?.actions.length ?? 0 }} / {{ maxMacroActions }} 个动作</small></div>
-        <button class="ghost" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()">{{ recording ? '停止录制' : '开始录制' }}</button>
-        <button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="addKeyPair">添加按键</button>
-        <button class="ghost" :disabled="busy || !draft?.actions.length" @click="clearActions">清除数据</button>
-        <button class="primary" :disabled="busy || !draft?.actions.length || !bindingCodes.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button>
       </header>
+      <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || !draft?.actions.length" @click="clearActions">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length || !bindingCodes.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
       <div v-if="unavailableActionCount" class="macro-placeholder macro-unavailable"><strong>设备中有 {{ unavailableActionCount }} 个动作</strong><span>当前方案只回读宏元数据；若宏不是由本网页保存，动作正文无法还原，可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
       <ol v-else class="macro-action-list">
         <li v-for="(action, index) in draft.actions" :key="index" draggable="true" @dragstart="startDraggingAction(index)" @dragover.prevent @drop="dropAction(index)">
-          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerIndex = index">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><label><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /> ms</label><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
+          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerIndex = index">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><div class="macro-action-time"><button title="减少 1 ms" @click="adjustActionDelay(index, -1)">−</button><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /><span>ms</span><button title="增加 1 ms" @click="adjustActionDelay(index, 1)">+</button></div><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
         </li>
       </ol>
+      <footer class="macro-add-footer"><button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="addKeyPair"><span>＋</span>添加按键</button></footer>
     </section>
 
     <MacroBindingDialog :open="bindingDialogOpen" :profile="profile" :assignments="assignments" :model-value="bindingCodes" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="bindingDialogOpen = false" @confirm="applyBindings" />

@@ -31,14 +31,22 @@ main {
   height: 100dvh;
   min-height: 0;
   display: grid;
-  grid-template-rows: 82px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
   overflow: hidden;
 }
 
 .topbar {
   position: relative;
   top: auto;
+  height: 64px;
+  padding-inline: 26px;
 }
+
+.topbar .brand { gap: 9px; }
+.topbar .brand-mark { width: 31px; height: 31px; font-size: 13px; }
+.topbar .brand strong { font-size: 13px; }
+.topbar .brand small { font-size: 7px; }
+.topbar .top-actions button { padding-block: 9px; }
 
 .hero {
   min-height: 0;
