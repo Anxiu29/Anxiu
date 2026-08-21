@@ -45,7 +45,13 @@ const boundPositionIds = computed(() => props.profile.positions.filter((position
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const unavailableActionCount = computed(() => !draft.value?.actionsAvailable ? draft.value?.storedActionCount ?? 0 : 0)
 // 宏列表收缩和执行模式压缩后，允许矩阵继续利用新增空间放大，而不是停在原来的 30px 上限。
-const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 42, minUnit: 10, horizontalPadding: 8, verticalPadding: 8 })
+const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, {
+  maxUnit: 42,
+  minUnit: 10,
+  // 画布自身还有间距、内边距和边框；预留完整空间可避免刚好多出几像素而出现滚动条。
+  horizontalPadding: 28,
+  verticalPadding: 24,
+})
 const bindingKeyboardHeight = computed(() => {
   const resolve = props.keyGeometry ?? matrixKeyGeometry
   const rowUnits = Math.max(...props.profile.positions.map((position) => {
