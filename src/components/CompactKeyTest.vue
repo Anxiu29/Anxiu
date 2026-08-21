@@ -1,56 +1,34 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { keyboardEventCodeToHidUsage } from '@/ui/keyboardEventCode'
 
 const props = defineProps<{ keyLabels: Record<number, string> }>()
-interface PressedKey { label: string; startedAt: number }
+const pressedCodes = ref(new Set<string>())
+const pressedLabel = ref('')
+const releasedLabel = ref('')
 
-const longPressThreshold = 500
-const pressed = ref(new Map<string, PressedKey>())
-const lastPressed = ref('')
-const clock = ref(Date.now())
-let clockTimer: number | undefined
-const displayLabel = computed(() => {
-  const active = [...pressed.value.values()].map((item) => {
-    const duration = clock.value - item.startedAt
-    return `${duration >= longPressThreshold ? '长按' : '点击'} · ${item.label}${duration >= longPressThreshold ? ` · ${(duration / 1000).toFixed(1)}s` : ''}`
-  })
-  return active.join(' + ') || lastPressed.value || '等待按键…'
-})
-
-function updatePressed(mutator: (next: Map<string, PressedKey>) => void) {
-  const next = new Map(pressed.value)
+function updatePressedCodes(mutator: (next: Set<string>) => void) {
+  const next = new Set(pressedCodes.value)
   mutator(next)
-  pressed.value = next
+  pressedCodes.value = next
 }
 function handleKeyDown(event: KeyboardEvent) {
   const usage = keyboardEventCodeToHidUsage(event.code)
   if (usage === undefined) return
   // 编辑输入框时只观察按键，不阻止用户输入；其他区域则拦截 F5、Tab 等浏览器默认动作。
   if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) event.preventDefault()
-  const label = props.keyLabels[usage] ?? event.key
-  if (pressed.value.has(event.code)) return
-  updatePressed((next) => next.set(event.code, { label, startedAt: Date.now() }))
-  startClock()
+  // 浏览器会为长按不断派发 repeat keydown；这里只记录第一次，避免再用时间阈值猜测点击/长按。
+  if (pressedCodes.value.has(event.code)) return
+  pressedLabel.value = props.keyLabels[usage] ?? event.key
+  updatePressedCodes((next) => next.add(event.code))
 }
 function handleKeyUp(event: KeyboardEvent) {
-  const item = pressed.value.get(event.code)
-  if (!item) return
-  const duration = Date.now() - item.startedAt
-  lastPressed.value = `${duration >= longPressThreshold ? '长按' : '点击'} · ${item.label}${duration >= longPressThreshold ? ` · ${(duration / 1000).toFixed(1)}s` : ''}`
-  updatePressed((next) => next.delete(event.code))
-  if (!pressed.value.size) stopClock()
+  const usage = keyboardEventCodeToHidUsage(event.code)
+  if (usage === undefined || !pressedCodes.value.has(event.code)) return
+  releasedLabel.value = props.keyLabels[usage] ?? event.key
+  updatePressedCodes((next) => next.delete(event.code))
 }
-function startClock() {
-  if (clockTimer !== undefined) return
-  clock.value = Date.now()
-  clockTimer = window.setInterval(() => { clock.value = Date.now() }, 50)
-}
-function stopClock() {
-  if (clockTimer !== undefined) window.clearInterval(clockTimer)
-  clockTimer = undefined
-}
-function releaseAll() { pressed.value = new Map(); stopClock() }
+function releaseAll() { pressedCodes.value = new Set() }
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown, true)
@@ -61,13 +39,23 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown, true)
   window.removeEventListener('keyup', handleKeyUp, true)
   window.removeEventListener('blur', releaseAll)
-  stopClock()
 })
 </script>
 
 <template>
-  <aside class="compact-key-test" :class="{ active: pressed.size > 0 }">
-    <span><i></i>按键测试</span>
-    <strong>{{ displayLabel }}</strong>
+  <aside class="compact-key-test">
+    <h3>按键测试</h3>
+    <section class="compact-key-event pressed" :class="{ active: pressedCodes.size > 0 }">
+      <span>按下的按键</span>
+      <strong v-if="pressedLabel">{{ pressedLabel }}</strong>
+      <div v-else class="compact-key-test-empty">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M17 21v-8a3 3 0 0 1 6 0v7-11a3 3 0 0 1 6 0v11-8a3 3 0 0 1 6 0v12l2-2a3 3 0 0 1 4 4l-9 12a9 9 0 0 1-7 3h-3a10 10 0 0 1-8-4L8 29a3 3 0 0 1 5-4l4 5v-9Z"/><path d="m8 12-4-2m8-5-2-4m9 3V0"/></svg>
+        <small>按下按键开始测试</small>
+      </div>
+    </section>
+    <section class="compact-key-event released">
+      <span>抬起的按键</span>
+      <strong v-if="releasedLabel">{{ releasedLabel }}</strong>
+    </section>
   </aside>
 </template>
