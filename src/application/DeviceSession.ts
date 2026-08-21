@@ -138,7 +138,23 @@ export class DeviceSession {
   async updateMacro(settings: MacroSettings) {
     if (!this.device.macro) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持宏设置', false, { details: { capability: 'macro' } })
     await this.device.macro.setMacro(settings)
-    return this.device.macro.getMacro(settings.sourceCode)
+    const verified = await this.device.macro.getMacro(settings.sourceCode)
+    const storedActionCount = verified.storedActionCount ?? verified.actions.length
+    const metadataMatches = verified.index === settings.index
+      && verified.mode === settings.mode
+      && verified.repeatCount === settings.repeatCount
+      && verified.repeatDelay === settings.repeatDelay
+      && storedActionCount === settings.actions.length
+    if (!metadataMatches) {
+      // 不能用设备回读值静默覆盖 UI，否则“写入 3、回读 1”看起来仍像保存成功。
+      throw new DriverError('VERIFY_FAILED', `宏设置未被设备完整接受：重复次数写入 ${settings.repeatCount}，设备回读 ${verified.repeatCount}`, true, {
+        details: {
+          expected: { index: settings.index, mode: settings.mode, repeatCount: settings.repeatCount, repeatDelay: settings.repeatDelay, actionCount: settings.actions.length },
+          actual: { index: verified.index, mode: verified.mode, repeatCount: verified.repeatCount, repeatDelay: verified.repeatDelay, actionCount: storedActionCount },
+        },
+      })
+    }
+    return verified
   }
 
   async deleteMacroBinding(sourceCode: number) {

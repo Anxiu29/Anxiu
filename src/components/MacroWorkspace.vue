@@ -182,7 +182,7 @@ onBeforeUnmount(stopRecording)
     </aside>
 
     <section class="macro-options">
-      <header><h2>宏设置</h2></header>
+      <header><h2>宏设置</h2><p>设置完后记得点击保存。</p></header>
       <strong>执行模式</strong>
       <div class="macro-mode-grid">
         <button v-for="option in modeOptions" :key="option.value" class="macro-mode-card" :class="{ active: draft?.mode === option.value }" @click="draft && (draft.mode = option.value)"><i></i><span><b>{{ option.title }}</b><small>{{ option.description }}</small></span></button>
