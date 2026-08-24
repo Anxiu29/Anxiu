@@ -1,6 +1,6 @@
 import { DriverError } from '@/application/DriverError'
 import type { DeviceTransport } from '@/application/ports'
-import { decodePacket, encodePacket, type CrcStrategy, type ProtocolPacket } from '../codec'
+import { decodePacket, encodePacket, PACKET_HEAD, type CrcStrategy, type ProtocolPacket } from '../codec'
 import { XSYD_FAILURE_RESPONSE, type CommandDefinition } from './commands'
 
 interface PendingRequest {
@@ -11,6 +11,8 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>
   expectedResponses: number
   responses: Uint8Array[]
+  /** 长响应的协议帧会被 HID 拆成若干个无独立包头的 64 字节分片。 */
+  fragmented?: { bytes: number[]; totalLength?: number }
 }
 
 export class XsydCommandClient {
@@ -70,6 +72,29 @@ export class XsydCommandClient {
   }
 
   /**
+   * 读取一个跨多个 HID report 的长协议帧。
+   *
+   * 0x12 响应的 length 为 128/130；只有第一片带 5C/length/cmd/crc，后续片
+   * 是原始数据续片，不能分别交给 decodePacket。这里先按 length 拼回完整帧，
+   * 再统一做命令匹配和 CRC 校验。
+   */
+  requestFragmented(definition: CommandDefinition, data: Uint8Array, timeoutMs = definition.timeoutMs): Promise<Uint8Array> {
+    if (this.closed) return Promise.reject(new DriverError('DEVICE_NOT_CONNECTED', '设备会话已关闭'))
+    const operation = () => new Promise<Uint8Array>(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending = undefined
+        reject(new DriverError('PROTOCOL_TIMEOUT', `设备分片响应超时（${definition.name}）`, true))
+      }, timeoutMs)
+      this.pending = { definition, resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [] } }
+      try { await this.transport.send(encodePacket(definition.code, data, this.crc)) }
+      catch (error) { clearTimeout(timer); this.pending = undefined; reject(error instanceof Error ? error : new Error(String(error))) }
+    })
+    const result = this.queue.then(operation, operation)
+    this.queue = result.catch(() => undefined)
+    return result
+  }
+
+  /**
    * 命令响应由 request 消费；没有对应请求的主动上报从这里交给设备协议解释。
    * 命令客户端只负责分流，不在公共层解释某款键盘的主动包含义。
    */
@@ -93,6 +118,10 @@ export class XsydCommandClient {
   private handleReport(report: Uint8Array) {
     const pending = this.pending
     try {
+      if (pending?.fragmented) {
+        this.handleFragment(report, pending)
+        return
+      }
       const packet = decodePacket(report, this.crc)
       // 空闲时收到的合法包是设备主动上报，不能丢弃，否则硬件侧状态变化无法同步到 UI。
       if (!pending) {
@@ -129,6 +158,26 @@ export class XsydCommandClient {
       if (this.pending === pending) this.pending = undefined
       pending.reject(error instanceof Error ? error : new Error(String(error)))
     }
+  }
+
+  private handleFragment(report: Uint8Array, pending: PendingRequest) {
+    const fragmented = pending.fragmented!
+    if (fragmented.bytes.length === 0) {
+      if (report[0] !== PACKET_HEAD) throw new DriverError('PROTOCOL_REJECTED', '分片响应缺少协议包头')
+      // 等待目标命令时仍可能收到硬件主动上报；完整普通包应继续交给通知监听器。
+      if (report[2] !== pending.definition.responseCode) {
+        this.emitNotification(decodePacket(report, this.crc))
+        return
+      }
+      fragmented.totalLength = 4 + (report[1] ?? 0)
+    }
+    fragmented.bytes.push(...report)
+    if (fragmented.bytes.length < fragmented.totalLength!) return
+
+    const packet = decodePacket(Uint8Array.from(fragmented.bytes.slice(0, fragmented.totalLength)), this.crc)
+    clearTimeout(pending.timer)
+    if (this.pending === pending) this.pending = undefined
+    pending.resolve(packet.data)
   }
 
   private emitNotification(packet: ProtocolPacket) {

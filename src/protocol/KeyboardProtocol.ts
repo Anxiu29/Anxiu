@@ -20,7 +20,7 @@ import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacro
 import type { KeyPerformanceSettings, PerformanceMode, PollingRate } from '@/domain/performance'
 import { validatePerformanceSettings } from '@/domain/performance'
 import { decodeGlobalPerformance, encodeGlobalPerformance } from './xsyd/performanceCodec'
-import { decodeTravelHalf, encodeTravelRequest } from './xsyd/travelCodec'
+import { decodeTravelHalf, encodeTravelRequest, encodeTravelStateRequest } from './xsyd/travelCodec'
 
 const ADVANCED_LAYOUT = {
   db0: 0x04, db1: 0x05, db2: 0x06, mode: 0x08,
@@ -283,9 +283,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async getTravelMatrix() {
-    // 每一半矩阵包含 3×21 个 uint16，固件固定拆成三个响应包。
-    const first = decodeTravelHalf(await this.commands.requestMultiple(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(1), 3))
-    const second = decodeTravelHalf(await this.commands.requestMultiple(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(2), 3))
+    // 官方抓包顺序为 matrix=2 的分页数据后紧跟 matrix=3 状态页；两者都是跨三个 HID report 的长帧。
+    const first = decodeTravelHalf(await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(1)))
+    await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelStateRequest())
+    const second = decodeTravelHalf(await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(2)))
+    await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelStateRequest())
     return [...first, ...second]
   }
 
