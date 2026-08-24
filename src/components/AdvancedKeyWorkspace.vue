@@ -63,12 +63,12 @@ const keyPickerValue = computed(() => {
 })
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
-// 固件只保存两个 DKS 行程；松开过程按相反方向经过同一组位置，因此四阶段采用 1、2、2、1 镜像显示。
+// 固件只保存两个 DKS 行程；返回过程按相反方向经过同一组位置，因此四阶段采用 1、2、2、1 镜像显示。
 const dksPhases = [
-  { direction: 'down', symbol: '↓', travelIndex: 0, editable: true, label: '按下阶段 1' },
-  { direction: 'down', symbol: '↓', travelIndex: 1, editable: true, label: '按下阶段 2' },
-  { direction: 'up', symbol: '↑', travelIndex: 1, editable: false, label: '抬起阶段 2' },
-  { direction: 'up', symbol: '↑', travelIndex: 0, editable: false, label: '抬起阶段 1' },
+  { direction: 'down', symbol: '↓', travelIndex: 0, editable: true, label: '阶段 1' },
+  { direction: 'down', symbol: '↓', travelIndex: 1, editable: true, label: '阶段 2' },
+  { direction: 'up', symbol: '↑', travelIndex: 1, editable: false, label: '阶段 3' },
+  { direction: 'up', symbol: '↑', travelIndex: 0, editable: false, label: '阶段 4' },
 ] as const
 onMounted(() => {
   // 页面每次进入都请求 Store 同步设备 MODE；Store 会合并在途请求并批量读取，不会逐键重复查询。
@@ -98,7 +98,7 @@ function updateTravel(index: number, value: string) {
   if (!draft.value || !('travels' in draft.value)) return
   draft.value.travels[index] = Number(value)
 }
-// 官方驱动把完整下压/回弹划成 7 个状态点。中间触底点在协议中占 bit3、bit4，
+// 官方驱动把一次完整行程划成 7 个状态点。中间点在协议中占 bit3、bit4，
 // 因此不能把一个可见阶段误当成相邻的 2 bit；四个大阶段对应状态点 0、2、4、6。
 const DKS_POINT_MASKS = [0x01, 0x02, 0x04, 0x18, 0x20, 0x40, 0x80] as const
 const DKS_PHASE_POINTS = [0, 2, 4, 6] as const
@@ -141,7 +141,7 @@ function clearContinuousSegment(row: number, phase: number) {
 }
 function cycleTrigger(row: number, phase: number) {
   if (draft.value?.type !== 'dks') return
-  // 单独选中一个状态点会在进入下一状态点时自然抬起，形成一次完整单击。
+  // 单独选中一个状态点会在进入下一状态点时结束，形成一次完整单击。
   if (clearContinuousSegment(row, phase)) return
   const point = DKS_PHASE_POINTS[phase]!
   setTriggerPoint(row, point, !triggerPointSelected(row, point))
@@ -245,7 +245,7 @@ function deleteCurrentAdvancedKey() {
                   </div>
                 </template>
               </div>
-              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：在该阶段触发一次完整点击</p><p>再次单击：取消该阶段触发</p><p>按住并横向拖动：所经过的状态点连续保持按下</p><p>上方行程按 ↓↓↑↑ 镜像经过两个触发位置</p></aside>
+              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：选择一个独立触发点</p><p>再次单击：取消该触发点</p><p>按住并横向拖动：连接所经过的状态点</p><p>上方行程按 ↓↓↑↑ 镜像经过两个触发位置</p></aside>
             </div>
           </template>
 

@@ -15,9 +15,17 @@ const sameNumbers = (left: readonly number[], right: readonly number[], toleranc
 /** 比较“请求写入值”和“设备实际回读值”，防止用旧值覆盖界面后仍提示验证成功。 */
 function advancedKeyMatches(expected: Exclude<AdvancedKeySettings, { type: 'none' }>, actual: AdvancedKeySettings) {
   if (expected.type !== actual.type || expected.sourceCode !== actual.sourceCode) return false
-  if (expected.type === 'dks' && actual.type === 'dks') return sameNumbers(expected.keyCodes, actual.keyCodes)
-    && sameNumbers(expected.triggers, actual.triggers)
-    && sameNumbers(expected.travels, actual.travels, 0.001)
+  if (expected.type === 'dks' && actual.type === 'dks') {
+    const firstTravelMatches = sameNumbers(expected.travels.slice(0, 1), actual.travels.slice(0, 1), 0.001)
+    // 设备会把 3.5 mm 这类理论最大值收窄到当前轴体的实际校准上限。
+    // 只接受“接近上限且向下收窄”的情况，普通行程不一致仍必须报错。
+    const maximumTravelMatches = Math.abs(expected.travels[1] - actual.travels[1]) <= 0.001
+      || expected.travels[1] >= 3.3 && actual.travels[1] <= expected.travels[1] && expected.travels[1] - actual.travels[1] <= 0.1
+    return sameNumbers(expected.keyCodes, actual.keyCodes)
+      && sameNumbers(expected.triggers, actual.triggers)
+      && firstTravelMatches
+      && maximumTravelMatches
+  }
   if (expected.type === 'mpt' && actual.type === 'mpt') return sameNumbers(expected.keyCodes, actual.keyCodes)
     && sameNumbers(expected.travels, actual.travels, 0.001)
   if (expected.type === 'mt' && actual.type === 'mt') return sameNumbers(expected.keyCodes, actual.keyCodes) && expected.delay === actual.delay

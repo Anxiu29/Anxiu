@@ -13,7 +13,7 @@ export interface DksAdvancedKey extends AdvancedKeyBase {
   keyCodes: [number, number, number, number]
   /** 四个 TRPS 触发掩码，协议按 1 字节保存。 */
   triggers: [number, number, number, number]
-  /** 按下和抬起行程，UI 与领域层统一使用 mm。 */
+  /** 两个 DKS 触发位置，UI 与领域层统一使用 mm。 */
   travels: [number, number]
 }
 export interface MptAdvancedKey extends AdvancedKeyBase {
@@ -54,7 +54,8 @@ export function cloneAdvancedKeySettings(value: AdvancedKeySettings): AdvancedKe
 
 /** 切换类型时提供可编辑初值；真正设备状态仍须通过 getAdvancedKey 回读。 */
 export function createAdvancedKeySettings(type: Exclude<AdvancedKeyType, 'none'>, sourceCode: number, fallbackKeyCode: number): Exclude<AdvancedKeySettings, NoAdvancedKey> {
-  if (type === 'dks') return { type, sourceCode, keyCodes: [fallbackKeyCode, 0, 0, 0], triggers: [0, 0, 0, 0], travels: [0.5, 3.5] }
+  // 与设备官方默认值保持一致，避免使用理论最大值 3.5 mm 时被轴体校准上限再次收窄。
+  if (type === 'dks') return { type, sourceCode, keyCodes: [fallbackKeyCode, 0, 0, 0], triggers: [0, 0, 0, 0], travels: [1.4, 3] }
   if (type === 'mpt') return { type, sourceCode, keyCodes: [fallbackKeyCode, 0, 0], travels: [0.5, 2, 3.5] }
   if (type === 'mt') return { type, sourceCode, keyCodes: [fallbackKeyCode, fallbackKeyCode], delay: 200 }
   if (type === 'tgl') return { type, sourceCode, keyCode: fallbackKeyCode, delay: 200 }
