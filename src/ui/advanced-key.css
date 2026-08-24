@@ -304,8 +304,6 @@
 
 .dks-trigger-cell.single { width: 38px; border-color: #7ce9d9; border-radius: 999px; color: #071310; background: var(--cyan); }
 .dks-trigger-cell.continuous { width: 26px; border-color: #f4f5f5; background: #f4f5f5; box-shadow: none; }
-.dks-auto-tap { display: flex; align-items: center; justify-content: center; gap: 1px; font-size: 13px; font-weight: 700; }
-.dks-auto-tap i { font-style: normal; line-height: 1; }
 .dks-help { padding: 16px 18px; border-radius: 9px; color: #d4dce4; background: rgba(255, 255, 255, .055); }
 .dks-help strong { display: block; margin-bottom: 10px; font-size: 12px; }
 .dks-help p { margin: 6px 0; color: #aeb9c4; font-size: 10px; line-height: 1.45; }

@@ -8,6 +8,27 @@ import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 
+const wait = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds))
+const sameNumbers = (left: readonly number[], right: readonly number[], tolerance = 0) => left.length === right.length
+  && left.every((value, index) => Math.abs(value - right[index]!) <= tolerance)
+
+/** 比较“请求写入值”和“设备实际回读值”，防止用旧值覆盖界面后仍提示验证成功。 */
+function advancedKeyMatches(expected: Exclude<AdvancedKeySettings, { type: 'none' }>, actual: AdvancedKeySettings) {
+  if (expected.type !== actual.type || expected.sourceCode !== actual.sourceCode) return false
+  if (expected.type === 'dks' && actual.type === 'dks') return sameNumbers(expected.keyCodes, actual.keyCodes)
+    && sameNumbers(expected.triggers, actual.triggers)
+    && sameNumbers(expected.travels, actual.travels, 0.001)
+  if (expected.type === 'mpt' && actual.type === 'mpt') return sameNumbers(expected.keyCodes, actual.keyCodes)
+    && sameNumbers(expected.travels, actual.travels, 0.001)
+  if (expected.type === 'mt' && actual.type === 'mt') return sameNumbers(expected.keyCodes, actual.keyCodes) && expected.delay === actual.delay
+  if (expected.type === 'socd' && actual.type === 'socd') return expected.pairedSourceCode === actual.pairedSourceCode
+    && sameNumbers(expected.keyCodes, actual.keyCodes) && expected.mode === actual.mode && expected.delay === actual.delay
+  if ((expected.type === 'tgl' && actual.type === 'tgl') || (expected.type === 'end' && actual.type === 'end')) {
+    return expected.keyCode === actual.keyCode && expected.delay === actual.delay
+  }
+  return false
+}
+
 export class DeviceSession {
   // original 是最近一次已验证的设备状态；draft 是允许 UI 修改的工作副本。
   profile?: KeyboardProfile
@@ -138,11 +159,23 @@ export class DeviceSession {
     return this.device.advancedKey.getAdvancedKeyTypes(sourceCodes)
   }
 
-  /** 高级键是单键即时事务：写入后立即回读，UI 始终展示固件实际接受的值。 */
+  /** 高级键写入后等待固件落盘并回读；回读不一致时保留 UI 草稿并明确报错。 */
   async updateAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
     if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
     await this.device.advancedKey.setAdvancedKey(settings)
-    return this.device.advancedKey.getAdvancedKey(settings.sourceCode)
+    let verified: AdvancedKeySettings = { type: 'none', sourceCode: settings.sourceCode }
+    // 0x26 的响应只表示报文已接收，个别固件的 Layout_DB3 会稍后才更新，因此允许短暂重试。
+    for (const delay of [60, 100, 160]) {
+      await wait(delay)
+      verified = await this.device.advancedKey.getAdvancedKey(settings.sourceCode)
+      if (advancedKeyMatches(settings, verified)) return verified
+    }
+    const travelDetails = settings.type === 'dks' && verified.type === 'dks'
+      ? `：请求 ${settings.travels.join(' / ')} mm，设备回读 ${verified.travels.join(' / ')} mm`
+      : ''
+    throw new DriverError('VERIFY_FAILED', `高级键设置未被设备完整接受${travelDetails}`, true, {
+      details: { expected: settings, actual: verified },
+    })
   }
 
   async deleteAdvancedKey(sourceCode: number) {

@@ -98,43 +98,53 @@ function updateTravel(index: number, value: string) {
   if (!draft.value || !('travels' in draft.value)) return
   draft.value.travels[index] = Number(value)
 }
-function triggerBits(row: number, phase: number) {
+// 官方驱动把完整下压/回弹划成 7 个状态点。中间触底点在协议中占 bit3、bit4，
+// 因此不能把一个可见阶段误当成相邻的 2 bit；四个大阶段对应状态点 0、2、4、6。
+const DKS_POINT_MASKS = [0x01, 0x02, 0x04, 0x18, 0x20, 0x40, 0x80] as const
+const DKS_PHASE_POINTS = [0, 2, 4, 6] as const
+function triggerPointSelected(row: number, point: number) {
   if (draft.value?.type !== 'dks') return 0
-  // 每格 2 bit 是两个真实键盘事件：bit0=按下、bit1=抬起，11 才是同一区域完整单击。
-  return (draft.value.triggers[row]! >> (phase * 2)) & 0x03
+  const mask = DKS_POINT_MASKS[point]!
+  return (draft.value.triggers[row]! & mask) === mask
 }
-function cycleTrigger(row: number, phase: number) {
+function phaseSelected(row: number, phase: number) {
+  return triggerPointSelected(row, DKS_PHASE_POINTS[phase]!)
+}
+function setTriggerPoint(row: number, point: number, selected: boolean) {
   if (draft.value?.type !== 'dks') return
-  const current = triggerBits(row, phase)
-  clearContinuousSegment(row, phase)
-  setTriggerBits(row, phase, current === 3 ? 0 : 3)
+  const mask = DKS_POINT_MASKS[point]!
+  draft.value.triggers[row] = selected
+    ? draft.value.triggers[row]! | mask
+    : draft.value.triggers[row]! & ~mask
 }
-function setTriggerBits(row: number, phase: number, state: 0 | 1 | 2 | 3) {
-  if (draft.value?.type !== 'dks') return
-  const shift = phase * 2
-  draft.value.triggers[row] = (draft.value.triggers[row]! & ~(0x03 << shift)) | (state << shift)
-}
-function continuousSegments(row: number) {
+function selectedPointRuns(row: number) {
   const segments: { start: number; end: number }[] = []
   let start: number | undefined
-  for (let phase = 0; phase < 4; phase += 1) {
-    const bits = triggerBits(row, phase)
-    if (bits === 1) start = phase
-    else if (bits === 2 && start !== undefined) {
-      segments.push({ start, end: phase })
+  for (let point = 0; point < DKS_POINT_MASKS.length; point += 1) {
+    if (triggerPointSelected(row, point)) start ??= point
+    if (start !== undefined && (!triggerPointSelected(row, point + 1) || point === DKS_POINT_MASKS.length - 1)) {
+      segments.push({ start, end: point })
       start = undefined
     }
   }
   return segments
 }
 function isContinuousPhase(row: number, phase: number) {
-  return continuousSegments(row).some(({ start, end }) => phase >= start && phase <= end)
+  const point = DKS_PHASE_POINTS[phase]!
+  return selectedPointRuns(row).some(({ start, end }) => end > start && point >= start && point <= end)
 }
 function clearContinuousSegment(row: number, phase: number) {
-  const segment = continuousSegments(row).find(({ start, end }) => phase >= start && phase <= end)
-  if (!segment) return
-  setTriggerBits(row, segment.start, 0)
-  setTriggerBits(row, segment.end, 0)
+  const point = DKS_PHASE_POINTS[phase]!
+  const segment = selectedPointRuns(row).find(({ start, end }) => end > start && point >= start && point <= end)
+  if (segment) for (let index = segment.start; index <= segment.end; index += 1) setTriggerPoint(row, index, false)
+  return Boolean(segment)
+}
+function cycleTrigger(row: number, phase: number) {
+  if (draft.value?.type !== 'dks') return
+  // 单独选中一个状态点会在进入下一状态点时自然抬起，形成一次完整单击。
+  if (clearContinuousSegment(row, phase)) return
+  const point = DKS_PHASE_POINTS[phase]!
+  setTriggerPoint(row, point, !triggerPointSelected(row, point))
 }
 function startTriggerDrag(row: number, phase: number) {
   triggerDrag.value = { row, startPhase: phase, endPhase: phase, moved: false }
@@ -151,14 +161,9 @@ function finishTriggerDrag() {
 
   const first = Math.min(drag.startPhase, drag.endPhase)
   const last = Math.max(drag.startPhase, drag.endPhase)
-  // 连续区域只在起点写按下(01)、终点写抬起(10)；中间保持按住，不能每格都写完整单击(11)。
+  // 连续触发需要把两个可见阶段之间的隐藏状态点一并选中；状态连续为 1 时固件保持按住。
   for (let phase = first; phase <= last; phase += 1) clearContinuousSegment(drag.row, phase)
-  for (let phase = first; phase <= last; phase += 1) setTriggerBits(drag.row, phase, 0)
-  if (first === last) setTriggerBits(drag.row, first, 3)
-  else {
-    setTriggerBits(drag.row, first, 1)
-    setTriggerBits(drag.row, last, 2)
-  }
+  for (let point = DKS_PHASE_POINTS[first]!; point <= DKS_PHASE_POINTS[last]!; point += 1) setTriggerPoint(drag.row, point, true)
   ignoreTriggerClick.value = true
   // pointerup 后浏览器会紧接着派发 click；下一轮事件循环再复位，也能覆盖在格外松手、没有 click 的情况。
   window.setTimeout(() => { ignoreTriggerClick.value = false }, 0)
@@ -236,11 +241,11 @@ function deleteCurrentAdvancedKey() {
                 <template v-for="(keyCode, row) in draft.keyCodes" :key="row">
                   <button class="advanced-key-value compact" type="button" @click="openKeyPicker({ kind: 'keyCodes', index: row })"><span>{{ keyLabel(keyCode) }}</span><small>键值 {{ row + 1 }}</small></button>
                   <div v-for="phase in 4" :key="phase" class="dks-trigger-slot" :class="{ continuous: isContinuousPhase(row, phase - 1), 'connected-next': phase < 4 && isContinuousPhase(row, phase - 1) && isContinuousPhase(row, phase) }">
-                    <button class="dks-trigger-cell" :class="{ single: triggerBits(row, phase - 1) === 3, continuous: isContinuousPhase(row, phase - 1) }" type="button" :title="triggerBits(row, phase - 1) === 3 ? '自动按下并抬起' : isContinuousPhase(row, phase - 1) ? '连续按住区域' : '未触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)"><span v-if="triggerBits(row, phase - 1) === 0 && !isContinuousPhase(row, phase - 1)">+</span><span v-else-if="triggerBits(row, phase - 1) === 3" class="dks-auto-tap" aria-label="自动按下并抬起"><i>↓</i><i>↑</i></span></button>
+                    <button class="dks-trigger-cell" :class="{ single: phaseSelected(row, phase - 1) && !isContinuousPhase(row, phase - 1), continuous: isContinuousPhase(row, phase - 1) }" type="button" :title="phaseSelected(row, phase - 1) && !isContinuousPhase(row, phase - 1) ? '单次触发' : isContinuousPhase(row, phase - 1) ? '连续按住区域' : '未触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)">{{ !phaseSelected(row, phase - 1) && !isContinuousPhase(row, phase - 1) ? '+' : phaseSelected(row, phase - 1) && !isContinuousPhase(row, phase - 1) ? '●' : '' }}</button>
                   </div>
                 </template>
               </div>
-              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：自动生成一次完整按下和抬起</p><p>再次单击：取消该区域触发</p><p>按住并横向拖动：起点按下、终点抬起</p><p>上方行程按 ↓↓↑↑ 镜像经过两个触发位置</p></aside>
+              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：在该阶段触发一次完整点击</p><p>再次单击：取消该阶段触发</p><p>按住并横向拖动：所经过的状态点连续保持按下</p><p>上方行程按 ↓↓↑↑ 镜像经过两个触发位置</p></aside>
             </div>
           </template>
 
