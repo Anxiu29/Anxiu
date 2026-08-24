@@ -63,6 +63,13 @@ const keyPickerValue = computed(() => {
 })
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
+// 固件只保存两个 DKS 行程；松开过程按相反方向经过同一组位置，因此四阶段采用 1、2、2、1 镜像显示。
+const dksPhases = [
+  { direction: 'down', symbol: '↓', travelIndex: 0, editable: true, label: '按下阶段 1' },
+  { direction: 'down', symbol: '↓', travelIndex: 1, editable: true, label: '按下阶段 2' },
+  { direction: 'up', symbol: '↑', travelIndex: 1, editable: false, label: '抬起阶段 2' },
+  { direction: 'up', symbol: '↑', travelIndex: 0, editable: false, label: '抬起阶段 1' },
+] as const
 onMounted(() => {
   // 页面每次进入都请求 Store 同步设备 MODE；Store 会合并在途请求并批量读取，不会逐键重复查询。
   emit('load-all')
@@ -221,20 +228,19 @@ function deleteCurrentAdvancedKey() {
             <div class="dks-editor">
               <div class="dks-matrix">
                 <span class="dks-corner">输出键值</span>
-                <div v-for="(phase, phaseIndex) in ['按下', '触底', '抬起', '复位']" :key="phase" class="dks-phase-heading">
-                  <strong>{{ phase }}</strong>
-                  <label v-if="phaseIndex === 0"><input type="number" min="0" max="4" step="0.1" :value="draft.travels[0]" @input="updateTravel(0, ($event.target as HTMLInputElement).value)" /> mm</label>
-                  <label v-else-if="phaseIndex === 2"><input type="number" min="0" max="4" step="0.1" :value="draft.travels[1]" @input="updateTravel(1, ($event.target as HTMLInputElement).value)" /> mm</label>
-                  <small v-else>{{ draft.travels[1].toFixed(2) }} mm</small>
+                <div v-for="(phase, phaseIndex) in dksPhases" :key="phase.label" class="dks-phase-heading" :class="phase.direction" :aria-label="phase.label">
+                  <strong aria-hidden="true">{{ phase.symbol }}</strong>
+                  <label v-if="phase.editable"><input type="number" min="0" max="4" step="0.1" :aria-label="`${phase.label}行程`" :value="draft.travels[phase.travelIndex]" @input="updateTravel(phase.travelIndex, ($event.target as HTMLInputElement).value)" /><span>mm</span></label>
+                  <small v-else>{{ draft.travels[phase.travelIndex].toFixed(1) }} mm</small>
                 </div>
                 <template v-for="(keyCode, row) in draft.keyCodes" :key="row">
                   <button class="advanced-key-value compact" type="button" @click="openKeyPicker({ kind: 'keyCodes', index: row })"><span>{{ keyLabel(keyCode) }}</span><small>键值 {{ row + 1 }}</small></button>
                   <div v-for="phase in 4" :key="phase" class="dks-trigger-slot" :class="{ continuous: isContinuousPhase(row, phase - 1), 'connected-next': phase < 4 && isContinuousPhase(row, phase - 1) && isContinuousPhase(row, phase) }">
-                    <button class="dks-trigger-cell" :class="{ single: triggerBits(row, phase - 1) === 3, continuous: isContinuousPhase(row, phase - 1) }" type="button" :title="triggerBits(row, phase - 1) === 3 ? '完整按下并抬起' : isContinuousPhase(row, phase - 1) ? '连续按住区域' : '未触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)">{{ triggerBits(row, phase - 1) === 0 && !isContinuousPhase(row, phase - 1) ? '+' : triggerBits(row, phase - 1) === 3 ? '●' : '' }}</button>
+                    <button class="dks-trigger-cell" :class="{ single: triggerBits(row, phase - 1) === 3, continuous: isContinuousPhase(row, phase - 1) }" type="button" :title="triggerBits(row, phase - 1) === 3 ? '自动按下并抬起' : isContinuousPhase(row, phase - 1) ? '连续按住区域' : '未触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)"><span v-if="triggerBits(row, phase - 1) === 0 && !isContinuousPhase(row, phase - 1)">+</span><span v-else-if="triggerBits(row, phase - 1) === 3" class="dks-auto-tap" aria-label="自动按下并抬起"><i>↓</i><i>↑</i></span></button>
                   </div>
                 </template>
               </div>
-              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：在该区域完整按下并抬起一次</p><p>再次单击：取消该区域触发</p><p>按住并横向拖动：起点按下、终点抬起</p><p>连续区域中间会保持按住，不重复触发</p></aside>
+              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：自动生成一次完整按下和抬起</p><p>再次单击：取消该区域触发</p><p>按住并横向拖动：起点按下、终点抬起</p><p>上方行程按 ↓↓↑↑ 镜像经过两个触发位置</p></aside>
             </div>
           </template>
 
