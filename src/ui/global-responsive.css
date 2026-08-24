@@ -7,8 +7,7 @@
 .category-tabs,
 .extended-category-tabs,
 .picker-modes,
-.requirements,
-.key-test-records {
+.requirements {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
@@ -17,8 +16,7 @@
 
 .category-tabs,
 .picker-modes,
-.requirements,
-.key-test-records { flex-wrap: nowrap; }
+.requirements { flex-wrap: nowrap; }
 
 .lighting-dashboard {
   overflow-x: auto;
