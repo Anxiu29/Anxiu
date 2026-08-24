@@ -38,7 +38,7 @@
 .key-test-history > header small,
 .key-test-history > header span { color: #75808d; font-size: 11px; }
 .key-test-history > header span { color: var(--cyan); }
-.key-test-records { margin-top: 14px; padding-bottom: 5px; display: flex; align-items: flex-start; gap: 9px; overflow-x: auto; overflow-y: hidden; }
+.key-test-records { max-height: calc(100% - 32px); margin-top: 14px; padding: 0 4px 5px 0; display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: 9px; overflow-x: hidden; overflow-y: auto; }
 .key-test-records article { min-width: 208px; padding: 12px 13px; display: grid; gap: 6px; border: 1px solid #2a3440; border-radius: 7px; background: #0c1117; }
 .key-test-records article.unmatched { opacity: .55; }
 .key-test-records article > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
