@@ -6,7 +6,8 @@ const props = defineProps<{ keyLabels: Record<number, string> }>()
 const pressedCodes = ref(new Set<string>())
 const pressedKeys = ref(new Map<string, string>())
 const releasedKeys = ref(new Map<string, string>())
-let clearTimer: number | undefined
+const pressedTimers = new Map<string, number>()
+const releasedTimers = new Map<string, number>()
 
 function updatePressedCodes(mutator: (next: Set<string>) => void) {
   const next = new Set(pressedCodes.value)
@@ -20,17 +21,19 @@ function updateKeyMap(target: typeof pressedKeys, code: string, label: string) {
   next.set(code, label)
   target.value = next
 }
-function cancelPendingClear() {
-  if (clearTimer !== undefined) window.clearTimeout(clearTimer)
-  clearTimer = undefined
+function removeKeyAfter(target: typeof pressedKeys, timers: Map<string, number>, code: string, delay: number) {
+  const previous = timers.get(code)
+  if (previous !== undefined) window.clearTimeout(previous)
+  timers.set(code, window.setTimeout(() => {
+    const next = new Map(target.value)
+    next.delete(code)
+    target.value = next
+    timers.delete(code)
+  }, delay))
 }
-function scheduleClear() {
-  cancelPendingClear()
-  clearTimer = window.setTimeout(() => {
-    pressedKeys.value = new Map()
-    releasedKeys.value = new Map()
-    clearTimer = undefined
-  }, 2000)
+function clearTimers(timers: Map<string, number>) {
+  timers.forEach((timer) => window.clearTimeout(timer))
+  timers.clear()
 }
 function handleKeyDown(event: KeyboardEvent) {
   const usage = keyboardEventCodeToHidUsage(event.code)
@@ -39,21 +42,19 @@ function handleKeyDown(event: KeyboardEvent) {
   if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) event.preventDefault()
   // 浏览器会为长按不断派发 repeat keydown；这里只记录第一次，避免再用时间阈值猜测点击/长按。
   if (pressedCodes.value.has(event.code)) return
-  cancelPendingClear()
   updateKeyMap(pressedKeys, event.code, props.keyLabels[usage] ?? event.key)
+  removeKeyAfter(pressedKeys, pressedTimers, event.code, 500)
   updatePressedCodes((next) => next.add(event.code))
 }
 function handleKeyUp(event: KeyboardEvent) {
   const usage = keyboardEventCodeToHidUsage(event.code)
   if (usage === undefined || !pressedCodes.value.has(event.code)) return
   updateKeyMap(releasedKeys, event.code, props.keyLabels[usage] ?? event.key)
+  removeKeyAfter(releasedKeys, releasedTimers, event.code, 2000)
   updatePressedCodes((next) => next.delete(event.code))
-  // 一组组合键全部抬起后保留结果两秒，便于观察；继续输入会取消本次清空。
-  if (!pressedCodes.value.size) scheduleClear()
 }
 function releaseAll() {
   pressedCodes.value = new Set()
-  if (pressedKeys.value.size || releasedKeys.value.size) scheduleClear()
 }
 
 onMounted(() => {
@@ -65,7 +66,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown, true)
   window.removeEventListener('keyup', handleKeyUp, true)
   window.removeEventListener('blur', releaseAll)
-  cancelPendingClear()
+  clearTimers(pressedTimers)
+  clearTimers(releasedTimers)
 })
 </script>
 

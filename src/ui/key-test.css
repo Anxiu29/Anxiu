@@ -38,10 +38,14 @@
 .key-test-history > header span { color: #75808d; font-size: 9px; }
 .key-test-history > header span { color: var(--cyan); }
 .key-test-records { margin-top: 12px; padding-bottom: 4px; display: flex; gap: 7px; overflow-x: auto; overflow-y: hidden; }
-.key-test-records article { min-width: 104px; padding: 9px 10px; display: grid; gap: 3px; border: 1px solid #2a3440; border-radius: 6px; background: #0c1117; }
+.key-test-records article { min-width: 168px; padding: 9px 10px; display: grid; gap: 4px; border: 1px solid #2a3440; border-radius: 6px; background: #0c1117; }
 .key-test-records article.unmatched { opacity: .55; }
+.key-test-records article > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .key-test-records strong { color: #e5ebf0; font-size: 12px; }
-.key-test-records code { color: var(--cyan); font-size: 9px; }
+.key-test-records b { padding: 2px 5px; border-radius: 3px; color: #8ff3e4; background: rgba(69, 230, 208, .12); font-size: 8px; }
+.key-test-records article.up b { color: #9fc4ff; background: rgba(96, 155, 255, .13); }
+.key-test-records code { color: var(--cyan); font-size: 10px; }
+.key-test-records article.up code { color: #9fc4ff; }
 .key-test-records small { color: #66727f; font-size: 8px; }
 .key-test-empty { height: 88px; display: grid; place-items: center; color: #596573; font-size: 11px; }
 
