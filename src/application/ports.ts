@@ -2,6 +2,7 @@ import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfil
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
+import type { KeyPerformanceSettings } from '@/domain/performance'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -71,6 +72,11 @@ export interface MacroCapability {
   deleteMacroBinding(sourceCode: number): Promise<void>
 }
 
+export interface PerformanceCapability {
+  getPerformance(sourceCode: number): Promise<KeyPerformanceSettings>
+  setPerformance(settings: KeyPerformanceSettings): Promise<void>
+}
+
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */
 export interface KeyboardDevice {
   readonly profile: DeviceProfileCapability
@@ -83,5 +89,6 @@ export interface KeyboardDevice {
   readonly customLighting?: CustomLightingCapability
   readonly advancedKey?: AdvancedKeyCapability
   readonly macro?: MacroCapability
+  readonly performance?: PerformanceCapability
   close(): void
 }

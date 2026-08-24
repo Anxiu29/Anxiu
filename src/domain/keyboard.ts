@@ -60,6 +60,8 @@ export interface DeviceCapabilities {
   advancedKey?: boolean
   /** true 时设备提供宏录制、槽位和物理键绑定能力。 */
   macro?: boolean
+  /** true 时设备提供全局、单键和快速触发性能参数。 */
+  performance?: boolean
   /** 宏容量由设备层声明，公共 UI 不假定所有型号都有 16 个槽位。 */
   macroSlots?: number
   macroMaxActions?: number

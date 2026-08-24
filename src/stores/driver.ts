@@ -6,12 +6,13 @@ import { createDriverState } from './driverState'
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
+import type { KeyPerformanceSettings } from '@/domain/performance'
 import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -20,6 +21,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   let advancedKeyTypesLoading = false
   let macroReadRevision = 0
   let loadingMacroSourceCode: number | undefined
+  let performanceReadRevision = 0
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
@@ -277,6 +279,31 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     catch (cause) { fail(cause) }
   }
 
+  async function loadPerformance(positionId = selectedPositionId.value, force = false) {
+    if (!state.session || !profile.value?.capabilities.performance || !positionId || performanceLoading.value || ['connecting', 'writing'].includes(status.value)) return
+    const position = profile.value.positions.find((item) => item.id === positionId)
+    if (!position || !force && performanceSettings.value?.sourceCode === position.sourceCode) return
+    const observedSession = state.session
+    const readRevision = ++performanceReadRevision
+    performanceLoading.value = true
+    clearFeedback()
+    try {
+      const result = await observedSession.getPerformance(position.sourceCode)
+      if (state.session === observedSession && readRevision === performanceReadRevision) performanceSettings.value = result
+    } catch (cause) { if (state.session === observedSession && readRevision === performanceReadRevision) fail(cause) }
+    finally { if (readRevision === performanceReadRevision) performanceLoading.value = false }
+  }
+
+  async function updatePerformance(settings: KeyPerformanceSettings) {
+    if (!state.session || !profile.value?.capabilities.performance || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try {
+      performanceSettings.value = await state.session.updatePerformance(settings)
+      status.value = 'ready'
+      message.value = '性能设置已写入并通过回读验证'
+    } catch (cause) { fail(cause) }
+  }
+
   async function loadMacro(positionId = selectedPositionId.value, force = false) {
     if (!state.session || !profile.value?.capabilities.macro || !positionId || ['connecting', 'writing'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
@@ -436,6 +463,9 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     loadingAdvancedSourceCode = undefined
     advancedKeyTypes.value = {}
     advancedKeyTypesLoading = false
+    performanceReadRevision++
+    performanceSettings.value = undefined
+    performanceLoading.value = false
     invalidateMacroCache()
   }
   function invalidateMacroCache() {
@@ -522,5 +552,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadPerformance, updatePerformance, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

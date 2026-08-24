@@ -6,6 +6,7 @@ import type { DriverErrorCode } from '@/application/DriverError'
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
+import type { KeyPerformanceSettings } from '@/domain/performance'
 
 /** Driver Store 的响应式状态与派生查询；不执行连接、协议或写入操作。 */
 export const createDriverState = () => {
@@ -42,6 +43,8 @@ export const createDriverState = () => {
   const macroBindings = ref<Record<number, string>>({})
   /** 宏读取和高级键读取一样按页面按需执行，不占用全局 reading 状态。 */
   const macroLoading = ref(false)
+  const performanceSettings = ref<KeyPerformanceSettings>()
+  const performanceLoading = ref(false)
   // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
   const activeSession = shallowRef<DeviceSession>()
 
@@ -55,7 +58,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning,
-    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }

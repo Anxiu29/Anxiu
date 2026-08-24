@@ -8,6 +8,7 @@ import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type CustomKeyLighting, type LightingSettings } from '@/domain/lighting'
 import { cloneAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
 import { cloneMacroSettings, createEmptyMacro, type MacroSettings } from '@/domain/macro'
+import { DEFAULT_PERFORMANCE_SETTINGS, type KeyPerformanceSettings } from '@/domain/performance'
 
 /**
  * 不访问 HID 的内存协议实现。它实现与真机相同的 KeyboardDevice 端口，
@@ -30,12 +31,20 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly customLighting = { getCustomLighting: (sourceCodes: number[]) => this.getCustomLighting(sourceCodes), setCustomLighting: (items: CustomKeyLighting[]) => this.setCustomLighting(items), saveCustomLighting: () => this.saveCustomLighting() }
   readonly advancedKey = { getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode), getAdvancedKeyTypes: (sourceCodes: number[]) => this.getAdvancedKeyTypes(sourceCodes), setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings), deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode) }
   readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings), deleteMacroBinding: (sourceCode: number) => this.deleteMacroBinding(sourceCode) }
+  readonly performance = { getPerformance: (sourceCode: number) => this.getPerformance(sourceCode), setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings) }
   private readonly capabilities: DeviceCapabilities
   private currentMode: KeyboardMode = 'win'
   private lightingSettings = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS)
   private readonly customLightingColors = new Map<number, string>()
   private readonly advancedKeys = new Map<number, AdvancedKeySettings>()
   private readonly macros = new Map<number, MacroSettings>()
+  private readonly performanceSettings = new Map<number, KeyPerformanceSettings>()
+  // 全局触发与死区在真机中由 0x29 单独保存，不能错误地挂在某一个物理键上。
+  private globalPerformance = {
+    globalActuation: DEFAULT_PERFORMANCE_SETTINGS.globalActuation,
+    pressDeadZone: DEFAULT_PERFORMANCE_SETTINGS.pressDeadZone,
+    releaseDeadZone: DEFAULT_PERFORMANCE_SETTINGS.releaseDeadZone,
+  }
   constructor(
     private readonly keyCatalog: KeyCatalog,
     demoKeys: readonly MatrixKeyInput[],
@@ -61,7 +70,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
-  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear(); this.customLightingColors.clear() }
+  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear(); this.performanceSettings.clear(); this.globalPerformance = { globalActuation: DEFAULT_PERFORMANCE_SETTINGS.globalActuation, pressDeadZone: DEFAULT_PERFORMANCE_SETTINGS.pressDeadZone, releaseDeadZone: DEFAULT_PERFORMANCE_SETTINGS.releaseDeadZone }; this.customLightingColors.clear() }
   async switchMode(mode: KeyboardMode) {
     await this.wait()
     this.currentMode = mode
@@ -93,6 +102,17 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
     this.macros.set(settings.sourceCode, cloneMacroSettings(settings))
   }
   async deleteMacroBinding(sourceCode: number) { await this.wait(); this.macros.delete(sourceCode) }
+  async getPerformance(sourceCode: number) {
+    await this.wait()
+    return { sourceCode, ...DEFAULT_PERFORMANCE_SETTINGS, ...this.performanceSettings.get(sourceCode), ...this.globalPerformance }
+  }
+  async setPerformance(settings: KeyPerformanceSettings) {
+    await this.wait()
+    if (settings.mode === 'global') {
+      this.globalPerformance = { globalActuation: settings.globalActuation, pressDeadZone: settings.pressDeadZone, releaseDeadZone: settings.releaseDeadZone }
+    }
+    this.performanceSettings.set(settings.sourceCode, { ...settings })
+  }
   close() {}
 
   private defaultsFor(mode: KeyboardMode) {

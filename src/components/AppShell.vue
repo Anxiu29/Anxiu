@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 
-type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'macro' | 'key-test'
+type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'performance' | 'macro' | 'key-test'
 
 const props = withDefaults(defineProps<{
   profile: KeyboardProfile
@@ -120,6 +120,10 @@ onBeforeUnmount(() => {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13H11l-1 9 8.5-11H12z" /></svg>
           <span>高级键设置</span>
         </button>
+        <button v-if="profile.capabilities.performance" :class="{ active: activeView === 'performance' }" :disabled="navigationDisabled" title="性能设置" @click="navigate('performance')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19a8 8 0 1 1 16 0M12 11l4-4M7 17h10" /><circle cx="12" cy="19" r="1" /></svg>
+          <span>性能设置</span>
+        </button>
         <button v-if="profile.capabilities.macro" :class="{ active: activeView === 'macro' }" :disabled="navigationDisabled" title="宏设置" @click="navigate('macro')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="m7 8 4 4-4 4m6 0h4" /></svg>
           <span>宏设置</span>
@@ -142,6 +146,7 @@ onBeforeUnmount(() => {
       <slot v-else-if="activeView === 'keymap'" name="keymap" />
       <slot v-else-if="activeView === 'lighting'" name="lighting" />
       <slot v-else-if="activeView === 'advanced'" name="advanced" />
+      <slot v-else-if="activeView === 'performance'" name="performance" />
       <slot v-else-if="activeView === 'macro'" name="macro" />
       <slot v-else name="key-test" />
     </div>

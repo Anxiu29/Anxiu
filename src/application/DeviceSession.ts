@@ -7,6 +7,7 @@ import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguratio
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
+import type { KeyPerformanceSettings } from '@/domain/performance'
 
 const wait = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds))
 const sameNumbers = (left: readonly number[], right: readonly number[], tolerance = 0) => left.length === right.length
@@ -194,6 +195,30 @@ export class DeviceSession {
     await this.device.advancedKey.deleteAdvancedKey(sourceCode)
     this.dksTravelCache.delete(sourceCode)
     return this.device.advancedKey.getAdvancedKey(sourceCode)
+  }
+
+  async getPerformance(sourceCode: number) {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持性能设置', false, { details: { capability: 'performance' } })
+    return this.device.performance.getPerformance(sourceCode)
+  }
+
+  async updatePerformance(settings: KeyPerformanceSettings) {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持性能设置', false, { details: { capability: 'performance' } })
+    await this.device.performance.setPerformance(settings)
+    let verified = await this.device.performance.getPerformance(settings.sourceCode)
+    // 固件的布局区和全局参数区可能异步落盘，短暂重读避免把已成功写入误报为失败。
+    for (const delay of [0, 60, 100]) {
+      if (delay) {
+        await wait(delay)
+        verified = await this.device.performance.getPerformance(settings.sourceCode)
+      }
+      const same = verified.mode === settings.mode
+        && (settings.mode !== 'global' || sameNumbers([verified.globalActuation, verified.pressDeadZone, verified.releaseDeadZone], [settings.globalActuation, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
+        && (settings.mode !== 'single' || sameNumbers([verified.actuation, verified.pressDeadZone, verified.releaseDeadZone], [settings.actuation, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
+        && (settings.mode !== 'rapid-trigger' || sameNumbers([verified.rapidPress, verified.rapidRelease, verified.pressDeadZone, verified.releaseDeadZone], [settings.rapidPress, settings.rapidRelease, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
+      if (same) return verified
+    }
+    throw new DriverError('VERIFY_FAILED', '性能设置未被设备完整接受', true, { details: { expected: settings, actual: verified } })
   }
 
   async getMacro(sourceCode: number) {

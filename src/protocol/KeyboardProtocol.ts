@@ -17,13 +17,18 @@ import { DriverError } from '@/application/DriverError'
 import type { MacroSettings } from '@/domain/macro'
 import { createEmptyMacro, validateMacroSettings } from '@/domain/macro'
 import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MACRO_LAYOUT_MODE, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
+import type { KeyPerformanceSettings, PerformanceMode } from '@/domain/performance'
+import { validatePerformanceSettings } from '@/domain/performance'
+import { decodeGlobalPerformance, encodeGlobalPerformance } from './xsyd/performanceCodec'
 
 const ADVANCED_LAYOUT = {
-  db1: 0x05, db2: 0x06, mode: 0x08,
+  db0: 0x04, db1: 0x05, db2: 0x06, mode: 0x08,
   dks1: 0x09, dks2: 0x0a, dks3: 0x0b, dks4: 0x0c,
   trps1: 0x0d, trps2: 0x0e, trps3: 0x0f, trps4: 0x10,
-  delay: 0x13,
+  delay: 0x13, rapidPress: 0x14, rapidRelease: 0x15, pressDeadZone: 0x16, releaseDeadZone: 0x17,
 } as const
+const PERFORMANCE_MODE: Record<PerformanceMode, number> = { global: 0, single: 1, 'rapid-trigger': 2 }
+const PERFORMANCE_MODE_BY_VALUE: Record<number, PerformanceMode> = { 0: 'global', 1: 'single', 2: 'rapid-trigger' }
 
 // MODE=6 在 1.0.7 方案中保留给宏；7 为 RS，8 为 SOCD。
 const ADVANCED_MODE = { dks: 1, mpt: 2, mt: 3, tgl: 4, end: 5, macro: 6, socd: 8 } as const
@@ -65,6 +70,10 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     getAdvancedKeyTypes: (sourceCodes: number[]) => this.getAdvancedKeyTypes(sourceCodes),
     setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings),
     deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode),
+  }
+  readonly performance = {
+    getPerformance: (sourceCode: number) => this.getPerformance(sourceCode),
+    setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings),
   }
   readonly macro = {
     getMacro: (sourceCode: number) => this.getMacro(sourceCode),
@@ -211,6 +220,47 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const modeValue = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
     // 高四位属于性能触发方式，删除高级键只能清除低四位，不能把另一项设置一并破坏。
     await this.writeLayoutValue(sourceCode, ADVANCED_LAYOUT.mode, modeValue & 0xf0)
+  }
+
+  async getPerformance(sourceCode: number): Promise<KeyPerformanceSettings> {
+    const global = decodeGlobalPerformance(await this.commands.request(
+      XSYD_COMMANDS.performance,
+      encodeGlobalPerformance({ sourceCode, mode: 'global', globalActuation: 0, actuation: 0, rapidPress: 0, rapidRelease: 0, pressDeadZone: 0, releaseDeadZone: 0 }, false),
+    ))
+    const layouts = [ADVANCED_LAYOUT.mode, ADVANCED_LAYOUT.db0, ADVANCED_LAYOUT.rapidPress, ADVANCED_LAYOUT.rapidRelease, ADVANCED_LAYOUT.pressDeadZone, ADVANCED_LAYOUT.releaseDeadZone]
+    const values: number[] = []
+    for (const layout of layouts) values.push(await this.readLayoutValue(sourceCode, layout))
+    const mode = PERFORMANCE_MODE_BY_VALUE[((values[0] ?? 0) >> 4) & 0x0f] ?? 'global'
+    return {
+      sourceCode,
+      mode,
+      globalActuation: global.globalActuation,
+      actuation: (values[1] ?? 0) / 1000,
+      rapidPress: (values[2] ?? 0) / 1000,
+      rapidRelease: (values[3] ?? 0) / 1000,
+      // 全局模式以 0x29 为唯一真值，不能被该键之前保存的单键参数污染。
+      pressDeadZone: mode === 'global' ? global.pressDeadZone : ((values[4] ?? 0) || Math.round(global.pressDeadZone * 1000)) / 1000,
+      releaseDeadZone: mode === 'global' ? global.releaseDeadZone : ((values[5] ?? 0) || Math.round(global.releaseDeadZone * 1000)) / 1000,
+    }
+  }
+
+  async setPerformance(settings: KeyPerformanceSettings) {
+    const errors = validatePerformanceSettings(settings)
+    if (errors.length) throw new DriverError('INVALID_CONFIGURATION', errors.join('；'))
+    if (settings.mode === 'global') {
+      await this.commands.request(XSYD_COMMANDS.performance, encodeGlobalPerformance(settings, true))
+    } else {
+      if (settings.mode === 'single') await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.db0, Math.round(settings.actuation * 1000))
+      else {
+        await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.rapidPress, Math.round(settings.rapidPress * 1000))
+        await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.rapidRelease, Math.round(settings.rapidRelease * 1000))
+      }
+      await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.pressDeadZone, Math.round(settings.pressDeadZone * 1000))
+      await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.releaseDeadZone, Math.round(settings.releaseDeadZone * 1000))
+    }
+    // MODE 高四位属于性能模式；低四位可能保存 DKS、宏等高级键类型，必须原样保留。
+    const mode = await this.readLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode)
+    await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, (mode & 0x0f) | (PERFORMANCE_MODE[settings.mode] << 4))
   }
 
   async getMacro(sourceCode: number): Promise<MacroSettings> {
