@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import type { KeyPerformanceSettings, PerformanceMode, PollingRate, TravelSnapshot } from '@/domain/performance'
+import type { KeyPerformanceSettings, PerformanceMode, PollingRate, TravelMatrix } from '@/domain/performance'
 import { clonePerformanceSettings } from '@/domain/performance'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
@@ -15,7 +15,7 @@ const props = defineProps<{
   settings?: KeyPerformanceSettings
   loading?: boolean
   pollingRate?: PollingRate
-  travelMatrix?: TravelSnapshot
+  travelMatrix?: TravelMatrix
   travelReading?: boolean
   calibrationActive?: boolean
   assignments: KeyAssignment[]
@@ -46,7 +46,7 @@ let travelTimer: number | undefined
 /** 把设备矩阵读数映射回 UI 物理位置，行程测试始终覆盖整把键盘。 */
 const travelByPosition = computed(() => Object.fromEntries(props.profile.positions.map((position) => {
   const address = position.address
-  const value = address.kind === 'matrix' ? props.travelMatrix?.travels[address.row]?.[address.column] ?? 0 : 0
+  const value = address.kind === 'matrix' ? props.travelMatrix?.[address.row]?.[address.column] ?? 0 : 0
   return [position.id, Math.max(0, Math.min(4, value))]
 })))
 const activeTravelPositionIds = computed(() => travelTestActive.value
@@ -111,12 +111,9 @@ watch(() => props.travelMatrix, () => {
   const nextCompleted = new Set(calibratedPositionIds.value)
   for (const position of props.profile.positions) {
     const current = travelByPosition.value[position.id] ?? 0
-    const address = position.address
-    const deviceState = address.kind === 'matrix' ? props.travelMatrix?.states[address.row]?.[address.column] ?? 0 : 0
     nextMax[position.id] = Math.max(nextMax[position.id] ?? 0, current)
-    // matrix=3 是固件自身的逐键状态；值 2 与抓包中达到底部并点亮状态灯的键对应。
-    // 同时保留行程回退，仅用于不返回状态矩阵的兼容设备和演示实现。
-    if (deviceState >= 2 || !props.travelMatrix?.states.length && nextMax[position.id]! >= 3 && current <= 0.1) nextCompleted.add(position.id)
+    // 完整校准动作包含“按到底”和“完全松开”；只按下不松开不算完成。
+    if (nextMax[position.id]! >= 3 && current <= 0.1) nextCompleted.add(position.id)
   }
   calibrationMaxTravel.value = nextMax
   calibratedPositionIds.value = nextCompleted

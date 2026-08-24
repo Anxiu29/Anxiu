@@ -129,8 +129,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
     await this.wait()
     // 演示模式生成平滑变化，便于在没有真机时检查实时行程 UI。
     const phase = (Date.now() % 2400) / 2400 * Math.PI * 2
-    const travels = Array.from({ length: 6 }, (_, row) => Array.from({ length: 21 }, (_, column) => Math.max(0, Math.sin(phase + (row * 21 + column) * 0.07)) * 4))
-    return { travels, states: travels.map((row) => row.map((value) => value >= 3 ? 2 : 0)) }
+    return Array.from({ length: 6 }, (_, row) => Array.from({ length: 21 }, (_, column) => Math.max(0, Math.sin(phase + (row * 21 + column) * 0.07)) * 4))
   }
   async startCalibration() { await this.wait(); this.calibrationActive = true }
   async finishCalibration() { await this.wait(); this.calibrationActive = false }
