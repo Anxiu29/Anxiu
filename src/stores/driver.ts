@@ -329,7 +329,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       rebuildMacroBindings()
       status.value = 'ready'
       messageWarning.value = !bindings.length
-      message.value = bindings.length ? '宏已写入，槽位和执行参数已通过设备回读验证' : '宏已保存为未绑定草稿，选择物理键并保存后可写入键盘'
+      message.value = bindings.length ? '宏已写入，槽位和执行参数已通过设备回读验证' : '宏已保存为未绑定草稿，绑定按键并保存后可写入键盘'
     }
     catch (cause) { fail(cause) }
   }
