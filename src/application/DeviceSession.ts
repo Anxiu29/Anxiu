@@ -15,17 +15,9 @@ const sameNumbers = (left: readonly number[], right: readonly number[], toleranc
 /** 比较“请求写入值”和“设备实际回读值”，防止用旧值覆盖界面后仍提示验证成功。 */
 function advancedKeyMatches(expected: Exclude<AdvancedKeySettings, { type: 'none' }>, actual: AdvancedKeySettings) {
   if (expected.type !== actual.type || expected.sourceCode !== actual.sourceCode) return false
-  if (expected.type === 'dks' && actual.type === 'dks') {
-    const firstTravelMatches = sameNumbers(expected.travels.slice(0, 1), actual.travels.slice(0, 1), 0.001)
-    // 设备会把 3.5 mm 这类理论最大值收窄到当前轴体的实际校准上限。
-    // 只接受“接近上限且向下收窄”的情况，普通行程不一致仍必须报错。
-    const maximumTravelMatches = Math.abs(expected.travels[1] - actual.travels[1]) <= 0.001
-      || expected.travels[1] >= 3.3 && actual.travels[1] <= expected.travels[1] && expected.travels[1] - actual.travels[1] <= 0.1
-    return sameNumbers(expected.keyCodes, actual.keyCodes)
-      && sameNumbers(expected.triggers, actual.triggers)
-      && firstTravelMatches
-      && maximumTravelMatches
-  }
+  if (expected.type === 'dks' && actual.type === 'dks') return sameNumbers(expected.keyCodes, actual.keyCodes)
+    && sameNumbers(expected.triggers, actual.triggers)
+    && sameNumbers(expected.travels, actual.travels, 0.001)
   if (expected.type === 'mpt' && actual.type === 'mpt') return sameNumbers(expected.keyCodes, actual.keyCodes)
     && sameNumbers(expected.travels, actual.travels, 0.001)
   if (expected.type === 'mt' && actual.type === 'mt') return sameNumbers(expected.keyCodes, actual.keyCodes) && expected.delay === actual.delay
@@ -172,7 +164,7 @@ export class DeviceSession {
     if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
     await this.device.advancedKey.setAdvancedKey(settings)
     let verified: AdvancedKeySettings = { type: 'none', sourceCode: settings.sourceCode }
-    // 0x26 的响应只表示报文已接收，个别固件的 Layout_DB3 会稍后才更新，因此允许短暂重试。
+    // 0x26 的响应只表示报文已接收，布局参数可能稍后才更新，因此允许短暂重试。
     for (const delay of [60, 100, 160]) {
       await wait(delay)
       verified = await this.device.advancedKey.getAdvancedKey(settings.sourceCode)

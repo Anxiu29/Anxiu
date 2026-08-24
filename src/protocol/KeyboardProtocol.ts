@@ -19,7 +19,7 @@ import { createEmptyMacro, validateMacroSettings } from '@/domain/macro'
 import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MACRO_LAYOUT_MODE, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
 
 const ADVANCED_LAYOUT = {
-  db1: 0x05, db3: 0x07, mode: 0x08,
+  db1: 0x05, db2: 0x06, mode: 0x08,
   dks1: 0x09, dks2: 0x0a, dks3: 0x0b, dks4: 0x0c,
   trps1: 0x0d, trps2: 0x0e, trps3: 0x0f, trps4: 0x10,
   delay: 0x13,
@@ -167,7 +167,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const modeValue = await this.readLayoutValue(sourceCode, ADVANCED_LAYOUT.mode)
     const type = modeValue & 0x0f
     if (type === ADVANCED_MODE.dks) {
-      const layouts = [ADVANCED_LAYOUT.dks1, ADVANCED_LAYOUT.dks2, ADVANCED_LAYOUT.dks3, ADVANCED_LAYOUT.dks4, ADVANCED_LAYOUT.trps1, ADVANCED_LAYOUT.trps2, ADVANCED_LAYOUT.trps3, ADVANCED_LAYOUT.trps4, ADVANCED_LAYOUT.db1, ADVANCED_LAYOUT.db3]
+      // 当前真机现象表明 DKS 命令末尾的两个行程对应 Layout_DB1、Layout_DB2；
+      // Layout_DB3 始终返回轴体校准总行程，误读它会让第二位置固定显示 3.44 mm。
+      const layouts = [ADVANCED_LAYOUT.dks1, ADVANCED_LAYOUT.dks2, ADVANCED_LAYOUT.dks3, ADVANCED_LAYOUT.dks4, ADVANCED_LAYOUT.trps1, ADVANCED_LAYOUT.trps2, ADVANCED_LAYOUT.trps3, ADVANCED_LAYOUT.trps4, ADVANCED_LAYOUT.db1, ADVANCED_LAYOUT.db2]
       const values: number[] = []
       // HID 命令客户端按请求串行匹配响应；这里显式串行，避免同命令 0x23 的响应互相抢占。
       for (const layout of layouts) values.push(await this.readLayoutValue(sourceCode, layout))
