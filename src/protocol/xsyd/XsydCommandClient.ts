@@ -85,7 +85,8 @@ export class XsydCommandClient {
         this.pending = undefined
         reject(new DriverError('PROTOCOL_TIMEOUT', `设备分片响应超时（${definition.name}）`, true))
       }, timeoutMs)
-      this.pending = { definition, resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [] } }
+      // 0x12 的 data[1] 会回显请求的矩阵类型（请求 data[0]），用于区分同为 0x92 的长响应。
+      this.pending = { definition, expectedOrder: data[0], resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [] } }
       try { await this.transport.send(encodePacket(definition.code, data, this.crc)) }
       catch (error) { clearTimeout(timer); this.pending = undefined; reject(error instanceof Error ? error : new Error(String(error))) }
     })
@@ -175,6 +176,9 @@ export class XsydCommandClient {
     if (fragmented.bytes.length < fragmented.totalLength!) return
 
     const packet = decodePacket(Uint8Array.from(fragmented.bytes.slice(0, fragmented.totalLength)), this.crc)
+    if (pending.expectedOrder !== undefined && packet.data[1] !== pending.expectedOrder) {
+      throw new DriverError('PROTOCOL_REJECTED', `设备返回了其他矩阵（期望 0x${pending.expectedOrder.toString(16).padStart(2, '0')}，收到 0x${(packet.data[1] ?? 0xff).toString(16).padStart(2, '0')}）`, true)
+    }
     clearTimeout(pending.timer)
     if (this.pending === pending) this.pending = undefined
     pending.resolve(packet.data)
