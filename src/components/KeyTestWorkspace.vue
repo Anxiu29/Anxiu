@@ -84,7 +84,14 @@ function handleKeyUp(event: KeyboardEvent) {
   history.value = [record, ...history.value].slice(0, 24)
 }
 function releaseAll() { pressedByCode.clear(); refreshPressedPositions() }
-function clearResults() { releaseAll(); downCounts.value = {}; upCounts.value = {}; history.value = []; totalTriggers.value = 0 }
+function clearResults() {
+  releaseAll()
+  downCounts.value = {}
+  upCounts.value = {}
+  history.value = []
+  totalTriggers.value = 0
+  sequence.value = 0
+}
 onMounted(() => {
   // 使用捕获阶段可阻止 F5、Tab 等测试按键触发浏览器默认动作；组件卸载后立即恢复正常行为。
   window.addEventListener('keydown', handleKeyDown, true)
@@ -102,7 +109,7 @@ onBeforeUnmount(() => {
   <section class="key-test-workspace">
     <header class="panel key-test-heading">
       <div><span class="eyebrow">KEY TEST</span><h2>按键测试</h2><p>记录浏览器收到的按下、抬起时间以及两种事件的独立次数。</p></div>
-      <div class="key-test-stats"><span><strong>{{ testedKeys }}</strong> 已测试按键</span><span><strong>{{ totalTriggers }}</strong> 总触发次数</span><span><strong>{{ totalPresses }}</strong> 按下次数</span><span><strong>{{ totalReleases }}</strong> 抬起次数</span><button class="ghost" type="button" @click="clearResults">清空记录</button></div>
+      <div class="key-test-stats"><span><strong>{{ testedKeys }}</strong> 已测试按键</span><span><strong>{{ totalTriggers }}</strong> 总触发次数</span><span><strong>{{ totalPresses }}</strong> 按下次数</span><span><strong>{{ totalReleases }}</strong> 抬起次数</span></div>
     </header>
 
     <div ref="keyboardContainer" class="panel key-test-keyboard">
@@ -110,7 +117,7 @@ onBeforeUnmount(() => {
     </div>
 
     <section class="panel key-test-history">
-      <header><div><strong>事件记录</strong><small>键帽角标为“按下次数/抬起次数”；Fn 本身可能不会单独上报。</small></div><span v-if="pressedPositionIds.length">正在按下 {{ pressedPositionIds.length }} 个键</span></header>
+      <header><div><strong>事件记录</strong><small>键帽角标为“按下次数/抬起次数”；Fn 本身可能不会单独上报。</small></div><div class="key-test-history-actions"><span v-if="pressedPositionIds.length">正在按下 {{ pressedPositionIds.length }} 个键</span><button class="ghost" type="button" :disabled="!history.length && !totalTriggers" @click="clearResults">清空记录</button></div></header>
       <div v-if="history.length" class="key-test-records"><article v-for="record in history" :key="record.id" :class="[record.action, { unmatched: record.matched === 0 }]"><div><strong>{{ record.label }}</strong><b>{{ record.action === 'down' ? '按下' : '抬起' }}</b></div><code>{{ record.time }}</code><small>{{ record.code }} · {{ record.matched ? `匹配 ${record.matched} 个键位` : '未匹配当前层键位' }}<template v-if="record.duration !== undefined"> · 持续 {{ record.duration }} ms</template></small></article></div>
       <div v-else class="key-test-empty">等待按键输入…</div>
     </section>
