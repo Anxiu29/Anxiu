@@ -40,10 +40,26 @@ const selectedPosition = computed(() => props.profile.positions.find((item) => i
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
 const travelTestActive = ref(false)
 let travelTimer: number | undefined
-const selectedTravel = computed(() => {
-  const address = selectedPosition.value?.address
-  if (address?.kind !== 'matrix') return 0
-  return props.travelMatrix?.[address.row]?.[address.column] ?? 0
+/** 把设备矩阵读数映射回 UI 物理位置，行程测试始终覆盖整把键盘。 */
+const travelByPosition = computed(() => Object.fromEntries(props.profile.positions.map((position) => {
+  const address = position.address
+  const value = address.kind === 'matrix' ? props.travelMatrix?.[address.row]?.[address.column] ?? 0 : 0
+  return [position.id, Math.max(0, Math.min(4, value))]
+})))
+const activeTravelPositionIds = computed(() => travelTestActive.value
+  ? Object.entries(travelByPosition.value).filter(([, value]) => value > 0.02).map(([id]) => id)
+  : [])
+const travelBadges = computed(() => travelTestActive.value ? Object.fromEntries(activeTravelPositionIds.value.map((id) => [id, `${travelByPosition.value[id]!.toFixed(2)} mm`])) : {})
+const travelKeyColors = computed(() => travelTestActive.value ? Object.fromEntries(activeTravelPositionIds.value.map((id) => {
+  const ratio = travelByPosition.value[id]! / 4
+  return [id, `rgba(69, 230, 208, ${0.18 + ratio * 0.62})`]
+})) : {})
+const deepestTravel = computed(() => Math.max(0, ...Object.values(travelByPosition.value)))
+const deepestPosition = computed(() => deepestTravel.value > 0.02 ? props.profile.positions.find((position) => travelByPosition.value[position.id] === deepestTravel.value) : undefined)
+const travelStatusText = computed(() => {
+  if (!travelTestActive.value) return '尚未开始'
+  if (props.travelReading) return '正在读取整把键盘…'
+  return '全键盘实时测试中'
 })
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
@@ -82,12 +98,16 @@ onBeforeUnmount(() => { if (travelTimer !== undefined) window.clearTimeout(trave
 
 function setMode(mode: PerformanceMode) { if (draft.value) draft.value.mode = mode }
 function save() { if (draft.value) emit('update', clonePerformanceSettings(draft.value)) }
+function selectKeyboardPosition(positionId: string) {
+  // 行程测试展示整个矩阵，点击键帽不应把测试退化为单键绑定。
+  if (activePanel.value !== 'travel') emit('select-position', positionId)
+}
 </script>
 
 <template>
   <section class="performance-workspace">
-    <div ref="keyboardContainer" class="panel performance-keyboard-panel">
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="emit('select-position', $event)" />
+    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel === 'travel' && travelTestActive }">
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel === 'travel' ? undefined : selectedPositionId" :pressed="activePanel === 'travel' ? activeTravelPositionIds : []" :badges="activePanel === 'travel' ? travelBadges : {}" :key-colors="activePanel === 'travel' ? travelKeyColors : {}" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
     </div>
 
     <section class="panel performance-editor">
@@ -98,7 +118,7 @@ function save() { if (draft.value) emit('update', clonePerformanceSettings(draft
           <button v-if="profile.capabilities.travelTest" type="button" :class="{ active: activePanel === 'travel' }" @click="selectPanel('travel')">行程测试</button>
           <button v-if="profile.capabilities.calibration" type="button" :class="{ active: activePanel === 'calibration' }" @click="selectPanel('calibration')">键盘校准</button>
         </nav>
-        <div class="performance-current"><span>当前物理按键</span><strong>{{ selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div>
+        <div v-if="activePanel === 'settings'" class="performance-current"><span>当前物理按键</span><strong>{{ selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div>
         <button v-if="activePanel === 'settings'" class="primary" type="button" :disabled="busy || !draft" @click="save">{{ status === 'writing' ? '正在保存…' : '保存设置' }}</button>
       </header>
 
@@ -145,12 +165,9 @@ function save() { if (draft.value) emit('update', clonePerformanceSettings(draft
         </template>
 
         <section v-else-if="activePanel === 'travel'" class="travel-test-panel">
-          <div class="travel-test-copy"><span class="eyebrow">MAGNETIC TRAVEL</span><h3>磁轴行程测试</h3><p>在上方键盘选择按键，再开始读取实时行程。切换页面或停止测试后不会继续占用 HID 通信。</p><button class="primary" type="button" :disabled="busy || !selectedPosition" @click="toggleTravelTest">{{ travelTestActive ? '停止测试' : '开始测试' }}</button></div>
-          <div class="travel-test-visual">
-            <div class="travel-key-preview" :class="{ active: travelTestActive }" :style="{ transform: `translateY(${Math.min(4, selectedTravel) * 7}px)` }"><span>{{ selectedPosition?.label ?? 'KEY' }}</span></div>
-            <div class="travel-scale"><i v-for="mark in 5" :key="mark"><span>{{ mark - 1 }} mm</span></i></div>
-          </div>
-          <div class="travel-test-value"><span>{{ travelReading ? '正在读取' : travelTestActive ? '实时行程' : '当前行程' }}</span><strong>{{ selectedTravel.toFixed(2) }}</strong><em>mm</em><div class="travel-meter"><div :style="{ width: `${Math.min(100, selectedTravel / 4 * 100)}%` }"></div><i :style="{ left: `${Math.min(100, selectedTravel / 4 * 100)}%` }"></i></div><small>量程 0.00 – 4.00 mm</small></div>
+          <div class="travel-test-copy"><span class="eyebrow">MAGNETIC TRAVEL</span><h3>全键盘行程测试</h3><p>开始后可直接按下任意或多个按键。上方每个键帽会独立显示实时行程，不需要选择或绑定测试按键。</p><button class="primary" type="button" :disabled="busy" @click="toggleTravelTest">{{ travelTestActive ? '停止测试' : '开始测试' }}</button></div>
+          <div class="travel-global-status"><i :class="{ active: travelTestActive }"></i><div><span>测试状态</span><strong>{{ travelStatusText }}</strong></div><div><span>当前按下</span><strong>{{ activeTravelPositionIds.length }} 个按键</strong></div></div>
+          <div class="travel-test-value"><span>当前最大行程</span><strong>{{ deepestTravel.toFixed(2) }}</strong><em>mm</em><b>{{ deepestPosition?.label ?? '—' }}</b><div class="travel-meter"><div :style="{ width: `${Math.min(100, deepestTravel / 4 * 100)}%` }"></div><i :style="{ left: `${Math.min(100, deepestTravel / 4 * 100)}%` }"></i></div><small>每个按键的具体数值显示在上方对应键帽中，量程 0.00 – 4.00 mm</small></div>
         </section>
 
         <section v-else class="calibration-panel" :class="{ active: calibrationActive }">
