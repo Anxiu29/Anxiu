@@ -1,6 +1,6 @@
 import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfile } from '@/domain/keyboard'
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
-import type { AdvancedKeySettings } from '@/domain/advancedKey'
+import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
@@ -60,6 +60,7 @@ export interface CustomLightingCapability {
 
 export interface AdvancedKeyCapability {
   getAdvancedKey(sourceCode: number): Promise<AdvancedKeySettings>
+  getAdvancedKeyTypes(sourceCodes: number[]): Promise<Record<number, Exclude<AdvancedKeyType, 'none'>>>
   setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>): Promise<void>
   deleteAdvancedKey(sourceCode: number): Promise<void>
 }

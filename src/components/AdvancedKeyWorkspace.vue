@@ -25,6 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'select-position': [positionId: string]
   load: [positionId: string]
+  'load-all': []
   update: [settings: Exclude<AdvancedKeySettings, { type: 'none' }>]
   delete: [sourceCode: number]
 }>()
@@ -63,6 +64,8 @@ const keyPickerValue = computed(() => {
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
 onMounted(() => {
+  // 页面每次进入都请求 Store 同步设备 MODE；Store 会合并在途请求并批量读取，不会逐键重复查询。
+  emit('load-all')
   window.addEventListener('pointerup', finishTriggerDrag)
   window.addEventListener('pointercancel', cancelTriggerDrag)
 })
@@ -88,23 +91,43 @@ function updateTravel(index: number, value: string) {
   if (!draft.value || !('travels' in draft.value)) return
   draft.value.travels[index] = Number(value)
 }
-function triggerState(row: number, phase: number) {
+function triggerBits(row: number, phase: number) {
   if (draft.value?.type !== 'dks') return 0
-  // 每个 TRPS 字节按四组 2 bit 保存四个阶段：00=关闭、01=单次、11=连续。
-  const state = (draft.value.triggers[row]! >> (phase * 2)) & 0x03
-  return state === 3 ? 3 : state === 0 ? 0 : 1
+  // 每格 2 bit 是两个真实键盘事件：bit0=按下、bit1=抬起，11 才是同一区域完整单击。
+  return (draft.value.triggers[row]! >> (phase * 2)) & 0x03
 }
 function cycleTrigger(row: number, phase: number) {
   if (draft.value?.type !== 'dks') return
-  const current = triggerState(row, phase)
-  const next = current === 0 ? 1 : current === 1 ? 3 : 0
-  const shift = phase * 2
-  draft.value.triggers[row] = (draft.value.triggers[row]! & ~(0x03 << shift)) | (next << shift)
+  const current = triggerBits(row, phase)
+  clearContinuousSegment(row, phase)
+  setTriggerBits(row, phase, current === 3 ? 0 : 3)
 }
-function setTriggerState(row: number, phase: number, state: 0 | 1 | 3) {
+function setTriggerBits(row: number, phase: number, state: 0 | 1 | 2 | 3) {
   if (draft.value?.type !== 'dks') return
   const shift = phase * 2
   draft.value.triggers[row] = (draft.value.triggers[row]! & ~(0x03 << shift)) | (state << shift)
+}
+function continuousSegments(row: number) {
+  const segments: { start: number; end: number }[] = []
+  let start: number | undefined
+  for (let phase = 0; phase < 4; phase += 1) {
+    const bits = triggerBits(row, phase)
+    if (bits === 1) start = phase
+    else if (bits === 2 && start !== undefined) {
+      segments.push({ start, end: phase })
+      start = undefined
+    }
+  }
+  return segments
+}
+function isContinuousPhase(row: number, phase: number) {
+  return continuousSegments(row).some(({ start, end }) => phase >= start && phase <= end)
+}
+function clearContinuousSegment(row: number, phase: number) {
+  const segment = continuousSegments(row).find(({ start, end }) => phase >= start && phase <= end)
+  if (!segment) return
+  setTriggerBits(row, segment.start, 0)
+  setTriggerBits(row, segment.end, 0)
 }
 function startTriggerDrag(row: number, phase: number) {
   triggerDrag.value = { row, startPhase: phase, endPhase: phase, moved: false }
@@ -119,10 +142,16 @@ function finishTriggerDrag() {
   triggerDrag.value = undefined
   if (!drag?.moved) return
 
-  // 拖过的阶段统一写为 11（连续触发）；相邻的 11 在 UI 中会合并成一条连续横条。
   const first = Math.min(drag.startPhase, drag.endPhase)
   const last = Math.max(drag.startPhase, drag.endPhase)
-  for (let phase = first; phase <= last; phase += 1) setTriggerState(drag.row, phase, 3)
+  // 连续区域只在起点写按下(01)、终点写抬起(10)；中间保持按住，不能每格都写完整单击(11)。
+  for (let phase = first; phase <= last; phase += 1) clearContinuousSegment(drag.row, phase)
+  for (let phase = first; phase <= last; phase += 1) setTriggerBits(drag.row, phase, 0)
+  if (first === last) setTriggerBits(drag.row, first, 3)
+  else {
+    setTriggerBits(drag.row, first, 1)
+    setTriggerBits(drag.row, last, 2)
+  }
   ignoreTriggerClick.value = true
   // pointerup 后浏览器会紧接着派发 click；下一轮事件循环再复位，也能覆盖在格外松手、没有 click 的情况。
   window.setTimeout(() => { ignoreTriggerClick.value = false }, 0)
@@ -200,12 +229,12 @@ function deleteCurrentAdvancedKey() {
                 </div>
                 <template v-for="(keyCode, row) in draft.keyCodes" :key="row">
                   <button class="advanced-key-value compact" type="button" @click="openKeyPicker({ kind: 'keyCodes', index: row })"><span>{{ keyLabel(keyCode) }}</span><small>键值 {{ row + 1 }}</small></button>
-                  <div v-for="phase in 4" :key="phase" class="dks-trigger-slot" :class="{ continuous: triggerState(row, phase - 1) === 3, 'connected-next': phase < 4 && triggerState(row, phase - 1) === 3 && triggerState(row, phase) === 3 }">
-                    <button class="dks-trigger-cell" :class="{ single: triggerState(row, phase - 1) === 1, continuous: triggerState(row, phase - 1) === 3 }" type="button" :title="triggerState(row, phase - 1) === 0 ? '未触发' : triggerState(row, phase - 1) === 1 ? '单次触发' : '连续触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)">{{ triggerState(row, phase - 1) === 0 ? '+' : triggerState(row, phase - 1) === 1 ? '●' : '' }}</button>
+                  <div v-for="phase in 4" :key="phase" class="dks-trigger-slot" :class="{ continuous: isContinuousPhase(row, phase - 1), 'connected-next': phase < 4 && isContinuousPhase(row, phase - 1) && isContinuousPhase(row, phase) }">
+                    <button class="dks-trigger-cell" :class="{ single: triggerBits(row, phase - 1) === 3, continuous: isContinuousPhase(row, phase - 1) }" type="button" :title="triggerBits(row, phase - 1) === 3 ? '完整按下并抬起' : isContinuousPhase(row, phase - 1) ? '连续按住区域' : '未触发'" @pointerdown.prevent="startTriggerDrag(row, phase - 1)" @pointerenter="extendTriggerDrag(row, phase - 1)" @click="handleTriggerClick(row, phase - 1)">{{ triggerBits(row, phase - 1) === 0 && !isContinuousPhase(row, phase - 1) ? '+' : triggerBits(row, phase - 1) === 3 ? '●' : '' }}</button>
                   </div>
                 </template>
               </div>
-              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”图标：设置单次触发</p><p>再次单击：切换连续或取消选中</p><p>按住并横向拖动：设置连续触发</p><p>拖过的相邻阶段会显示为连续横条</p></aside>
+              <aside class="dks-help"><strong>动态按键设置</strong><p>单击“+”：在该区域完整按下并抬起一次</p><p>再次单击：取消该区域触发</p><p>按住并横向拖动：起点按下、终点抬起</p><p>连续区域中间会保持按住，不重复触发</p></aside>
             </div>
           </template>
 

@@ -16,6 +16,8 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
   let loadingAdvancedSourceCode: number | undefined
+  let advancedKeyTypesReadRevision = 0
+  let advancedKeyTypesLoading = false
   let macroReadRevision = 0
   let loadingMacroSourceCode: number | undefined
 
@@ -215,12 +217,12 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     } catch (cause) { fail(cause) }
   }
 
-  async function loadAdvancedKey(positionId = selectedPositionId.value) {
+  async function loadAdvancedKey(positionId = selectedPositionId.value, force = false) {
     if (!state.session || !profile.value?.capabilities.advancedKey || !positionId || ['connecting', 'writing'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
     if (!position) return
     // 页面重新挂载或同一键被重复点击时复用已有数据/请求，不再向 HID 队列追加相同命令。
-    if (advancedKey.value?.sourceCode === position.sourceCode || advancedKeyLoading.value && loadingAdvancedSourceCode === position.sourceCode) return
+    if ((!force && advancedKey.value?.sourceCode === position.sourceCode) || (advancedKeyLoading.value && loadingAdvancedSourceCode === position.sourceCode)) return
     const observedSession = state.session
     const readRevision = ++advancedKeyReadRevision
     loadingAdvancedSourceCode = position.sourceCode
@@ -240,6 +242,24 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
         advancedKeyLoading.value = false
         loadingAdvancedSourceCode = undefined
       }
+    }
+  }
+
+  async function loadAdvancedKeyTypes() {
+    if (!state.session || !profile.value?.capabilities.advancedKey || advancedKeyTypesLoading) return
+    const observedSession = state.session
+    const readRevision = ++advancedKeyTypesReadRevision
+    advancedKeyTypesLoading = true
+    try {
+      const types = await observedSession.getAdvancedKeyTypes(profile.value.positions.map((position) => position.sourceCode))
+      if (state.session !== observedSession || readRevision !== advancedKeyTypesReadRevision) return
+      advancedKeyTypes.value = Object.fromEntries(Object.entries(types).map(([sourceCode, type]) => [Number(sourceCode), type.toUpperCase()]))
+      // 每次进入页面都重新扫描类型，并强制刷新当前键的完整参数，避免展示设备外部修改前的旧缓存。
+      await loadAdvancedKey(selectedPositionId.value, true)
+    } catch (cause) {
+      if (state.session === observedSession && readRevision === advancedKeyTypesReadRevision) fail(cause)
+    } finally {
+      if (readRevision === advancedKeyTypesReadRevision) advancedKeyTypesLoading = false
     }
   }
 
@@ -408,10 +428,12 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   /** 模式、配置槽或设备会话改变后，上一上下文的单键缓存和在途结果都必须失效。 */
   function invalidateAdvancedKeyCache() {
     advancedKeyReadRevision++
+    advancedKeyTypesReadRevision++
     advancedKey.value = undefined
     advancedKeyLoading.value = false
     loadingAdvancedSourceCode = undefined
     advancedKeyTypes.value = {}
+    advancedKeyTypesLoading = false
     invalidateMacroCache()
   }
   function invalidateMacroCache() {
@@ -498,5 +520,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

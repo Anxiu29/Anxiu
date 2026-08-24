@@ -133,6 +133,11 @@ export class DeviceSession {
     return this.device.advancedKey.getAdvancedKey(sourceCode)
   }
 
+  async getAdvancedKeyTypes(sourceCodes: number[]) {
+    if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
+    return this.device.advancedKey.getAdvancedKeyTypes(sourceCodes)
+  }
+
   /** 高级键是单键即时事务：写入后立即回读，UI 始终展示固件实际接受的值。 */
   async updateAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
     if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })

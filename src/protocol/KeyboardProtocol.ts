@@ -11,7 +11,7 @@ import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import { DEFAULT_LIGHTING_SETTINGS } from '@/domain/lighting'
 import { decodeMainLighting, encodeMainLighting } from './xsyd/lightingCodec'
 import { decodeCustomLighting, encodeCustomLightingRead, encodeCustomLightingSave, encodeCustomLightingWrite, XSYD_CUSTOM_LIGHTING_KEYS_PER_PACKET } from './xsyd/customLightingCodec'
-import type { AdvancedKeySettings, DksAdvancedKey } from '@/domain/advancedKey'
+import type { AdvancedKeySettings, AdvancedKeyType, DksAdvancedKey } from '@/domain/advancedKey'
 import { advancedReadRequest, decodeEnd, decodeMpt, decodeSocd, decodeTgl, encodeDks, encodeEnd, encodeMpt, encodeMt, encodeSocd, encodeTgl } from './xsyd/advancedKeyCodec'
 import { DriverError } from '@/application/DriverError'
 import type { MacroSettings } from '@/domain/macro'
@@ -27,6 +27,10 @@ const ADVANCED_LAYOUT = {
 
 // MODE=6 在 1.0.7 方案中保留给宏；7 为 RS，8 为 SOCD。
 const ADVANCED_MODE = { dks: 1, mpt: 2, mt: 3, tgl: 4, end: 5, macro: 6, socd: 8 } as const
+const ADVANCED_TYPE_BY_MODE: Partial<Record<number, Exclude<AdvancedKeyType, 'none'>>> = {
+  [ADVANCED_MODE.dks]: 'dks', [ADVANCED_MODE.mpt]: 'mpt', [ADVANCED_MODE.mt]: 'mt',
+  [ADVANCED_MODE.tgl]: 'tgl', [ADVANCED_MODE.end]: 'end', [ADVANCED_MODE.socd]: 'socd',
+}
 
 export class XsydKeyboardProtocol implements KeyboardDevice {
   private readonly commands: XsydCommandClient
@@ -58,6 +62,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
   readonly advancedKey = {
     getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode),
+    getAdvancedKeyTypes: (sourceCodes: number[]) => this.getAdvancedKeyTypes(sourceCodes),
     setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings),
     deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode),
   }
@@ -179,6 +184,15 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     if (type === ADVANCED_MODE.end) return decodeEnd(sourceCode, await this.commands.request(XSYD_COMMANDS.end, advancedReadRequest(sourceCode)))
     if (type === ADVANCED_MODE.socd) return decodeSocd(sourceCode, await this.commands.request(XSYD_COMMANDS.socd, advancedReadRequest(sourceCode)))
     return { type: 'none', sourceCode }
+  }
+
+  async getAdvancedKeyTypes(sourceCodes: number[]) {
+    // MODE 可以像普通层键值一样每包读取 14 键；只扫描类型，不读取每个高级键的完整参数。
+    const modes = await this.readLayoutValues(sourceCodes, ADVANCED_LAYOUT.mode)
+    return Object.fromEntries([...modes].flatMap(([sourceCode, mode]) => {
+      const type = ADVANCED_TYPE_BY_MODE[mode & 0x0f]
+      return type ? [[sourceCode, type]] : []
+    }))
   }
 
   async setAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
@@ -363,6 +377,18 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   private async readLayoutValue(sourceCode: number, layout: number) {
     const data = await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array([0, sourceCode, layout, 0xff, 0xff]))
     return readUint16le(data, 3)
+  }
+
+  private async readLayoutValues(sourceCodes: number[], layout: number) {
+    const result = new Map<number, number>()
+    for (let offset = 0; offset < sourceCodes.length; offset += 14) {
+      const batch = sourceCodes.slice(offset, offset + 14)
+      const request = [0]
+      batch.forEach((sourceCode) => request.push(sourceCode, layout, 0xff, 0xff))
+      const data = await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array(request))
+      batch.forEach((sourceCode, index) => result.set(sourceCode, readUint16le(data, 1 + index * 4 + 2)))
+    }
+    return result
   }
 
   private async writeLayoutValue(sourceCode: number, layout: number, value: number) {
