@@ -15,9 +15,9 @@ const sameNumbers = (left: readonly number[], right: readonly number[], toleranc
 /** 比较“请求写入值”和“设备实际回读值”，防止用旧值覆盖界面后仍提示验证成功。 */
 function advancedKeyMatches(expected: Exclude<AdvancedKeySettings, { type: 'none' }>, actual: AdvancedKeySettings) {
   if (expected.type !== actual.type || expected.sourceCode !== actual.sourceCode) return false
+  // 此类固件的布局读取无法返回 DKS 写入行程；模式、四个键值和 TRPS 仍可可靠回读验证。
   if (expected.type === 'dks' && actual.type === 'dks') return sameNumbers(expected.keyCodes, actual.keyCodes)
     && sameNumbers(expected.triggers, actual.triggers)
-    && sameNumbers(expected.travels, actual.travels, 0.001)
   if (expected.type === 'mpt' && actual.type === 'mpt') return sameNumbers(expected.keyCodes, actual.keyCodes)
     && sameNumbers(expected.travels, actual.travels, 0.001)
   if (expected.type === 'mt' && actual.type === 'mt') return sameNumbers(expected.keyCodes, actual.keyCodes) && expected.delay === actual.delay
@@ -34,6 +34,8 @@ export class DeviceSession {
   profile?: KeyboardProfile
   original: KeyAssignment[] = []
   draft: KeyAssignment[] = []
+  // 部分固件的 DB1/DB2 读取返回轴体校准行程，而不是最近写入的 DKS 位置；会话内保留已确认写入值。
+  private readonly dksTravelCache = new Map<number, [number, number]>()
 
   constructor(private readonly device: KeyboardDevice, readonly keyCatalog: KeyCatalog, private readonly transport?: DeviceTransport) {}
 
@@ -151,7 +153,11 @@ export class DeviceSession {
 
   async getAdvancedKey(sourceCode: number) {
     if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
-    return this.device.advancedKey.getAdvancedKey(sourceCode)
+    const settings = await this.device.advancedKey.getAdvancedKey(sourceCode)
+    const cachedTravels = this.dksTravelCache.get(sourceCode)
+    return settings.type === 'dks' && cachedTravels
+      ? { ...settings, travels: [...cachedTravels] as [number, number] }
+      : settings
   }
 
   async getAdvancedKeyTypes(sourceCodes: number[]) {
@@ -168,12 +174,17 @@ export class DeviceSession {
     for (const delay of [60, 100, 160]) {
       await wait(delay)
       verified = await this.device.advancedKey.getAdvancedKey(settings.sourceCode)
-      if (advancedKeyMatches(settings, verified)) return verified
+      if (advancedKeyMatches(settings, verified)) {
+        if (settings.type === 'dks' && verified.type === 'dks') {
+          const travels: [number, number] = [...settings.travels]
+          this.dksTravelCache.set(settings.sourceCode, travels)
+          // 真机功能已经证明 0x26 接受了行程；布局读取却返回校准总行程，因此 UI 保留本次写入值。
+          return { ...verified, travels }
+        }
+        return verified
+      }
     }
-    const travelDetails = settings.type === 'dks' && verified.type === 'dks'
-      ? `：请求 ${settings.travels.join(' / ')} mm，设备回读 ${verified.travels.join(' / ')} mm`
-      : ''
-    throw new DriverError('VERIFY_FAILED', `高级键设置未被设备完整接受${travelDetails}`, true, {
+    throw new DriverError('VERIFY_FAILED', '高级键设置未被设备完整接受：模式、键值或触发点回读不一致', true, {
       details: { expected: settings, actual: verified },
     })
   }
@@ -181,6 +192,7 @@ export class DeviceSession {
   async deleteAdvancedKey(sourceCode: number) {
     if (!this.device.advancedKey) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持高级键', false, { details: { capability: 'advanced-key' } })
     await this.device.advancedKey.deleteAdvancedKey(sourceCode)
+    this.dksTravelCache.delete(sourceCode)
     return this.device.advancedKey.getAdvancedKey(sourceCode)
   }
 
