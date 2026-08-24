@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import type { KeyPerformanceSettings, PerformanceMode, PollingRate, TravelMatrix } from '@/domain/performance'
+import type { KeyPerformanceSettings, PerformanceMode, PollingRate, TravelSnapshot } from '@/domain/performance'
 import { clonePerformanceSettings } from '@/domain/performance'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
@@ -15,7 +15,7 @@ const props = defineProps<{
   settings?: KeyPerformanceSettings
   loading?: boolean
   pollingRate?: PollingRate
-  travelMatrix?: TravelMatrix
+  travelMatrix?: TravelSnapshot
   travelReading?: boolean
   calibrationActive?: boolean
   assignments: KeyAssignment[]
@@ -41,11 +41,12 @@ const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'
 const travelTestActive = ref(false)
 const calibrationMaxTravel = ref<Record<string, number>>({})
 const calibratedPositionIds = ref<Set<string>>(new Set())
+const autoSaveCalibrationRequested = ref(false)
 let travelTimer: number | undefined
 /** 把设备矩阵读数映射回 UI 物理位置，行程测试始终覆盖整把键盘。 */
 const travelByPosition = computed(() => Object.fromEntries(props.profile.positions.map((position) => {
   const address = position.address
-  const value = address.kind === 'matrix' ? props.travelMatrix?.[address.row]?.[address.column] ?? 0 : 0
+  const value = address.kind === 'matrix' ? props.travelMatrix?.travels[address.row]?.[address.column] ?? 0 : 0
   return [position.id, Math.max(0, Math.min(4, value))]
 })))
 const activeTravelPositionIds = computed(() => travelTestActive.value
@@ -110,12 +111,19 @@ watch(() => props.travelMatrix, () => {
   const nextCompleted = new Set(calibratedPositionIds.value)
   for (const position of props.profile.positions) {
     const current = travelByPosition.value[position.id] ?? 0
+    const address = position.address
+    const deviceState = address.kind === 'matrix' ? props.travelMatrix?.states[address.row]?.[address.column] ?? 0 : 0
     nextMax[position.id] = Math.max(nextMax[position.id] ?? 0, current)
-    // 完整校准动作包含“按到底”和“完全松开”；只按下不松开不算完成。
-    if (nextMax[position.id]! >= 3 && current <= 0.1) nextCompleted.add(position.id)
+    // matrix=3 是固件自身的逐键状态；值 2 与抓包中达到底部并点亮状态灯的键对应。
+    // 同时保留行程回退，仅用于不返回状态矩阵的兼容设备和演示实现。
+    if (deviceState >= 2 || !props.travelMatrix?.states.length && nextMax[position.id]! >= 3 && current <= 0.1) nextCompleted.add(position.id)
   }
   calibrationMaxTravel.value = nextMax
   calibratedPositionIds.value = nextCompleted
+  if (nextCompleted.size === props.profile.positions.length && !autoSaveCalibrationRequested.value) {
+    autoSaveCalibrationRequested.value = true
+    emit('finish-calibration')
+  }
 }, { deep: true })
 
 function setMode(mode: PerformanceMode) { if (draft.value) draft.value.mode = mode }
@@ -123,6 +131,7 @@ function save() { if (draft.value) emit('update', clonePerformanceSettings(draft
 function startCalibrationTracking() {
   calibrationMaxTravel.value = {}
   calibratedPositionIds.value = new Set()
+  autoSaveCalibrationRequested.value = false
   emit('start-calibration')
 }
 function selectKeyboardPosition(positionId: string) {
@@ -200,7 +209,7 @@ function selectKeyboardPosition(positionId: string) {
         <section v-else class="calibration-panel" :class="{ active: calibrationActive }">
           <div class="calibration-copy"><span class="eyebrow">SWITCH CALIBRATION</span><h3>轴体校准</h3><p>更换轴体、恢复出厂设置或发现按键行程异常时进行校准。校准过程中请勿断开键盘。</p></div>
           <div><ol class="calibration-steps"><li :class="{ active: !calibrationActive }"><b>1</b><div><strong>开始校准</strong><span>进入键盘的轴体校准状态</span></div></li><li :class="{ active: calibrationActive }"><b>2</b><div><strong>按压全部按键</strong><span>将每个按键按到底再完全松开，完成后键帽数字变绿</span></div></li><li :class="{ active: calibratedPositionIds.size === profile.positions.length }"><b>3</b><div><strong>保存校准</strong><span>全部按键完成后将新的行程范围写入键盘</span></div></li></ol><div class="calibration-progress"><div><span>校准进度</span><strong>{{ calibratedPositionIds.size }} / {{ profile.positions.length }}</strong></div><i><b :style="{ width: `${calibrationProgress}%` }"></b></i></div></div>
-          <div class="calibration-action"><span>{{ calibrationActive ? '正在检测全部按键' : calibratedPositionIds.size ? '本轮校准已停止' : '等待开始' }}</span><button v-if="!calibrationActive" class="primary" type="button" :disabled="busy" @click="startCalibrationTracking">开始校准</button><button v-else class="primary" type="button" :disabled="busy" @click="emit('finish-calibration')">保存校准</button></div>
+          <div class="calibration-action"><span>{{ autoSaveCalibrationRequested ? '全部完成，正在自动保存…' : calibrationActive ? '正在检测全部按键' : calibratedPositionIds.size ? '本轮校准已停止' : '等待开始' }}</span><button v-if="!calibrationActive" class="primary" type="button" :disabled="busy" @click="startCalibrationTracking">开始校准</button><button v-else class="primary" type="button" :disabled="busy || autoSaveCalibrationRequested" @click="emit('finish-calibration')">{{ autoSaveCalibrationRequested ? '正在保存…' : '保存校准' }}</button></div>
         </section>
       </div>
     </section>

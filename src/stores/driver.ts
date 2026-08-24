@@ -502,7 +502,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     performanceSettings.value = undefined
     performanceLoading.value = false
     pollingRate.value = undefined
-    travelMatrix.value = []
+    travelMatrix.value = { travels: [], states: [] }
     travelReading.value = false
     calibrationActive.value = false
     invalidateMacroCache()
