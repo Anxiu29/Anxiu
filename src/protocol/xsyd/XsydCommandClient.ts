@@ -164,7 +164,9 @@ export class XsydCommandClient {
   private handleFragment(report: Uint8Array, pending: PendingRequest) {
     const fragmented = pending.fragmented!
     if (fragmented.bytes.length === 0) {
-      if (report[0] !== PACKET_HEAD) throw new DriverError('PROTOCOL_REJECTED', '分片响应缺少协议包头')
+      // 抓包可见长帧尾片本身没有 5C 包头；快速进入下一轮查询时，旧尾片或同接口
+      // 的无关原始报告可能先到达。它无法归属当前事务，只能忽略并继续等待真正首片。
+      if (report[0] !== PACKET_HEAD) return
       // 等待目标命令时仍可能收到硬件主动上报；完整普通包应继续交给通知监听器。
       if (report[2] !== pending.definition.responseCode) {
         this.emitNotification(decodePacket(report, this.crc))
