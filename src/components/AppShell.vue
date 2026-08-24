@@ -10,6 +10,7 @@ const props = withDefaults(defineProps<{
   navigationDisabled?: boolean
   error?: string
   message?: string
+  messageWarning?: boolean
   sidebarImageUrl?: string
 }>(), { activeConfiguration: 1 })
 
@@ -145,7 +146,7 @@ onBeforeUnmount(() => {
       <slot v-else name="key-test" />
     </div>
 
-    <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error }" role="status">
+    <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error, warning: !error && messageWarning }" role="status">
       <span>{{ error || message }}</span>
       <button aria-label="关闭提示" title="关闭提示" @click="closeFeedback">×</button>
     </div>

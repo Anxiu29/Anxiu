@@ -344,6 +344,13 @@ main {
   background: rgba(43,20,24,.97);
 }
 
+.feedback-toast.warning {
+  color: #f2cf78;
+  border-color: rgba(232,180,75,.48);
+  background: rgba(48,37,17,.97);
+  box-shadow: 0 16px 48px rgba(0,0,0,.42), inset 3px 0 #e8b44b;
+}
+
 .feedback-toast button {
   position: absolute;
   top: 7px;

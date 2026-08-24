@@ -18,6 +18,8 @@ export const createDriverState = () => {
   const error = ref('')
   const errorCode = ref<DriverErrorCode>()
   const message = ref('')
+  // 普通成功消息和“尚未写入设备”的警告必须显式区分，UI 不通过文案内容猜状态。
+  const messageWarning = ref(false)
   const demo = ref(false)
   // 表现层通过驱动 id 选择对应图片、几何和方案名称，不根据 VID/PID 猜设备型号。
   const driverId = ref<string>()
@@ -52,7 +54,7 @@ export const createDriverState = () => {
   const keyLabels = computed(() => Object.fromEntries(keyOptions.value.map(({ code, label }) => [code, label])))
 
   return {
-    status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message,
+    status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning,
     demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
