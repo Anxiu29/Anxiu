@@ -8,7 +8,7 @@ import type { DefaultKeymapResolver } from './DefaultKeymapResolver'
 import { cloneLightingSettings, DEFAULT_LIGHTING_SETTINGS, type CustomKeyLighting, type LightingSettings } from '@/domain/lighting'
 import { cloneAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
 import { cloneMacroSettings, createEmptyMacro, type MacroSettings } from '@/domain/macro'
-import { DEFAULT_PERFORMANCE_SETTINGS, type KeyPerformanceSettings } from '@/domain/performance'
+import { DEFAULT_PERFORMANCE_SETTINGS, type KeyPerformanceSettings, type PollingRate } from '@/domain/performance'
 
 /**
  * 不访问 HID 的内存协议实现。它实现与真机相同的 KeyboardDevice 端口，
@@ -31,7 +31,15 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly customLighting = { getCustomLighting: (sourceCodes: number[]) => this.getCustomLighting(sourceCodes), setCustomLighting: (items: CustomKeyLighting[]) => this.setCustomLighting(items), saveCustomLighting: () => this.saveCustomLighting() }
   readonly advancedKey = { getAdvancedKey: (sourceCode: number) => this.getAdvancedKey(sourceCode), getAdvancedKeyTypes: (sourceCodes: number[]) => this.getAdvancedKeyTypes(sourceCodes), setAdvancedKey: (settings: Exclude<AdvancedKeySettings, { type: 'none' }>) => this.setAdvancedKey(settings), deleteAdvancedKey: (sourceCode: number) => this.deleteAdvancedKey(sourceCode) }
   readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings), deleteMacroBinding: (sourceCode: number) => this.deleteMacroBinding(sourceCode) }
-  readonly performance = { getPerformance: (sourceCode: number) => this.getPerformance(sourceCode), setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings) }
+  readonly performance = {
+    getPerformance: (sourceCode: number) => this.getPerformance(sourceCode),
+    setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings),
+    getPollingRate: () => this.getPollingRate(),
+    setPollingRate: (rate: PollingRate) => this.setPollingRate(rate),
+    getTravelMatrix: () => this.getTravelMatrix(),
+    startCalibration: () => this.startCalibration(),
+    finishCalibration: () => this.finishCalibration(),
+  }
   private readonly capabilities: DeviceCapabilities
   private currentMode: KeyboardMode = 'win'
   private lightingSettings = cloneLightingSettings(DEFAULT_LIGHTING_SETTINGS)
@@ -39,6 +47,8 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   private readonly advancedKeys = new Map<number, AdvancedKeySettings>()
   private readonly macros = new Map<number, MacroSettings>()
   private readonly performanceSettings = new Map<number, KeyPerformanceSettings>()
+  private pollingRate: PollingRate = 1000
+  private calibrationActive = false
   // 全局触发与死区在真机中由 0x29 单独保存，不能错误地挂在某一个物理键上。
   private globalPerformance = {
     globalActuation: DEFAULT_PERFORMANCE_SETTINGS.globalActuation,
@@ -70,7 +80,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   }
   async save() { await this.wait(); this.stored = cloneAssignments(this.working) }
   async reload() { await this.wait(); this.working = cloneAssignments(this.stored) }
-  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear(); this.performanceSettings.clear(); this.globalPerformance = { globalActuation: DEFAULT_PERFORMANCE_SETTINGS.globalActuation, pressDeadZone: DEFAULT_PERFORMANCE_SETTINGS.pressDeadZone, releaseDeadZone: DEFAULT_PERFORMANCE_SETTINGS.releaseDeadZone }; this.customLightingColors.clear() }
+  async restoreFactory() { await this.wait(); const defaults = this.defaultsFor(this.currentMode); this.working = cloneAssignments(defaults); this.stored = cloneAssignments(defaults); this.macros.clear(); this.performanceSettings.clear(); this.globalPerformance = { globalActuation: DEFAULT_PERFORMANCE_SETTINGS.globalActuation, pressDeadZone: DEFAULT_PERFORMANCE_SETTINGS.pressDeadZone, releaseDeadZone: DEFAULT_PERFORMANCE_SETTINGS.releaseDeadZone }; this.pollingRate = 1000; this.calibrationActive = false; this.customLightingColors.clear() }
   async switchMode(mode: KeyboardMode) {
     await this.wait()
     this.currentMode = mode
@@ -113,6 +123,16 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
     }
     this.performanceSettings.set(settings.sourceCode, { ...settings })
   }
+  async getPollingRate() { await this.wait(); return this.pollingRate }
+  async setPollingRate(rate: PollingRate) { await this.wait(); this.pollingRate = rate; return rate }
+  async getTravelMatrix() {
+    await this.wait()
+    // 演示模式生成平滑变化，便于在没有真机时检查实时行程 UI。
+    const phase = (Date.now() % 2400) / 2400 * Math.PI * 2
+    return Array.from({ length: 6 }, (_, row) => Array.from({ length: 21 }, (_, column) => Math.max(0, Math.sin(phase + (row * 21 + column) * 0.07)) * 4))
+  }
+  async startCalibration() { await this.wait(); this.calibrationActive = true }
+  async finishCalibration() { await this.wait(); this.calibrationActive = false }
   close() {}
 
   private defaultsFor(mode: KeyboardMode) {

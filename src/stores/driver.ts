@@ -6,13 +6,13 @@ import { createDriverState } from './driverState'
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
-import type { KeyPerformanceSettings } from '@/domain/performance'
+import type { KeyPerformanceSettings, PollingRate } from '@/domain/performance'
 import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -304,6 +304,41 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     } catch (cause) { fail(cause) }
   }
 
+  async function loadPollingRate() {
+    if (!state.session || !profile.value?.capabilities.pollingRates?.length) return
+    try { pollingRate.value = await state.session.getPollingRate() }
+    catch (cause) { fail(cause) }
+  }
+
+  async function updatePollingRate(rate: PollingRate) {
+    if (!state.session || !profile.value?.capabilities.pollingRates?.includes(rate) || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try { pollingRate.value = await state.session.updatePollingRate(rate); status.value = 'ready'; message.value = `回报率已设置为 ${rate} Hz` }
+    catch (cause) { fail(cause) }
+  }
+
+  async function readTravelMatrix() {
+    if (!state.session || !profile.value?.capabilities.travelTest || travelReading.value) return
+    travelReading.value = true
+    try { travelMatrix.value = await state.session.getTravelMatrix() }
+    catch (cause) { fail(cause) }
+    finally { travelReading.value = false }
+  }
+
+  async function startCalibration() {
+    if (!state.session || !profile.value?.capabilities.calibration || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try { await state.session.startCalibration(); calibrationActive.value = true; status.value = 'ready'; message.value = '校准已开始，请依次将所有按键按到底' }
+    catch (cause) { fail(cause) }
+  }
+
+  async function finishCalibration() {
+    if (!state.session || !profile.value?.capabilities.calibration || !calibrationActive.value) return
+    clearFeedback(); status.value = 'writing'
+    try { await state.session.finishCalibration(); calibrationActive.value = false; status.value = 'ready'; message.value = '键盘校准已完成' }
+    catch (cause) { fail(cause) }
+  }
+
   async function loadMacro(positionId = selectedPositionId.value, force = false) {
     if (!state.session || !profile.value?.capabilities.macro || !positionId || ['connecting', 'writing'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
@@ -466,6 +501,10 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     performanceReadRevision++
     performanceSettings.value = undefined
     performanceLoading.value = false
+    pollingRate.value = undefined
+    travelMatrix.value = []
+    travelReading.value = false
+    calibrationActive.value = false
     invalidateMacroCache()
   }
   function invalidateMacroCache() {
@@ -552,5 +591,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadPerformance, updatePerformance, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadPerformance, updatePerformance, loadPollingRate, updatePollingRate, readTravelMatrix, startCalibration, finishCalibration, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

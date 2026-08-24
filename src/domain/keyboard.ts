@@ -62,6 +62,10 @@ export interface DeviceCapabilities {
   macro?: boolean
   /** true 时设备提供全局、单键和快速触发性能参数。 */
   performance?: boolean
+  /** 型号实际开放的 USB 回报率；公共界面不假定所有设备都支持 8K。 */
+  pollingRates?: number[]
+  travelTest?: boolean
+  calibration?: boolean
   /** 宏容量由设备层声明，公共 UI 不假定所有型号都有 16 个槽位。 */
   macroSlots?: number
   macroMaxActions?: number

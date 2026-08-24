@@ -17,9 +17,10 @@ import { DriverError } from '@/application/DriverError'
 import type { MacroSettings } from '@/domain/macro'
 import { createEmptyMacro, validateMacroSettings } from '@/domain/macro'
 import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacroModeWrite, MACRO_ACTIONS_PER_PACKET, XSYD_MACRO_BUFFER_OFFSET, XSYD_MACRO_LAYOUT_MODE, XSYD_MAX_MACRO_ACTIONS, XSYD_MAX_MACRO_SLOTS } from './xsyd/macroCodec'
-import type { KeyPerformanceSettings, PerformanceMode } from '@/domain/performance'
+import type { KeyPerformanceSettings, PerformanceMode, PollingRate } from '@/domain/performance'
 import { validatePerformanceSettings } from '@/domain/performance'
 import { decodeGlobalPerformance, encodeGlobalPerformance } from './xsyd/performanceCodec'
+import { decodeTravelHalf, encodeTravelRequest } from './xsyd/travelCodec'
 
 const ADVANCED_LAYOUT = {
   db0: 0x04, db1: 0x05, db2: 0x06, mode: 0x08,
@@ -29,6 +30,8 @@ const ADVANCED_LAYOUT = {
 } as const
 const PERFORMANCE_MODE: Record<PerformanceMode, number> = { global: 0, single: 1, 'rapid-trigger': 2 }
 const PERFORMANCE_MODE_BY_VALUE: Record<number, PerformanceMode> = { 0: 'global', 1: 'single', 2: 'rapid-trigger' }
+const POLLING_RATE_CODES: Record<PollingRate, number> = { 8000: 0, 4000: 1, 2000: 2, 1000: 3, 500: 4, 250: 5, 125: 6 }
+const POLLING_RATES_BY_CODE: Record<number, PollingRate> = { 0: 8000, 1: 4000, 2: 2000, 3: 1000, 4: 500, 5: 250, 6: 125 }
 
 // MODE=6 在 1.0.7 方案中保留给宏；7 为 RS，8 为 SOCD。
 const ADVANCED_MODE = { dks: 1, mpt: 2, mt: 3, tgl: 4, end: 5, macro: 6, socd: 8 } as const
@@ -74,6 +77,11 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   readonly performance = {
     getPerformance: (sourceCode: number) => this.getPerformance(sourceCode),
     setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings),
+    getPollingRate: () => this.getPollingRate(),
+    setPollingRate: (rate: PollingRate) => this.setPollingRate(rate),
+    getTravelMatrix: () => this.getTravelMatrix(),
+    startCalibration: () => this.startCalibration(),
+    finishCalibration: () => this.finishCalibration(),
   }
   readonly macro = {
     getMacro: (sourceCode: number) => this.getMacro(sourceCode),
@@ -262,6 +270,27 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     const mode = await this.readLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode)
     await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, (mode & 0x0f) | (PERFORMANCE_MODE[settings.mode] << 4))
   }
+
+  async getPollingRate(): Promise<PollingRate> {
+    const data = await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([XSYD_ACTIONS.pollingRate]))
+    return POLLING_RATES_BY_CODE[data[2] ?? -1] ?? 1000
+  }
+
+  async setPollingRate(rate: PollingRate): Promise<PollingRate> {
+    const code = POLLING_RATE_CODES[rate]
+    const data = await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([XSYD_ACTIONS.pollingRate, code]))
+    return POLLING_RATES_BY_CODE[data[2] ?? code] ?? rate
+  }
+
+  async getTravelMatrix() {
+    // 每一半矩阵包含 3×21 个 uint16，固件固定拆成三个响应包。
+    const first = decodeTravelHalf(await this.commands.requestMultiple(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(1), 3))
+    const second = decodeTravelHalf(await this.commands.requestMultiple(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(2), 3))
+    return [...first, ...second]
+  }
+
+  startCalibration() { return this.action(XSYD_ACTIONS.startCalibration, 1600) }
+  finishCalibration() { return this.action(XSYD_ACTIONS.finishCalibration, 1600) }
 
   async getMacro(sourceCode: number): Promise<MacroSettings> {
     // 0x21 的空查询也会回显传入的物理键，因此不能用 response.key 判断是否绑定宏。

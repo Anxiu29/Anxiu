@@ -6,9 +6,11 @@ import { XSYD_FAILURE_RESPONSE, type CommandDefinition } from './commands'
 interface PendingRequest {
   definition: CommandDefinition
   expectedOrder?: number
-  resolve: (packet: Uint8Array) => void
+  resolve: (packet: Uint8Array | Uint8Array[]) => void
   reject: (error: Error) => void
   timer: ReturnType<typeof setTimeout>
+  expectedResponses: number
+  responses: Uint8Array[]
 }
 
 export class XsydCommandClient {
@@ -35,7 +37,7 @@ export class XsydCommandClient {
         this.pending = undefined
         reject(new DriverError('PROTOCOL_TIMEOUT', `设备响应超时（${definition.name}: 0x${definition.code.toString(16)}）`, true, { details: { command: definition.code, commandName: definition.name } }))
       }, timeoutMs)
-      this.pending = { definition, expectedOrder: definition.responseEchoesOrder ? data[0] : undefined, resolve, reject, timer }
+      this.pending = { definition, expectedOrder: definition.responseEchoesOrder ? data[0] : undefined, resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [] }
       try {
         await this.transport.send(encodePacket(definition.code, data, this.crc))
       } catch (error) {
@@ -46,6 +48,23 @@ export class XsydCommandClient {
     })
     const result = this.queue.then(operation, operation)
     // queue 自身吞掉错误只为保持队列可继续；调用者拿到的 result 仍会正常 reject。
+    this.queue = result.catch(() => undefined)
+    return result
+  }
+
+  /** 0x12 的矩阵数据会拆成三个 HID 报告；仍进入同一串行队列，避免和普通请求抢响应。 */
+  requestMultiple(definition: CommandDefinition, data: Uint8Array, expectedResponses: number, timeoutMs = definition.timeoutMs): Promise<Uint8Array[]> {
+    if (this.closed) return Promise.reject(new DriverError('DEVICE_NOT_CONNECTED', '设备会话已关闭'))
+    const operation = () => new Promise<Uint8Array[]>(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending = undefined
+        reject(new DriverError('PROTOCOL_TIMEOUT', `设备多包响应超时（${definition.name}）`, true))
+      }, timeoutMs)
+      this.pending = { definition, resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses, responses: [] }
+      try { await this.transport.send(encodePacket(definition.code, data, this.crc)) }
+      catch (error) { clearTimeout(timer); this.pending = undefined; reject(error instanceof Error ? error : new Error(String(error))) }
+    })
+    const result = this.queue.then(operation, operation)
     this.queue = result.catch(() => undefined)
     return result
   }
@@ -98,9 +117,11 @@ export class XsydCommandClient {
         this.emitNotification(packet)
         return
       }
+      pending.responses.push(packet.data)
+      if (pending.responses.length < pending.expectedResponses) return
       clearTimeout(timer)
       this.pending = undefined
-      resolve(packet.data)
+      resolve(pending.expectedResponses === 1 ? packet.data : pending.responses)
     } catch (error) {
       // 空闲时的损坏上报不对应任何调用方，忽略即可；请求响应损坏仍应让请求失败。
       if (!pending) return

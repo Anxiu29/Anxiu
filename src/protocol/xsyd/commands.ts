@@ -20,6 +20,7 @@ export const XSYD_COMMANDS = {
   lighting: command('main-lighting', 0x18),
   customLighting: command('custom-key-lighting', 0x2a),
   performance: command('global-performance', 0x29),
+  travelMatrix: command('matrix-travel', 0x12, 1200, 'none'),
   mt: command('advanced-mt', 0x24),
   tgl: command('advanced-tgl', 0x25),
   dks: command('advanced-dks', 0x26),
@@ -32,8 +33,9 @@ export const XSYD_COMMANDS = {
 
 export const XSYD_ACTIONS = {
   protocolVersion: 0x01, save: 0x02, reload: 0x03, restoreFactory: 0x11,
+  startCalibration: 0x0c, finishCalibration: 0x0d,
   queryWinMode: 0x21, queryMacMode: 0x22,
-  switchToWin: 0x30, switchToMac: 0x31, switchConfiguration: 0x70,
+  switchToWin: 0x30, switchToMac: 0x31, pollingRate: 0x50, switchConfiguration: 0x70,
 } as const
 
 export const XSYD_FAILURE_RESPONSE = 0xff

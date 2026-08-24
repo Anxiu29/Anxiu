@@ -2,7 +2,7 @@ import type { KeyboardConfiguration, KeyboardMode, KeyAssignment, KeyboardProfil
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
-import type { KeyPerformanceSettings } from '@/domain/performance'
+import type { KeyPerformanceSettings, PollingRate, TravelMatrix } from '@/domain/performance'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -75,6 +75,11 @@ export interface MacroCapability {
 export interface PerformanceCapability {
   getPerformance(sourceCode: number): Promise<KeyPerformanceSettings>
   setPerformance(settings: KeyPerformanceSettings): Promise<void>
+  getPollingRate(): Promise<PollingRate>
+  setPollingRate(rate: PollingRate): Promise<PollingRate>
+  getTravelMatrix(): Promise<TravelMatrix>
+  startCalibration(): Promise<void>
+  finishCalibration(): Promise<void>
 }
 
 /** 协议适配器按能力组合；未支持的能力保持 undefined。 */

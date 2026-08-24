@@ -6,7 +6,7 @@ import type { DriverErrorCode } from '@/application/DriverError'
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
-import type { KeyPerformanceSettings } from '@/domain/performance'
+import type { KeyPerformanceSettings, PollingRate, TravelMatrix } from '@/domain/performance'
 
 /** Driver Store 的响应式状态与派生查询；不执行连接、协议或写入操作。 */
 export const createDriverState = () => {
@@ -45,6 +45,10 @@ export const createDriverState = () => {
   const macroLoading = ref(false)
   const performanceSettings = ref<KeyPerformanceSettings>()
   const performanceLoading = ref(false)
+  const pollingRate = ref<PollingRate>()
+  const travelMatrix = ref<TravelMatrix>([])
+  const travelReading = ref(false)
+  const calibrationActive = ref(false)
   // DeviceSession 是可变的类实例，用 shallowRef 只追踪“会话被替换”，避免 Vue 深度代理协议对象。
   const activeSession = shallowRef<DeviceSession>()
 
@@ -58,7 +62,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning,
-    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }

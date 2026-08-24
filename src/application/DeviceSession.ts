@@ -7,7 +7,7 @@ import { saveConfiguration, type SaveProgressObserver } from './SaveConfiguratio
 import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
-import type { KeyPerformanceSettings } from '@/domain/performance'
+import type { KeyPerformanceSettings, PollingRate } from '@/domain/performance'
 
 const wait = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds))
 const sameNumbers = (left: readonly number[], right: readonly number[], tolerance = 0) => left.length === right.length
@@ -219,6 +219,33 @@ export class DeviceSession {
       if (same) return verified
     }
     throw new DriverError('VERIFY_FAILED', '性能设置未被设备完整接受', true, { details: { expected: settings, actual: verified } })
+  }
+
+  async getPollingRate() {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持回报率设置', false)
+    return this.device.performance.getPollingRate()
+  }
+
+  async updatePollingRate(rate: PollingRate) {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持回报率设置', false)
+    const actual = await this.device.performance.setPollingRate(rate)
+    if (actual !== rate) throw new DriverError('VERIFY_FAILED', `设备回报率为 ${actual} Hz，未接受 ${rate} Hz`, true)
+    return actual
+  }
+
+  async getTravelMatrix() {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持行程测试', false)
+    return this.device.performance.getTravelMatrix()
+  }
+
+  async startCalibration() {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持键盘校准', false)
+    await this.device.performance.startCalibration()
+  }
+
+  async finishCalibration() {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持键盘校准', false)
+    await this.device.performance.finishCalibration()
   }
 
   async getMacro(sourceCode: number) {

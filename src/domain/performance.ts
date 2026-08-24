@@ -1,4 +1,7 @@
 export type PerformanceMode = 'global' | 'single' | 'rapid-trigger'
+export type PollingRate = 125 | 250 | 500 | 1000 | 2000 | 4000 | 8000
+/** 设备 6×21 矩阵中的实时按压行程，单位为 mm。 */
+export type TravelMatrix = number[][]
 
 /** 单个物理键的性能参数；所有行程统一使用 mm。 */
 export interface KeyPerformanceSettings {
