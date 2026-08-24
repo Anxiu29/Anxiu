@@ -39,6 +39,8 @@ const activePanel = ref<PerformancePanel>('settings')
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
 const travelTestActive = ref(false)
+const calibrationMaxTravel = ref<Record<string, number>>({})
+const calibratedPositionIds = ref<Set<string>>(new Set())
 let travelTimer: number | undefined
 /** 把设备矩阵读数映射回 UI 物理位置，行程测试始终覆盖整把键盘。 */
 const travelByPosition = computed(() => Object.fromEntries(props.profile.positions.map((position) => {
@@ -61,6 +63,9 @@ const travelStatusText = computed(() => {
   if (props.travelReading) return '正在读取整把键盘…'
   return '全键盘实时测试中'
 })
+const calibrationBadges = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, `${(calibrationMaxTravel.value[position.id] ?? 0).toFixed(2)} mm`])))
+const calibrationKeyColors = computed(() => Object.fromEntries([...calibratedPositionIds.value].map((id) => [id, '#39d98a'])))
+const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
 
@@ -78,36 +83,58 @@ watch(() => props.selectedPositionId, (positionId) => {
 }, { immediate: true })
 watch(() => props.profile.capabilities.pollingRates, (rates) => { if (rates?.length) emit('load-polling-rate') }, { immediate: true })
 
+const shouldPollTravel = () => travelTestActive.value || (activePanel.value === 'calibration' && props.calibrationActive)
 function scheduleTravelRead() {
-  if (!travelTestActive.value) return
+  if (!shouldPollTravel()) return
   if (props.status === 'ready') emit('read-travel')
   travelTimer = window.setTimeout(scheduleTravelRead, 220)
 }
-function toggleTravelTest() {
-  travelTestActive.value = !travelTestActive.value
+function refreshTravelPolling() {
   if (travelTimer !== undefined) window.clearTimeout(travelTimer)
   travelTimer = undefined
-  if (travelTestActive.value) scheduleTravelRead()
+  if (shouldPollTravel()) scheduleTravelRead()
 }
+function toggleTravelTest() { travelTestActive.value = !travelTestActive.value; refreshTravelPolling() }
 /** 切走行程测试时停止轮询，避免隐藏页面继续占用 HID 通信。 */
 function selectPanel(panel: PerformancePanel) {
   activePanel.value = panel
-  if (panel !== 'travel' && travelTestActive.value) toggleTravelTest()
+  if (panel !== 'travel') travelTestActive.value = false
+  refreshTravelPolling()
 }
 onBeforeUnmount(() => { if (travelTimer !== undefined) window.clearTimeout(travelTimer) })
 
+watch([() => props.calibrationActive, activePanel], refreshTravelPolling)
+watch(() => props.travelMatrix, () => {
+  if (!props.calibrationActive) return
+  const nextMax = { ...calibrationMaxTravel.value }
+  const nextCompleted = new Set(calibratedPositionIds.value)
+  for (const position of props.profile.positions) {
+    const current = travelByPosition.value[position.id] ?? 0
+    nextMax[position.id] = Math.max(nextMax[position.id] ?? 0, current)
+    // 完整校准动作包含“按到底”和“完全松开”；只按下不松开不算完成。
+    if (nextMax[position.id]! >= 3 && current <= 0.1) nextCompleted.add(position.id)
+  }
+  calibrationMaxTravel.value = nextMax
+  calibratedPositionIds.value = nextCompleted
+}, { deep: true })
+
 function setMode(mode: PerformanceMode) { if (draft.value) draft.value.mode = mode }
 function save() { if (draft.value) emit('update', clonePerformanceSettings(draft.value)) }
+function startCalibrationTracking() {
+  calibrationMaxTravel.value = {}
+  calibratedPositionIds.value = new Set()
+  emit('start-calibration')
+}
 function selectKeyboardPosition(positionId: string) {
-  // 行程测试展示整个矩阵，点击键帽不应把测试退化为单键绑定。
-  if (activePanel.value !== 'travel') emit('select-position', positionId)
+  // 行程测试和校准都操作整个矩阵，点击键帽不应切换成单键配置。
+  if (activePanel.value === 'settings') emit('select-position', positionId)
 }
 </script>
 
 <template>
   <section class="performance-workspace">
-    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel === 'travel' && travelTestActive }">
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel === 'travel' ? undefined : selectedPositionId" :pressed="activePanel === 'travel' ? activeTravelPositionIds : []" :badges="activePanel === 'travel' ? travelBadges : {}" :key-colors="activePanel === 'travel' ? travelKeyColors : {}" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
+    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel === 'travel' && travelTestActive, 'calibration-tracking': activePanel === 'calibration' }">
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel === 'travel' || activePanel === 'calibration' ? undefined : selectedPositionId" :pressed="activePanel === 'travel' ? activeTravelPositionIds : []" :badges="activePanel === 'travel' ? travelBadges : activePanel === 'calibration' ? calibrationBadges : {}" :key-colors="activePanel === 'travel' ? travelKeyColors : activePanel === 'calibration' ? calibrationKeyColors : {}" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
     </div>
 
     <section class="panel performance-editor">
@@ -172,8 +199,8 @@ function selectKeyboardPosition(positionId: string) {
 
         <section v-else class="calibration-panel" :class="{ active: calibrationActive }">
           <div class="calibration-copy"><span class="eyebrow">SWITCH CALIBRATION</span><h3>轴体校准</h3><p>更换轴体、恢复出厂设置或发现按键行程异常时进行校准。校准过程中请勿断开键盘。</p></div>
-          <ol class="calibration-steps"><li :class="{ active: !calibrationActive }"><b>1</b><div><strong>开始校准</strong><span>进入键盘的轴体校准状态</span></div></li><li :class="{ active: calibrationActive }"><b>2</b><div><strong>按压全部按键</strong><span>将每个按键依次按到底并完全松开，建议重复两次</span></div></li><li><b>3</b><div><strong>保存校准</strong><span>完成后将新的行程范围写入键盘</span></div></li></ol>
-          <div class="calibration-action"><span>{{ calibrationActive ? '校准进行中' : '等待开始' }}</span><button v-if="!calibrationActive" class="primary" type="button" :disabled="busy" @click="emit('start-calibration')">开始校准</button><button v-else class="primary" type="button" :disabled="busy" @click="emit('finish-calibration')">保存校准</button></div>
+          <div><ol class="calibration-steps"><li :class="{ active: !calibrationActive }"><b>1</b><div><strong>开始校准</strong><span>进入键盘的轴体校准状态</span></div></li><li :class="{ active: calibrationActive }"><b>2</b><div><strong>按压全部按键</strong><span>将每个按键按到底再完全松开，完成后键帽数字变绿</span></div></li><li :class="{ active: calibratedPositionIds.size === profile.positions.length }"><b>3</b><div><strong>保存校准</strong><span>全部按键完成后将新的行程范围写入键盘</span></div></li></ol><div class="calibration-progress"><div><span>校准进度</span><strong>{{ calibratedPositionIds.size }} / {{ profile.positions.length }}</strong></div><i><b :style="{ width: `${calibrationProgress}%` }"></b></i></div></div>
+          <div class="calibration-action"><span>{{ calibrationActive ? '正在检测全部按键' : calibratedPositionIds.size ? '本轮校准已停止' : '等待开始' }}</span><button v-if="!calibrationActive" class="primary" type="button" :disabled="busy" @click="startCalibrationTracking">开始校准</button><button v-else class="primary" type="button" :disabled="busy" @click="emit('finish-calibration')">保存校准</button></div>
         </section>
       </div>
     </section>
