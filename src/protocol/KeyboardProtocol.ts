@@ -20,7 +20,7 @@ import { decodeMacroMode, encodeMacroDataWrite, encodeMacroModeRead, encodeMacro
 import type { KeyPerformanceSettings, PerformanceMode, PollingRate } from '@/domain/performance'
 import { validatePerformanceSettings } from '@/domain/performance'
 import { decodeGlobalPerformance, encodeGlobalPerformance } from './xsyd/performanceCodec'
-import { decodeTravelHalf, encodeTravelRequest } from './xsyd/travelCodec'
+import { decodeTravelHalf, encodeTravelRequest, encodeTravelStateRequest } from './xsyd/travelCodec'
 
 const ADVANCED_LAYOUT = {
   db0: 0x04, db1: 0x05, db2: 0x06, mode: 0x08,
@@ -283,9 +283,12 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async getTravelMatrix() {
-    // UI 只需要 matrix=2 的毫米行程；matrix=3 是另一张状态矩阵，不能混作行程解码。
+    // 完整抓包中的官方循环固定为 02-01 → 03-01 → 02-02 → 03-01。
+    // matrix=3 不作为毫米值解码，但必须在两页行程后读取，保持设备分页状态与官方一致。
     const first = decodeTravelHalf(await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(1)))
+    await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelStateRequest())
     const second = decodeTravelHalf(await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(2)))
+    await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelStateRequest())
     return [...first, ...second]
   }
 

@@ -16,8 +16,13 @@ export class WebHidTransport implements DeviceTransport {
   private disconnectListeners = new Set<() => void>()
   private readonly reportHandler = (event: HIDInputReportEvent) => {
     const bytes = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength)
+    // WebHID 通常把 reportId 放在 event.reportId 并从 data 中移除；部分平台仍可能
+    // 返回抓包中那种“00 + 64 字节报告”。只在长度精确多 1 时剥离，避免误删长帧续片的 00 数据。
+    const payload = bytes.length === this.config.reportSize + 1 && bytes[0] === event.reportId
+      ? bytes.slice(1)
+      : bytes
     // 每个订阅者收到独立副本，避免某个解析器修改共享 HID 缓冲区。
-    this.reportListeners.forEach((listener) => listener(bytes.slice()))
+    this.reportListeners.forEach((listener) => listener(payload.slice()))
   }
   private readonly disconnectHandler = (event: HIDConnectionEvent) => {
     if (event.device === this.device) this.disconnectListeners.forEach((listener) => listener())
