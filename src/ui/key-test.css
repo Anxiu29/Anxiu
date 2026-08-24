@@ -3,7 +3,8 @@
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: 82px minmax(0, 1fr) 176px;
+  /* 顶部统计固定，中间键盘弹性收缩，把更多纵向空间留给事件记录。 */
+  grid-template-rows: 82px minmax(220px, 1fr) 250px;
   gap: 10px;
   overflow: hidden;
 }
@@ -37,8 +38,8 @@
 .key-test-history > header small,
 .key-test-history > header span { color: #75808d; font-size: 11px; }
 .key-test-history > header span { color: var(--cyan); }
-.key-test-records { margin-top: 14px; padding-bottom: 5px; display: flex; gap: 9px; overflow-x: auto; overflow-y: hidden; }
-.key-test-records article { min-width: 208px; padding: 12px 13px; display: grid; gap: 6px; border: 1px solid #2a3440; border-radius: 7px; background: #0c1117; }
+.key-test-records { height: calc(100% - 32px); min-height: 0; margin-top: 14px; padding-bottom: 5px; display: flex; align-items: stretch; gap: 9px; overflow-x: auto; overflow-y: hidden; }
+.key-test-records article { min-width: 208px; padding: 12px 13px; display: grid; align-content: center; gap: 8px; border: 1px solid #2a3440; border-radius: 7px; background: #0c1117; }
 .key-test-records article.unmatched { opacity: .55; }
 .key-test-records article > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .key-test-records strong { color: #e5ebf0; font-size: 15px; }
@@ -50,7 +51,7 @@
 .key-test-empty { height: 88px; display: grid; place-items: center; color: #596573; font-size: 11px; }
 
 @media (max-height: 820px) {
-  .key-test-workspace { grid-template-rows: 68px minmax(0, 1fr) 150px; gap: 8px; }
+  .key-test-workspace { grid-template-rows: 68px minmax(180px, 1fr) 210px; gap: 8px; }
   .key-test-heading { padding-block: 9px; }
   .key-test-history { padding-block: 10px; }
   .key-test-records { margin-top: 8px; }
