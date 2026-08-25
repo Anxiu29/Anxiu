@@ -205,7 +205,12 @@ export class XsydCommandClient {
 
     const packet = decodePacket(Uint8Array.from(fragmented.bytes.slice(0, fragmented.totalLength)), this.crc)
     if (pending.expectedOrder !== undefined && packet.data[1] !== pending.expectedOrder) {
-      throw new DriverError('PROTOCOL_REJECTED', `设备返回了其他矩阵（期望 0x${pending.expectedOrder.toString(16).padStart(2, '0')}，收到 0x${(packet.data[1] ?? 0xff).toString(16).padStart(2, '0')}）`, true)
+      // 上一轮最后一个 matrix=3 完整帧也可能延迟到下一轮 matrix=2 已开始后才到达。
+      // 它和当前响应使用相同的 0x92 命令码，不能仅凭命令码归入当前事务；清空本帧后
+      // 继续等待目标矩阵。原请求计时器保持不变，目标帧始终不到仍会正常超时。
+      fragmented.bytes = []
+      fragmented.totalLength = undefined
+      return
     }
     clearTimeout(pending.timer)
     if (this.pending === pending) this.pending = undefined
