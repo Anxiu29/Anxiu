@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
+import type { AppTheme } from '@/ui/theme'
 
 type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'performance' | 'macro' | 'key-test'
 
@@ -12,11 +13,13 @@ const props = withDefaults(defineProps<{
   message?: string
   messageWarning?: boolean
   sidebarImageUrl?: string
-}>(), { activeConfiguration: 1 })
+  theme?: AppTheme
+}>(), { activeConfiguration: 1, theme: 'dark' })
 
 const emit = defineEmits<{
   'select-configuration': [configuration: KeyboardConfiguration]
   'restore-factory': []
+  'update:theme': [theme: AppTheme]
 }>()
 
 const activeView = ref<WorkspaceView>('device')
@@ -159,6 +162,13 @@ onBeforeUnmount(() => {
     <div v-if="settingsOpen" class="settings-backdrop" @click.self="settingsOpen = false">
       <section class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <header><div><span class="eyebrow">DEVICE SETTINGS</span><h2 id="settings-title">设置</h2></div><button type="button" aria-label="关闭设置" title="关闭设置" @click="settingsOpen = false">×</button></header>
+        <div class="settings-appearance">
+          <div><strong>界面主题</strong><p>选择更适合当前环境的显示外观，设置会保存在此浏览器中。</p></div>
+          <div class="theme-options" role="radiogroup" aria-label="界面主题">
+            <button type="button" role="radio" :aria-checked="theme === 'light'" :class="{ active: theme === 'light' }" @click="emit('update:theme', 'light')"><span class="theme-preview light"><i></i><i></i></span>浅色</button>
+            <button type="button" role="radio" :aria-checked="theme === 'dark'" :class="{ active: theme === 'dark' }" @click="emit('update:theme', 'dark')"><span class="theme-preview dark"><i></i><i></i></span>深色</button>
+          </div>
+        </div>
         <div v-if="profile.capabilities.restoreFactory" class="settings-danger-zone">
           <div><strong>恢复出厂设置</strong><p>清除全部改键、灯光、宏和配置数据，恢复后需重新连接键盘。</p></div>
           <button class="factory-reset-button" type="button" :disabled="navigationDisabled" @click="requestFactoryReset">恢复出厂设置</button>

@@ -13,7 +13,7 @@ import MacroWorkspace from '@/components/MacroWorkspace.vue'
 import { useTheme } from '@/ui/theme'
 
 const store = useDriverStore()
-const { theme, toggleTheme } = useTheme()
+const { theme, setTheme, toggleTheme } = useTheme()
 // storeToRefs 保留 Pinia 响应性；操作方法仍直接通过 store 调用。
 const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, messageWarning, dirty, assignments, selectedAssignment, keyOptions, keyLabels, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, macroSlots, selectedMacroSlot, macroLoading, demo, driverId } = storeToRefs(store)
 // 当前驱动决定设备表现；共享 App 不包含型号名称、图片或配列判断。
@@ -55,7 +55,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div v-if="error || message" class="notice" :class="{ error }">{{ error || message }}</div>
     </section>
 
-    <AppShell v-else :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :message-warning="messageWarning" :sidebar-image-url="devicePresentation.sidebarImageUrl" @select-configuration="store.selectConfiguration" @restore-factory="store.restoreFactory">
+    <AppShell v-else :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :message-warning="messageWarning" :sidebar-image-url="devicePresentation.sidebarImageUrl" :theme="theme" @update:theme="setTheme" @select-configuration="store.selectConfiguration" @restore-factory="store.restoreFactory">
       <template #device="{ openKeymap }"><DeviceOverview :profile="profile" :busy="busy()" :image-url="devicePresentation.overviewImageUrl" :image-alt="devicePresentation.overviewImageAlt" :solution-name="devicePresentation.solutionName" @reload="store.reload" @open-keymap="openKeymap" /></template>
       <template #keymap>
         <KeymapWorkspace :profile="profile" :status="status" :layer="layer" :mode="mode" :selected-position-id="selectedPositionId" :dirty="dirty" :assignments="assignments" :selected-assignment="selectedAssignment" :key-options="keyOptions" :extended-key-codes="devicePresentation.extendedKeyCodes" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-layer="store.selectLayer" @select-mode="store.selectMode" @select-position="selectedPositionId = $event" @assign-key="store.assignKey" @restore-defaults="store.restoreAllKeyDefaults" @restore-key="store.restoreKeyDefault" />
