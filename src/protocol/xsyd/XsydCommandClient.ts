@@ -80,16 +80,24 @@ export class XsydCommandClient {
    */
   requestFragmented(definition: CommandDefinition, data: Uint8Array, timeoutMs = definition.timeoutMs): Promise<Uint8Array> {
     if (this.closed) return Promise.reject(new DriverError('DEVICE_NOT_CONNECTED', '设备会话已关闭'))
-    const operation = () => new Promise<Uint8Array>(async (resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending = undefined
-        reject(new DriverError('PROTOCOL_TIMEOUT', `设备分片响应超时（${definition.name}）`, true))
-      }, timeoutMs)
-      // 0x12 的 data[1] 会回显请求的矩阵类型（请求 data[0]），用于区分同为 0x92 的长响应。
-      this.pending = { definition, expectedOrder: data[0], resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [] } }
-      try { await this.transport.send(encodePacket(definition.code, data, this.crc)) }
-      catch (error) { clearTimeout(timer); this.pending = undefined; reject(error instanceof Error ? error : new Error(String(error))) }
-    })
+    const operation = () => this.performFragmentedRequest(definition, data, timeoutMs)
+    const result = this.queue.then(operation, operation)
+    this.queue = result.catch(() => undefined)
+    return result
+  }
+
+  /**
+   * 把多次分片请求作为一个队列事务执行，事务完成前普通命令不能插队。
+   * 行程矩阵的 02/03 分页依赖设备内部游标，若按单包排队，切键触发的参数读取
+   * 可能插入四包之间，设备下一包便会返回另一张矩阵。
+   */
+  requestFragmentedSequence(definition: CommandDefinition, requests: Uint8Array[], timeoutMs = definition.timeoutMs): Promise<Uint8Array[]> {
+    if (this.closed) return Promise.reject(new DriverError('DEVICE_NOT_CONNECTED', '设备会话已关闭'))
+    const operation = async () => {
+      const responses: Uint8Array[] = []
+      for (const data of requests) responses.push(await this.performFragmentedRequest(definition, data, timeoutMs))
+      return responses
+    }
     const result = this.queue.then(operation, operation)
     this.queue = result.catch(() => undefined)
     return result
@@ -159,6 +167,24 @@ export class XsydCommandClient {
       if (this.pending === pending) this.pending = undefined
       pending.reject(error instanceof Error ? error : new Error(String(error)))
     }
+  }
+
+  /** 实际执行单个分片请求；只允许由已进入 queue 的 operation 调用。 */
+  private performFragmentedRequest(definition: CommandDefinition, data: Uint8Array, timeoutMs: number) {
+    return new Promise<Uint8Array>(async (resolve, reject) => {
+      if (this.closed) {
+        reject(new DriverError('DEVICE_NOT_CONNECTED', '设备会话已关闭'))
+        return
+      }
+      const timer = setTimeout(() => {
+        this.pending = undefined
+        reject(new DriverError('PROTOCOL_TIMEOUT', `设备分片响应超时（${definition.name}）`, true))
+      }, timeoutMs)
+      // 0x12 的 data[1] 会回显请求的矩阵类型（请求 data[0]），用于区分同为 0x92 的长响应。
+      this.pending = { definition, expectedOrder: data[0], resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [] } }
+      try { await this.transport.send(encodePacket(definition.code, data, this.crc)) }
+      catch (error) { clearTimeout(timer); this.pending = undefined; reject(error instanceof Error ? error : new Error(String(error))) }
+    })
   }
 
   private handleFragment(report: Uint8Array, pending: PendingRequest) {

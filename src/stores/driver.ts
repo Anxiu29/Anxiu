@@ -318,7 +318,8 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   }
 
   async function readTravelMatrix() {
-    if (!state.session || !profile.value?.capabilities.travelTest || travelReading.value) return
+    // 性能参数读取会连续访问布局字段；此时不再追加矩阵轮询，避免无意义排队和页面切键延迟。
+    if (!state.session || !profile.value?.capabilities.travelTest || status.value !== 'ready' || performanceLoading.value || travelReading.value) return
     travelReading.value = true
     try { travelMatrix.value = await state.session.getTravelMatrix() }
     catch (cause) { fail(cause) }

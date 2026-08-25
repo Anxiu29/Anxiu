@@ -285,11 +285,12 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
 
   async getTravelMatrix() {
     // 完整抓包中的官方循环固定为 02-01 → 03-01 → 02-02 → 03-01。
-    // matrix=3 不作为毫米值解码，但必须在两页行程后读取，保持设备分页状态与官方一致。
-    const first = decodeTravelHalf(await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(1)))
-    await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelStateRequest())
-    const second = decodeTravelHalf(await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelRequest(2)))
-    await this.commands.requestFragmented(XSYD_COMMANDS.travelMatrix, encodeTravelStateRequest())
+    // 四包必须作为一个事务进入命令队列，否则切换按键时的参数查询会插入并打乱设备分页游标。
+    const responses = await this.commands.requestFragmentedSequence(XSYD_COMMANDS.travelMatrix, [
+      encodeTravelRequest(1), encodeTravelStateRequest(), encodeTravelRequest(2), encodeTravelStateRequest(),
+    ])
+    const first = decodeTravelHalf(responses[0]!)
+    const second = decodeTravelHalf(responses[2]!)
     return [...first, ...second]
   }
 
