@@ -10,8 +10,10 @@ import AdvancedKeyWorkspace from '@/components/AdvancedKeyWorkspace.vue'
 import PerformanceWorkspace from '@/components/PerformanceWorkspace.vue'
 import KeyTestWorkspace from '@/components/KeyTestWorkspace.vue'
 import MacroWorkspace from '@/components/MacroWorkspace.vue'
+import { useTheme } from '@/ui/theme'
 
 const store = useDriverStore()
+const { theme, toggleTheme } = useTheme()
 // storeToRefs 保留 Pinia 响应性；操作方法仍直接通过 store 调用。
 const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, message, messageWarning, dirty, assignments, selectedAssignment, keyOptions, keyLabels, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, macroSlots, selectedMacroSlot, macroLoading, demo, driverId } = storeToRefs(store)
 // 当前驱动决定设备表现；共享 App 不包含型号名称、图片或配列判断。
@@ -33,6 +35,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div class="brand"><span class="brand-mark">A</span><div><strong>ANXIU</strong><small>KEYBOARD STUDIO</small></div></div>
       <div class="top-actions">
         <span class="status-pill" :class="status"><i></i>{{ labels[status] }}</span>
+        <button class="ghost theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'" :title="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'" @click="toggleTheme">
+          <svg v-if="theme === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" /></svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 15.1A8.5 8.5 0 0 1 8.9 3.6 8.5 8.5 0 1 0 20.4 15.1Z" /></svg>
+          <span>{{ theme === 'dark' ? '浅色' : '深色' }}</span>
+        </button>
         <button class="ghost" :disabled="busy()" @click="connect(true)">演示模式</button>
         <button class="primary" :disabled="busy()" @click="connect(false)">{{ profile && !demo ? '重新连接' : '连接键盘' }}</button>
       </div>
