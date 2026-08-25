@@ -40,6 +40,7 @@ const activePanel = ref<PerformancePanel>('normal')
 const lastNormalMode = ref<Extract<PerformanceMode, 'global' | 'single'>>('single')
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
+const travelTestActive = ref(false)
 const calibrationMaxTravel = ref<Record<string, number>>({})
 const calibratedPositionIds = ref<Set<string>>(new Set())
 const autoSaveCalibrationRequested = ref(false)
@@ -50,8 +51,17 @@ const travelByPosition = computed(() => Object.fromEntries(props.profile.positio
   const value = address.kind === 'matrix' ? props.travelMatrix?.[address.row]?.[address.column] ?? 0 : 0
   return [position.id, Math.max(0, Math.min(4, value))]
 })))
+const activeTravelPositionIds = computed(() => travelTestActive.value
+  ? Object.entries(travelByPosition.value).filter(([, value]) => value > 0.02).map(([id]) => id)
+  : [])
+const travelBadges = computed(() => travelTestActive.value ? Object.fromEntries(activeTravelPositionIds.value.map((id) => [id, `${travelByPosition.value[id]!.toFixed(2)} mm`])) : {})
+const travelKeyColors = computed(() => travelTestActive.value ? Object.fromEntries(activeTravelPositionIds.value.map((id) => {
+  const ratio = travelByPosition.value[id]! / 4
+  return [id, `rgba(69, 230, 208, ${0.18 + ratio * 0.62})`]
+})) : {})
 /** 右侧效果图只展示当前选中键，底层仍一次读取完整矩阵。 */
 const selectedTravel = computed(() => props.selectedPositionId ? travelByPosition.value[props.selectedPositionId] ?? 0 : 0)
+const displayedTravel = computed(() => travelTestActive.value ? selectedTravel.value : 0)
 const calibrationBadges = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, `${(calibrationMaxTravel.value[position.id] ?? 0).toFixed(2)} mm`])))
 const calibrationKeyColors = computed(() => Object.fromEntries([...calibratedPositionIds.value].map((id) => [id, '#39d98a'])))
 const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
@@ -78,7 +88,7 @@ watch(() => props.selectedPositionId, (positionId) => {
 watch(() => props.profile.capabilities.pollingRates, (rates) => { if (rates?.length) emit('load-polling-rate') }, { immediate: true })
 
 const shouldPollTravel = () => Boolean(props.profile.capabilities.travelTest)
-  && (activePanel.value !== 'calibration' || props.calibrationActive)
+  && (travelTestActive.value || activePanel.value === 'calibration' && props.calibrationActive)
 function scheduleTravelRead() {
   if (!shouldPollTravel()) return
   if (props.status === 'ready') emit('read-travel')
@@ -89,8 +99,13 @@ function refreshTravelPolling() {
   travelTimer = undefined
   if (shouldPollTravel()) scheduleTravelRead()
 }
+function toggleTravelTest() {
+  travelTestActive.value = !travelTestActive.value
+  refreshTravelPolling()
+}
 function selectPanel(panel: PerformancePanel) {
   activePanel.value = panel
+  if (panel === 'calibration') travelTestActive.value = false
   if (draft.value && panel === 'normal') draft.value.mode = lastNormalMode.value
   if (draft.value && panel === 'rt') draft.value.mode = 'rapid-trigger'
   refreshTravelPolling()
@@ -136,8 +151,8 @@ function selectKeyboardPosition(positionId: string) {
 
 <template>
   <section class="performance-workspace">
-    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'calibration-tracking': activePanel === 'calibration' }">
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel === 'calibration' ? undefined : selectedPositionId" :badges="activePanel === 'calibration' ? calibrationBadges : {}" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : {}" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
+    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration' }">
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel === 'calibration' ? undefined : selectedPositionId" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
     </div>
 
     <section class="panel performance-editor">
@@ -199,13 +214,13 @@ function selectKeyboardPosition(positionId: string) {
             </div>
 
             <aside v-if="profile.capabilities.travelTest" class="performance-live-travel">
-              <header><div><span>触发效果展示</span><strong>{{ selectedPosition?.label ?? '未选择按键' }}</strong></div><em :class="{ reading: travelReading }">{{ travelReading ? '读取中' : '实时' }}</em></header>
+              <header><div><span>触发效果展示</span><strong>{{ travelTestActive ? `正在测试全部按键 · ${activeTravelPositionIds.length} 个按下` : '开启后测试全部按键' }}</strong></div><button class="travel-test-toggle" type="button" role="switch" :aria-checked="travelTestActive" :class="{ active: travelTestActive }" @click="toggleTravelTest"><i></i><span>{{ travelTestActive ? '关闭' : '开启' }}</span></button></header>
               <div class="travel-visual-body">
                 <div class="travel-scale" aria-hidden="true"><span v-for="tick in [0, 1, 2, 3, 4]" :key="tick" :style="{ top: `${tick * 25}%` }">{{ tick.toFixed(1) }}</span></div>
-                <div class="travel-rail"><i :style="{ height: `${selectedTravel / 4 * 100}%` }"></i><b :style="{ top: `${selectedTravel / 4 * 100}%` }"></b><output :style="{ top: `${selectedTravel / 4 * 100}%` }">{{ selectedTravel.toFixed(2) }} mm</output></div>
+                <div class="travel-rail"><i :style="{ height: `${displayedTravel / 4 * 100}%` }"></i><b :style="{ top: `${displayedTravel / 4 * 100}%` }"></b><output :style="{ top: `${displayedTravel / 4 * 100}%` }">{{ displayedTravel.toFixed(2) }} mm</output></div>
               </div>
               <div class="magnetic-switch" aria-hidden="true"><i></i><b></b><span></span></div>
-              <p>按下当前选中的按键即可查看实时行程</p>
+              <p>{{ travelTestActive ? '所有按键的实时行程会显示在上方对应键帽中' : '打开测试后，可同时检测任意多个按键' }}</p>
             </aside>
           </div>
         </template>
