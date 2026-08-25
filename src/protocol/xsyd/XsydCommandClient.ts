@@ -12,7 +12,7 @@ interface PendingRequest {
   expectedResponses: number
   responses: Uint8Array[]
   /** 长响应的协议帧会被 HID 拆成若干个无独立包头的 64 字节分片。 */
-  fragmented?: { bytes: number[]; totalLength?: number }
+  fragmented?: { bytes: number[]; totalLength?: number; request: Uint8Array; retries: number }
 }
 
 export class XsydCommandClient {
@@ -181,7 +181,7 @@ export class XsydCommandClient {
         reject(new DriverError('PROTOCOL_TIMEOUT', `设备分片响应超时（${definition.name}）`, true))
       }, timeoutMs)
       // 0x12 的 data[1] 会回显请求的矩阵类型（请求 data[0]），用于区分同为 0x92 的长响应。
-      this.pending = { definition, expectedOrder: data[0], resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [] } }
+      this.pending = { definition, expectedOrder: data[0], resolve: resolve as PendingRequest['resolve'], reject, timer, expectedResponses: 1, responses: [], fragmented: { bytes: [], request: data, retries: 0 } }
       try { await this.transport.send(encodePacket(definition.code, data, this.crc)) }
       catch (error) { clearTimeout(timer); this.pending = undefined; reject(error instanceof Error ? error : new Error(String(error))) }
     })
@@ -203,7 +203,15 @@ export class XsydCommandClient {
     fragmented.bytes.push(...report)
     if (fragmented.bytes.length < fragmented.totalLength!) return
 
-    const packet = decodePacket(Uint8Array.from(fragmented.bytes.slice(0, fragmented.totalLength)), this.crc)
+    let packet: ProtocolPacket
+    try {
+      packet = decodePacket(Uint8Array.from(fragmented.bytes.slice(0, fragmented.totalLength)), this.crc)
+    } catch (error) {
+      // 分片错位最先表现为 CRC 失败。有限重发当前页，比把一次可恢复的实时采样错误
+      // 升级成整个设备会话错误更稳妥；达到上限后仍交给原错误流程处理。
+      if (error instanceof DriverError && error.code === 'PROTOCOL_CRC_ERROR' && this.retryFragmentedRequest(pending)) return
+      throw error
+    }
     if (pending.expectedOrder !== undefined && packet.data[1] !== pending.expectedOrder) {
       // 上一轮最后一个 matrix=3 完整帧也可能延迟到下一轮 matrix=2 已开始后才到达。
       // 它和当前响应使用相同的 0x92 命令码，不能仅凭命令码归入当前事务；清空本帧后
@@ -215,6 +223,21 @@ export class XsydCommandClient {
     clearTimeout(pending.timer)
     if (this.pending === pending) this.pending = undefined
     pending.resolve(packet.data)
+  }
+
+  /** 在原事务和原超时窗口内重发当前矩阵页，最多两次，避免噪声环境下无限重试。 */
+  private retryFragmentedRequest(pending: PendingRequest) {
+    const fragmented = pending.fragmented!
+    if (fragmented.retries >= 2 || this.closed) return false
+    fragmented.retries++
+    fragmented.bytes = []
+    fragmented.totalLength = undefined
+    void this.transport.send(encodePacket(pending.definition.code, fragmented.request, this.crc)).catch((error) => {
+      clearTimeout(pending.timer)
+      if (this.pending === pending) this.pending = undefined
+      pending.reject(error instanceof Error ? error : new Error(String(error)))
+    })
+    return true
   }
 
   private emitNotification(packet: ProtocolPacket) {

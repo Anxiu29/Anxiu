@@ -22,6 +22,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   let macroReadRevision = 0
   let loadingMacroSourceCode: number | undefined
   let performanceReadRevision = 0
+  let consecutiveTravelReadFailures = 0
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
@@ -321,8 +322,25 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     // 性能参数读取会连续访问布局字段；此时不再追加矩阵轮询，避免无意义排队和页面切键延迟。
     if (!state.session || !profile.value?.capabilities.travelTest || status.value !== 'ready' || performanceLoading.value || travelReading.value) return
     travelReading.value = true
-    try { travelMatrix.value = await state.session.getTravelMatrix() }
-    catch (cause) { fail(cause) }
+    try {
+      travelMatrix.value = await state.session.getTravelMatrix()
+      consecutiveTravelReadFailures = 0
+      // 行程采样曾短暂失败但随后恢复时，清掉仅由采样产生的协议提示。
+      if (['PROTOCOL_CRC_ERROR', 'PROTOCOL_REJECTED', 'PROTOCOL_TIMEOUT'].includes(errorCode.value ?? '')) {
+        error.value = ''
+        errorCode.value = undefined
+      }
+    } catch (cause) {
+      const driverError = toDriverError(cause)
+      const recoverableSamplingError = driverError.recoverable
+        && ['PROTOCOL_CRC_ERROR', 'PROTOCOL_REJECTED', 'PROTOCOL_TIMEOUT'].includes(driverError.code)
+      if (!recoverableSamplingError) fail(driverError)
+      else if (++consecutiveTravelReadFailures >= 3) {
+        // 实时采样失败不改变会话 ready 状态，否则轮询自身会被永久停止；后续成功会自动清除。
+        error.value = `行程采样暂时异常，正在自动重试：${driverError.message}`
+        errorCode.value = driverError.code
+      }
+    }
     finally { travelReading.value = false }
   }
 
