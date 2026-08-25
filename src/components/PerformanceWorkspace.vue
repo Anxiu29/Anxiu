@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { KeyPerformanceSettings, PerformanceMode, PollingRate, TravelMatrix } from '@/domain/performance'
-import { clonePerformanceSettings } from '@/domain/performance'
+import { clonePerformanceSettings, DEFAULT_PERFORMANCE_SETTINGS } from '@/domain/performance'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
@@ -13,7 +13,9 @@ const props = defineProps<{
   status: SessionStatus
   selectedPositionId?: string
   settings?: KeyPerformanceSettings
+  settingsBySourceCode?: Record<number, KeyPerformanceSettings>
   loading?: boolean
+  mapLoading?: boolean
   pollingRate?: PollingRate
   travelMatrix?: TravelMatrix
   travelReading?: boolean
@@ -25,7 +27,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   'select-position': [positionId: string]
   load: [positionId: string]
+  'load-all': []
   update: [settings: KeyPerformanceSettings]
+  'update-many': [settings: KeyPerformanceSettings[]]
   'load-polling-rate': []
   'update-polling-rate': [rate: PollingRate]
   'read-travel': []
@@ -38,8 +42,10 @@ const draft = ref<KeyPerformanceSettings>()
 type PerformancePanel = 'normal' | 'rt' | 'advanced' | 'calibration'
 const activePanel = ref<PerformancePanel>('normal')
 const lastNormalMode = ref<Extract<PerformanceMode, 'global' | 'single'>>('single')
+const selectedPerformancePositionIds = ref<string[]>([])
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
-const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
+const selectedPerformancePositions = computed(() => props.profile.positions.filter((position) => selectedPerformancePositionIds.value.includes(position.id)))
+const busy = computed(() => props.loading || props.mapLoading || ['connecting', 'reading', 'writing'].includes(props.status))
 const travelTestActive = ref(false)
 const calibrationMaxTravel = ref<Record<string, number>>({})
 const calibratedPositionIds = ref<Set<string>>(new Set())
@@ -83,6 +89,19 @@ const latestTravelPosition = computed(() => props.profile.positions.find((positi
 const displayedTravel = computed(() => travelTestActive.value && latestTravelPositionId.value ? travelByPosition.value[latestTravelPositionId.value] ?? 0 : 0)
 const calibrationBadges = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, `${(calibrationMaxTravel.value[position.id] ?? 0).toFixed(2)} mm`])))
 const calibrationKeyColors = computed(() => Object.fromEntries([...calibratedPositionIds.value].map((id) => [id, '#39d98a'])))
+const formatParameter = (value: number) => value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+const displayedPerformance = (positionId: string, sourceCode: number) => selectedPerformancePositionIds.value.includes(positionId) && draft.value
+  ? draft.value
+  : props.settingsBySourceCode?.[sourceCode]
+/** 高级设置矩阵的上下角标分别显示设备回读的顶部和底部死区。 */
+const performanceTopLabels = computed(() => activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
+  const settings = displayedPerformance(position.id, position.sourceCode)
+  return settings ? [[position.id, formatParameter(settings.pressDeadZone)]] : []
+})) : {})
+const performanceBottomLabels = computed(() => activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
+  const settings = displayedPerformance(position.id, position.sourceCode)
+  return settings ? [[position.id, formatParameter(settings.releaseDeadZone)]] : []
+})) : {})
 const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
 useHorizontalKeyboardScroll(keyboardContainer)
@@ -102,6 +121,8 @@ watch([() => props.settings, () => props.selectedPositionId], ([settings]) => {
   }
 }, { immediate: true, deep: true })
 watch(() => props.selectedPositionId, (positionId) => {
+  if (positionId && activePanel.value !== 'advanced') selectedPerformancePositionIds.value = [positionId]
+  else if (positionId && !selectedPerformancePositionIds.value.length) selectedPerformancePositionIds.value = [positionId]
   if (positionId && props.settings?.sourceCode !== selectedPosition.value?.sourceCode) emit('load', positionId)
 }, { immediate: true })
 watch(() => props.profile.capabilities.pollingRates, (rates) => { if (rates?.length) emit('load-polling-rate') }, { immediate: true })
@@ -146,6 +167,10 @@ function selectPanel(panel: PerformancePanel) {
   if (panel === 'calibration') travelTestActive.value = false
   if (draft.value && panel === 'normal') draft.value.mode = lastNormalMode.value
   if (draft.value && panel === 'rt') draft.value.mode = 'rapid-trigger'
+  if (panel === 'advanced') {
+    if (!selectedPerformancePositionIds.value.length && props.selectedPositionId) selectedPerformancePositionIds.value = [props.selectedPositionId]
+    emit('load-all')
+  }
   refreshTravelPolling()
 }
 onBeforeUnmount(() => { if (travelTimer !== undefined) window.clearTimeout(travelTimer) })
@@ -176,7 +201,14 @@ function setNormalMode(mode: Extract<PerformanceMode, 'global' | 'single'>) {
   lastNormalMode.value = mode
   setMode(mode)
 }
-function save() { if (draft.value) emit('update', clonePerformanceSettings(draft.value)) }
+function save() {
+  if (!draft.value) return
+  if (activePanel.value === 'advanced' && selectedPerformancePositions.value.length > 1) {
+    emit('update-many', selectedPerformancePositions.value.map((position) => ({ ...clonePerformanceSettings(draft.value!), sourceCode: position.sourceCode })))
+    return
+  }
+  emit('update', clonePerformanceSettings(draft.value))
+}
 function startCalibrationTracking() {
   calibrationMaxTravel.value = {}
   calibratedPositionIds.value = new Set()
@@ -185,14 +217,39 @@ function startCalibrationTracking() {
 }
 function selectKeyboardPosition(positionId: string) {
   // 校准操作整个矩阵；其他分类都允许从上方选择要配置和测试的物理键。
-  if (activePanel.value !== 'calibration') emit('select-position', positionId)
+  if (activePanel.value === 'calibration') return
+  if (activePanel.value !== 'advanced') { emit('select-position', positionId); return }
+  const selected = new Set(selectedPerformancePositionIds.value)
+  if (selected.has(positionId)) selected.delete(positionId)
+  else selected.add(positionId)
+  selectedPerformancePositionIds.value = [...selected]
+  if (selected.has(positionId)) emit('select-position', positionId)
+  else if (props.selectedPositionId === positionId && selectedPerformancePositionIds.value[0]) emit('select-position', selectedPerformancePositionIds.value[0]!)
+}
+
+/** 批量选择只操作物理位置，不受用户改键后的目标键值影响。 */
+function selectPerformanceGroup(predicate: (label: string) => boolean) {
+  selectedPerformancePositionIds.value = props.profile.positions.filter((position) => predicate(position.label)).map((position) => position.id)
+  const nextCurrent = selectedPerformancePositionIds.value.includes(props.selectedPositionId ?? '') ? props.selectedPositionId : selectedPerformancePositionIds.value[0]
+  if (nextCurrent) emit('select-position', nextCurrent)
+}
+function selectAllPerformanceKeys() { selectPerformanceGroup(() => true) }
+function selectWasdKeys() { selectPerformanceGroup((label) => ['W', 'A', 'S', 'D'].includes(label.toUpperCase())) }
+function selectNumberKeys() { selectPerformanceGroup((label) => /^(?:\d|PAD\d|NUM\d)$/i.test(label.replace(/\s/g, ''))) }
+function selectLetterKeys() { selectPerformanceGroup((label) => /^[A-Z]$/i.test(label)) }
+function clearPerformanceSelection() { selectedPerformancePositionIds.value = [] }
+/** 重置先回到默认草稿；用户点击“保存设置”后才会写入所选物理键。 */
+function resetSelectedTravel() {
+  if (!draft.value) return
+  draft.value = { sourceCode: draft.value.sourceCode, ...DEFAULT_PERFORMANCE_SETTINGS }
+  lastNormalMode.value = 'global'
 }
 </script>
 
 <template>
   <section class="performance-workspace">
-    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration' }">
-      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel === 'calibration' ? undefined : selectedPositionId" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
+    <div ref="keyboardContainer" class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration', 'bulk-select': activePanel === 'advanced' }">
+      <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected="activePanel !== 'calibration' && activePanel !== 'advanced' ? selectedPositionId : undefined" :selected-ids="activePanel === 'advanced' ? selectedPerformancePositionIds : []" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :top-labels="performanceTopLabels" :bottom-labels="performanceBottomLabels" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
     </div>
 
     <section class="panel performance-editor">
@@ -204,15 +261,15 @@ function selectKeyboardPosition(positionId: string) {
           <button type="button" :class="{ active: activePanel === 'advanced' }" @click="selectPanel('advanced')">高级设置</button>
           <button v-if="profile.capabilities.calibration" type="button" :class="{ active: activePanel === 'calibration' }" @click="selectPanel('calibration')">键盘校准</button>
         </nav>
-        <div v-if="activePanel !== 'calibration'" class="performance-current"><span>当前物理按键</span><strong>{{ selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div>
-        <button v-if="activePanel !== 'calibration'" class="primary" type="button" :disabled="busy || !draft" @click="save">{{ status === 'writing' ? '正在保存…' : '保存设置' }}</button>
+        <div v-if="activePanel !== 'calibration'" class="performance-current"><span>{{ activePanel === 'advanced' ? '已选择物理按键' : '当前物理按键' }}</span><strong>{{ activePanel === 'advanced' ? `${selectedPerformancePositionIds.length} 个` : selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition && activePanel !== 'advanced'">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div>
+        <button v-if="activePanel !== 'calibration'" class="primary" type="button" :disabled="busy || !draft || activePanel === 'advanced' && !selectedPerformancePositionIds.length" @click="save">{{ status === 'writing' ? '正在保存…' : activePanel === 'advanced' && selectedPerformancePositionIds.length > 1 ? `保存 ${selectedPerformancePositionIds.length} 个按键` : '保存设置' }}</button>
       </header>
 
       <div class="performance-editor-body">
         <template v-if="activePanel !== 'calibration'">
           <div v-if="loading && !draft" class="performance-placeholder">正在读取当前按键的性能参数…</div>
           <div v-else-if="!draft" class="performance-placeholder">请先在上方键盘选择一个物理键。</div>
-          <div v-else class="performance-settings-layout">
+          <div v-else class="performance-settings-layout" :class="{ 'advanced-layout': activePanel === 'advanced' }">
             <div class="performance-settings-main">
               <template v-if="activePanel === 'normal'">
                 <section class="performance-mode-section">
@@ -271,9 +328,20 @@ function selectKeyboardPosition(positionId: string) {
 
             <aside v-if="profile.capabilities.travelTest" class="performance-live-travel">
               <header><div><span>行程测试</span><strong>{{ travelTestActive ? latestTravelPosition ? `最新：${latestTravelPosition.label} · ${activeTravelPositionIds.length} 个按下` : '等待按键行程变化' : '开启后测试全部按键' }}</strong></div><button class="travel-test-toggle" type="button" role="switch" :aria-checked="travelTestActive" :class="{ active: travelTestActive }" title="请用鼠标点击开关" @keydown="blockKeyboardToggle" @keyup="blockKeyboardToggle" @click="handleTravelToggleClick"><i></i><span>{{ travelTestActive ? '关闭' : '开启' }}</span></button></header>
-              <div class="travel-visual-body">
-                <div class="travel-scale" aria-hidden="true"><span v-for="tick in [0, 1, 2, 3, 4]" :key="tick" :style="{ top: `${tick * 25}%` }">{{ tick.toFixed(1) }}</span></div>
-                <div class="travel-rail"><i :style="{ height: `${displayedTravel / 4 * 100}%` }"></i><b :style="{ top: `${displayedTravel / 4 * 100}%` }"></b><output :style="{ top: `${displayedTravel / 4 * 100}%` }">{{ displayedTravel.toFixed(2) }} mm</output></div>
+              <div class="travel-test-stage">
+                <div class="travel-visual-body">
+                  <div class="travel-scale" aria-hidden="true"><span v-for="tick in [0, 1, 2, 3, 4]" :key="tick" :style="{ top: `${tick * 25}%` }">{{ tick.toFixed(1) }}</span></div>
+                  <div class="travel-rail"><i :style="{ height: `${displayedTravel / 4 * 100}%` }"></i><b :style="{ top: `${displayedTravel / 4 * 100}%` }"></b><output :style="{ top: `${displayedTravel / 4 * 100}%` }">{{ displayedTravel.toFixed(2) }} mm</output></div>
+                </div>
+                <nav v-if="activePanel === 'advanced'" class="performance-selection-tools" aria-label="批量选择性能按键">
+                  <small>{{ mapLoading ? '正在读取参数…' : `已选 ${selectedPerformancePositionIds.length} 个` }}</small>
+                  <button type="button" :disabled="busy" @click="selectAllPerformanceKeys">全选</button>
+                  <button type="button" :disabled="busy" @click="selectWasdKeys">WASD</button>
+                  <button type="button" :disabled="busy" @click="selectNumberKeys">数字键</button>
+                  <button type="button" :disabled="busy" @click="selectLetterKeys">字母键</button>
+                  <button type="button" :disabled="busy" @click="clearPerformanceSelection">取消选中</button>
+                  <button class="reset" type="button" :disabled="busy || !draft || !selectedPerformancePositionIds.length" title="恢复默认参数，点击保存设置后写入所选按键" @click="resetSelectedTravel">重置行程</button>
+                </nav>
               </div>
               <div class="magnetic-switch" aria-hidden="true"><i></i><b></b><span></span></div>
               <p>{{ travelTestActive ? '所有按键的实时行程会显示在上方对应键帽中' : '打开测试后，可同时检测任意多个按键' }}</p>

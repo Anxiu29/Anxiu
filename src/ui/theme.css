@@ -141,6 +141,14 @@ html[data-theme='light'] .picker-key {
 html[data-theme='light'] .keycap small,
 html[data-theme='light'] .picker-key small { color: #74838e; }
 html[data-theme='light'] .keycap.changed { background: linear-gradient(#dff3ef, #cce8e3); }
+html[data-theme='light'] .performance-keyboard-panel.bulk-select .keycap.selected {
+  background: linear-gradient(rgba(23, 154, 136, .12), rgba(23, 154, 136, .05)), linear-gradient(#fff, #e5ebef);
+}
+html[data-theme='light'] .performance-selection-tools button {
+  color: #42515c;
+  border-color: #c9d4db;
+  background: #fff;
+}
 
 html[data-theme='light'] .layer-tabs button,
 html[data-theme='light'] .category-tabs button,

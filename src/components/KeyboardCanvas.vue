@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { KeyAssignment, KeyPosition } from '@/domain/keyboard'
 import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 
-const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; pressed?: readonly string[]; unit?: number; geometry?: KeyGeometryResolver; badges?: Record<string, string>; keyColors?: Record<string, string> }>(), { unit: 58, defaultAssignments: () => [], pressed: () => [], geometry: matrixKeyGeometry, badges: () => ({}), keyColors: () => ({}) })
+const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; selectedIds?: readonly string[]; pressed?: readonly string[]; unit?: number; geometry?: KeyGeometryResolver; badges?: Record<string, string>; topLabels?: Record<string, string>; bottomLabels?: Record<string, string>; keyColors?: Record<string, string> }>(), { unit: 58, defaultAssignments: () => [], selectedIds: () => [], pressed: () => [], geometry: matrixKeyGeometry, badges: () => ({}), topLabels: () => ({}), bottomLabels: () => ({}), keyColors: () => ({}) })
 const emit = defineEmits<{
   select: [id: string]
   contextmenu: [payload: { positionId: string; clientX: number; clientY: number }]
@@ -40,10 +40,12 @@ const keyStyle = (key: RenderedKey) => ({
 <template>
   <div class="keyboard-shell">
     <div class="keyboard-layout" :style="canvasStyle">
-      <button v-for="key in renderedPositions" :key="key.id" class="keycap" :data-position-id="key.id" :class="{ selected: selected === key.id, changed: isChanged(key.id), pressed: pressed.includes(key.id), 'custom-lit': !!keyColors[key.id] }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
+      <button v-for="key in renderedPositions" :key="key.id" class="keycap" :data-position-id="key.id" :class="{ selected: selected === key.id || selectedIds.includes(key.id), changed: isChanged(key.id), pressed: pressed.includes(key.id), 'custom-lit': !!keyColors[key.id] }" :style="keyStyle(key)" @click="emit('select', key.id)" @contextmenu.stop.prevent="emit('contextmenu', { positionId: key.id, clientX: $event.clientX, clientY: $event.clientY })">
         <b v-if="badges[key.id]" class="keycap-badge">{{ badges[key.id] }}</b>
+        <em v-if="topLabels[key.id]" class="keycap-top-label">{{ topLabels[key.id] }}</em>
         <span>{{ labelFor(assignment(key.id)?.keyCode ?? key.sourceCode) }}</span>
         <small>{{ key.label }}</small>
+        <em v-if="bottomLabels[key.id]" class="keycap-bottom-label">{{ bottomLabels[key.id] }}</em>
       </button>
     </div>
   </div>
