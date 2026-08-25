@@ -8,6 +8,7 @@ export interface KeyPerformanceSettings {
   sourceCode: number
   mode: PerformanceMode
   globalActuation: number
+  /** 普通单键模式的触发行程；RT 模式复用为第一次按下时的初始触发行程。 */
   actuation: number
   rapidPress: number
   rapidRelease: number

@@ -258,8 +258,9 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     if (settings.mode === 'global') {
       await this.commands.request(XSYD_COMMANDS.performance, encodeGlobalPerformance(settings, true))
     } else {
-      if (settings.mode === 'single') await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.db0, Math.round(settings.actuation * 1000))
-      else {
+      // db0 在普通单键模式中是触发行程，在 RT 模式中是第一次按下时的初始触发行程。
+      await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.db0, Math.round(settings.actuation * 1000))
+      if (settings.mode === 'rapid-trigger') {
         await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.rapidPress, Math.round(settings.rapidPress * 1000))
         await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.rapidRelease, Math.round(settings.rapidRelease * 1000))
       }

@@ -215,7 +215,7 @@ export class DeviceSession {
       const same = verified.mode === settings.mode
         && (settings.mode !== 'global' || sameNumbers([verified.globalActuation, verified.pressDeadZone, verified.releaseDeadZone], [settings.globalActuation, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
         && (settings.mode !== 'single' || sameNumbers([verified.actuation, verified.pressDeadZone, verified.releaseDeadZone], [settings.actuation, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
-        && (settings.mode !== 'rapid-trigger' || sameNumbers([verified.rapidPress, verified.rapidRelease, verified.pressDeadZone, verified.releaseDeadZone], [settings.rapidPress, settings.rapidRelease, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
+        && (settings.mode !== 'rapid-trigger' || sameNumbers([verified.actuation, verified.rapidPress, verified.rapidRelease, verified.pressDeadZone, verified.releaseDeadZone], [settings.actuation, settings.rapidPress, settings.rapidRelease, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
       if (same) return verified
     }
     throw new DriverError('VERIFY_FAILED', '性能设置未被设备完整接受', true, { details: { expected: settings, actual: verified } })
