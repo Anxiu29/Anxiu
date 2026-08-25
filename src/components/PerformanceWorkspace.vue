@@ -170,6 +170,8 @@ watch(() => props.travelMatrix, () => {
 }, { deep: true })
 
 function setMode(mode: PerformanceMode) { if (draft.value) draft.value.mode = mode }
+/** 预览轨道统一使用 0–4 mm 比例，避免模板中重复边界处理。 */
+function travelPercent(value: number) { return `${Math.max(0, Math.min(100, value / 4 * 100))}%` }
 function setNormalMode(mode: Extract<PerformanceMode, 'global' | 'single'>) {
   lastNormalMode.value = mode
   setMode(mode)
@@ -224,6 +226,14 @@ function selectKeyboardPosition(positionId: string) {
                   <label v-if="draft.mode === 'global'" class="performance-slider"><span>触发行程</span><input v-model.number="draft.globalActuation" type="range" min="0.1" max="4" step="0.1" /><output>{{ draft.globalActuation.toFixed(1) }} mm</output></label>
                   <label v-else class="performance-slider"><span>触发行程</span><input v-model.number="draft.actuation" type="range" min="0.1" max="4" step="0.1" /><output>{{ draft.actuation.toFixed(1) }} mm</output></label>
                 </div>
+                <section class="performance-logic-preview normal-preview">
+                  <header><div><span>触发逻辑预览</span><strong>固定触发点</strong></div><p>按键下压越过设定行程后输出按键</p></header>
+                  <div class="logic-scale">
+                    <div class="logic-track"><i :style="{ width: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }"></i><b :style="{ left: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }"></b><output :style="{ left: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }">{{ (draft.mode === 'global' ? draft.globalActuation : draft.actuation).toFixed(1) }} mm</output></div>
+                    <div class="logic-scale-labels"><span>0 mm<br /><small>未按下</small></span><span>2 mm</span><span>4 mm<br /><small>按到底</small></span></div>
+                  </div>
+                  <div class="logic-flow"><span><i></i>开始下压</span><b>→</b><span class="active"><i></i>越过触发点</span><b>→</b><span><i></i>发送按键</span></div>
+                </section>
               </template>
 
               <template v-else-if="activePanel === 'rt'">
@@ -234,6 +244,14 @@ function selectKeyboardPosition(positionId: string) {
                   <label class="performance-slider"><span>按下灵敏度</span><input v-model.number="draft.rapidPress" type="range" min="0.1" max="2" step="0.1" /><output>{{ draft.rapidPress.toFixed(1) }} mm</output></label>
                   <label class="performance-slider"><span>释放灵敏度</span><input v-model.number="draft.rapidRelease" type="range" min="0.1" max="2" step="0.1" /><output>{{ draft.rapidRelease.toFixed(1) }} mm</output></label>
                 </div>
+                <section class="performance-logic-preview rt-preview">
+                  <header><div><span>触发逻辑预览</span><strong>动态触发与复位</strong></div><p>首次触发后，根据移动方向持续计算下一次触发位置</p></header>
+                  <div class="rt-preview-grid">
+                    <article><span>首次触发</span><div class="mini-travel-track"><i :style="{ width: travelPercent(draft.actuation) }"></i><b :style="{ left: travelPercent(draft.actuation) }"></b></div><strong>{{ draft.actuation.toFixed(1) }} mm</strong></article>
+                    <article class="press"><span>继续下压</span><i>↓</i><strong>移动 {{ draft.rapidPress.toFixed(1) }} mm 再次触发</strong></article>
+                    <article class="release"><span>向上抬起</span><i>↑</i><strong>移动 {{ draft.rapidRelease.toFixed(1) }} mm 动态复位</strong></article>
+                  </div>
+                </section>
               </template>
 
               <template v-else>
