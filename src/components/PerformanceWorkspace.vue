@@ -59,9 +59,28 @@ const travelKeyColors = computed(() => travelTestActive.value ? Object.fromEntri
   const ratio = travelByPosition.value[id]! / 4
   return [id, `rgba(69, 230, 208, ${0.18 + ratio * 0.62})`]
 })) : {})
-/** 右侧效果图只展示当前选中键，底层仍一次读取完整矩阵。 */
-const selectedTravel = computed(() => props.selectedPositionId ? travelByPosition.value[props.selectedPositionId] ?? 0 : 0)
-const displayedTravel = computed(() => travelTestActive.value ? selectedTravel.value : 0)
+const latestTravelPositionId = ref<string>()
+let previousTravelByPosition: Record<string, number> = {}
+/** 右侧效果图跟随最近变化的键；同一帧多个键变化时采用变化幅度最大的按键。 */
+watch(travelByPosition, (current) => {
+  if (!travelTestActive.value) {
+    previousTravelByPosition = { ...current }
+    return
+  }
+  let latestId: string | undefined
+  let largestDelta = 0.005
+  for (const [positionId, travel] of Object.entries(current)) {
+    const delta = Math.abs(travel - (previousTravelByPosition[positionId] ?? 0))
+    if (delta > largestDelta) {
+      latestId = positionId
+      largestDelta = delta
+    }
+  }
+  if (latestId) latestTravelPositionId.value = latestId
+  previousTravelByPosition = { ...current }
+}, { immediate: true })
+const latestTravelPosition = computed(() => props.profile.positions.find((position) => position.id === latestTravelPositionId.value))
+const displayedTravel = computed(() => travelTestActive.value && latestTravelPositionId.value ? travelByPosition.value[latestTravelPositionId.value] ?? 0 : 0)
 const calibrationBadges = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, `${(calibrationMaxTravel.value[position.id] ?? 0).toFixed(2)} mm`])))
 const calibrationKeyColors = computed(() => Object.fromEntries([...calibratedPositionIds.value].map((id) => [id, '#39d98a'])))
 const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
@@ -101,7 +120,26 @@ function refreshTravelPolling() {
 }
 function toggleTravelTest() {
   travelTestActive.value = !travelTestActive.value
+  latestTravelPositionId.value = undefined
+  previousTravelByPosition = { ...travelByPosition.value }
   refreshTravelPolling()
+}
+/** 行程测试需要检测回车和空格本身，因此开关只响应真实鼠标点击。 */
+function blockKeyboardToggle(event: KeyboardEvent) {
+  if (event.key !== 'Enter' && event.key !== ' ' && event.code !== 'Space') return
+  event.preventDefault()
+  event.stopPropagation()
+}
+function handleTravelToggleClick(event: MouseEvent) {
+  // 键盘为原生 button 合成的 click.detail 为 0；鼠标点击大于 0，在这里做最终兜底。
+  if (event.detail === 0) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+  toggleTravelTest()
+  // 鼠标开启后立即失焦，随后测试回车或空格不会再次激活此按钮。
+  ;(event.currentTarget as HTMLButtonElement | null)?.blur()
 }
 function selectPanel(panel: PerformancePanel) {
   activePanel.value = panel
@@ -214,7 +252,7 @@ function selectKeyboardPosition(positionId: string) {
             </div>
 
             <aside v-if="profile.capabilities.travelTest" class="performance-live-travel">
-              <header><div><span>触发效果展示</span><strong>{{ travelTestActive ? `正在测试全部按键 · ${activeTravelPositionIds.length} 个按下` : '开启后测试全部按键' }}</strong></div><button class="travel-test-toggle" type="button" role="switch" :aria-checked="travelTestActive" :class="{ active: travelTestActive }" @click="toggleTravelTest"><i></i><span>{{ travelTestActive ? '关闭' : '开启' }}</span></button></header>
+              <header><div><span>行程测试</span><strong>{{ travelTestActive ? latestTravelPosition ? `最新：${latestTravelPosition.label} · ${activeTravelPositionIds.length} 个按下` : '等待按键行程变化' : '开启后测试全部按键' }}</strong></div><button class="travel-test-toggle" type="button" role="switch" :aria-checked="travelTestActive" :class="{ active: travelTestActive }" title="请用鼠标点击开关" @keydown="blockKeyboardToggle" @keyup="blockKeyboardToggle" @click="handleTravelToggleClick"><i></i><span>{{ travelTestActive ? '关闭' : '开启' }}</span></button></header>
               <div class="travel-visual-body">
                 <div class="travel-scale" aria-hidden="true"><span v-for="tick in [0, 1, 2, 3, 4]" :key="tick" :style="{ top: `${tick * 25}%` }">{{ tick.toFixed(1) }}</span></div>
                 <div class="travel-rail"><i :style="{ height: `${displayedTravel / 4 * 100}%` }"></i><b :style="{ top: `${displayedTravel / 4 * 100}%` }"></b><output :style="{ top: `${displayedTravel / 4 * 100}%` }">{{ displayedTravel.toFixed(2) }} mm</output></div>
