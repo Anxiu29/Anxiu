@@ -74,6 +74,7 @@ export interface MacroCapability {
 
 export interface PerformanceCapability {
   getPerformance(sourceCode: number): Promise<KeyPerformanceSettings>
+  getPerformances(sourceCodes: number[]): Promise<KeyPerformanceSettings[]>
   setPerformance(settings: KeyPerformanceSettings): Promise<void>
   getPollingRate(): Promise<PollingRate>
   setPollingRate(rate: PollingRate): Promise<PollingRate>

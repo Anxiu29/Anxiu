@@ -45,6 +45,9 @@ export const createDriverState = () => {
   const macroLoading = ref(false)
   const performanceSettings = ref<KeyPerformanceSettings>()
   const performanceLoading = ref(false)
+  /** 已从设备批量回读的各物理键性能参数，用于矩阵徽标和批量编辑。 */
+  const performanceBySourceCode = ref<Record<number, KeyPerformanceSettings>>({})
+  const performanceMapLoading = ref(false)
   const pollingRate = ref<PollingRate>()
   const travelMatrix = ref<TravelMatrix>([])
   const travelReading = ref(false)
@@ -62,7 +65,7 @@ export const createDriverState = () => {
 
   return {
     status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning,
-    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
+    demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, performanceBySourceCode, performanceMapLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels,
     get session() { return activeSession.value },
     set session(value: DeviceSession | undefined) { activeSession.value = value },
   }

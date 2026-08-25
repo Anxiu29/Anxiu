@@ -76,6 +76,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
   readonly performance = {
     getPerformance: (sourceCode: number) => this.getPerformance(sourceCode),
+    getPerformances: (sourceCodes: number[]) => this.getPerformances(sourceCodes),
     setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings),
     getPollingRate: () => this.getPollingRate(),
     setPollingRate: (rate: PollingRate) => this.setPollingRate(rate),
@@ -231,25 +232,39 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async getPerformance(sourceCode: number): Promise<KeyPerformanceSettings> {
+    const [settings] = await this.getPerformances([sourceCode])
+    if (!settings) throw new DriverError('PROTOCOL_REJECTED', '设备未返回按键性能参数')
+    return settings
+  }
+
+  /**
+   * 0x23 的每个读取包可携带 14 个物理键；按 Layout 分组批量读取比逐键读取
+   * 少大量 USB 往返，并确保矩阵徽标来自设备而不是 UI 默认值。
+   */
+  async getPerformances(sourceCodes: number[]): Promise<KeyPerformanceSettings[]> {
+    if (!sourceCodes.length) return []
     const global = decodeGlobalPerformance(await this.commands.request(
       XSYD_COMMANDS.performance,
-      encodeGlobalPerformance({ sourceCode, mode: 'global', globalActuation: 0, actuation: 0, rapidPress: 0, rapidRelease: 0, pressDeadZone: 0, releaseDeadZone: 0 }, false),
+      encodeGlobalPerformance({ sourceCode: sourceCodes[0]!, mode: 'global', globalActuation: 0, actuation: 0, rapidPress: 0, rapidRelease: 0, pressDeadZone: 0, releaseDeadZone: 0 }, false),
     ))
     const layouts = [ADVANCED_LAYOUT.mode, ADVANCED_LAYOUT.db0, ADVANCED_LAYOUT.rapidPress, ADVANCED_LAYOUT.rapidRelease, ADVANCED_LAYOUT.pressDeadZone, ADVANCED_LAYOUT.releaseDeadZone]
-    const values: number[] = []
-    for (const layout of layouts) values.push(await this.readLayoutValue(sourceCode, layout))
-    const mode = PERFORMANCE_MODE_BY_VALUE[((values[0] ?? 0) >> 4) & 0x0f] ?? 'global'
-    return {
-      sourceCode,
-      mode,
-      globalActuation: global.globalActuation,
-      actuation: (values[1] ?? 0) / 1000,
-      rapidPress: (values[2] ?? 0) / 1000,
-      rapidRelease: (values[3] ?? 0) / 1000,
-      // 全局模式以 0x29 为唯一真值，不能被该键之前保存的单键参数污染。
-      pressDeadZone: mode === 'global' ? global.pressDeadZone : ((values[4] ?? 0) || Math.round(global.pressDeadZone * 1000)) / 1000,
-      releaseDeadZone: mode === 'global' ? global.releaseDeadZone : ((values[5] ?? 0) || Math.round(global.releaseDeadZone * 1000)) / 1000,
-    }
+    const valuesByLayout: Map<number, number>[] = []
+    for (const layout of layouts) valuesByLayout.push(await this.readLayoutValues(sourceCodes, layout))
+    return sourceCodes.map((sourceCode) => {
+      const values = valuesByLayout.map((valuesBySourceCode) => valuesBySourceCode.get(sourceCode) ?? 0)
+      const mode = PERFORMANCE_MODE_BY_VALUE[((values[0] ?? 0) >> 4) & 0x0f] ?? 'global'
+      return {
+        sourceCode,
+        mode,
+        globalActuation: global.globalActuation,
+        actuation: (values[1] ?? 0) / 1000,
+        rapidPress: (values[2] ?? 0) / 1000,
+        rapidRelease: (values[3] ?? 0) / 1000,
+        // 全局模式以 0x29 为唯一真值，不能被该键之前保存的单键参数污染。
+        pressDeadZone: mode === 'global' ? global.pressDeadZone : ((values[4] ?? 0) || Math.round(global.pressDeadZone * 1000)) / 1000,
+        releaseDeadZone: mode === 'global' ? global.releaseDeadZone : ((values[5] ?? 0) || Math.round(global.releaseDeadZone * 1000)) / 1000,
+      }
+    })
   }
 
   async setPerformance(settings: KeyPerformanceSettings) {

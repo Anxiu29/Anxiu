@@ -12,7 +12,7 @@ import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, rep
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
+  const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, performanceBySourceCode, performanceMapLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
   let advancedKeyReadRevision = 0
@@ -22,6 +22,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   let macroReadRevision = 0
   let loadingMacroSourceCode: number | undefined
   let performanceReadRevision = 0
+  let performanceMapReadRevision = 0
   let consecutiveTravelReadFailures = 0
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
@@ -284,13 +285,18 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     if (!state.session || !profile.value?.capabilities.performance || !positionId || performanceLoading.value || ['connecting', 'writing'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
     if (!position || !force && performanceSettings.value?.sourceCode === position.sourceCode) return
+    const cached = performanceBySourceCode.value[position.sourceCode]
+    if (!force && cached) { performanceSettings.value = { ...cached }; return }
     const observedSession = state.session
     const readRevision = ++performanceReadRevision
     performanceLoading.value = true
     clearFeedback()
     try {
       const result = await observedSession.getPerformance(position.sourceCode)
-      if (state.session === observedSession && readRevision === performanceReadRevision) performanceSettings.value = result
+      if (state.session === observedSession && readRevision === performanceReadRevision) {
+        performanceSettings.value = result
+        performanceBySourceCode.value = { ...performanceBySourceCode.value, [result.sourceCode]: result }
+      }
     } catch (cause) { if (state.session === observedSession && readRevision === performanceReadRevision) fail(cause) }
     finally { if (readRevision === performanceReadRevision) performanceLoading.value = false }
   }
@@ -300,8 +306,45 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'writing'
     try {
       performanceSettings.value = await state.session.updatePerformance(settings)
+      performanceBySourceCode.value = { ...performanceBySourceCode.value, [performanceSettings.value.sourceCode]: performanceSettings.value }
       status.value = 'ready'
       message.value = '性能设置已写入并通过回读验证'
+    } catch (cause) { fail(cause) }
+  }
+
+  /** 批量读取全部键位参数；协议适配器会把相同 Layout 合并成每包 14 键。 */
+  async function loadPerformanceMap(force = false) {
+    if (!state.session || !profile.value?.capabilities.performance || performanceMapLoading.value || ['connecting', 'writing'].includes(status.value)) return
+    const positions = profile.value.positions
+    if (!force && positions.every((position) => performanceBySourceCode.value[position.sourceCode])) return
+    const observedSession = state.session
+    const readRevision = ++performanceMapReadRevision
+    performanceMapLoading.value = true
+    try {
+      const results = await observedSession.getPerformances(positions.map((position) => position.sourceCode))
+      if (state.session !== observedSession || readRevision !== performanceMapReadRevision) return
+      performanceBySourceCode.value = Object.fromEntries(results.map((settings) => [settings.sourceCode, settings]))
+      const currentSourceCode = positions.find((position) => position.id === selectedPositionId.value)?.sourceCode
+      if (currentSourceCode && performanceBySourceCode.value[currentSourceCode]) performanceSettings.value = { ...performanceBySourceCode.value[currentSourceCode]! }
+    } catch (cause) { if (state.session === observedSession && readRevision === performanceMapReadRevision) fail(cause) }
+    finally { if (readRevision === performanceMapReadRevision) performanceMapLoading.value = false }
+  }
+
+  /** 批量写入仍逐键执行设备回读验证，任何键失败都会停止并显示真实错误。 */
+  async function updatePerformances(settingsList: KeyPerformanceSettings[]) {
+    if (!state.session || !profile.value?.capabilities.performance || !settingsList.length || !['ready', 'error'].includes(status.value)) return
+    clearFeedback(); status.value = 'writing'
+    try {
+      const next = { ...performanceBySourceCode.value }
+      for (const settings of settingsList) {
+        const verified = await state.session.updatePerformance(settings)
+        next[verified.sourceCode] = verified
+        // 每个键验证后立即推进缓存；后续键失败时，界面仍准确反映已经落盘的部分。
+        performanceBySourceCode.value = { ...next }
+        if (verified.sourceCode === performanceSettings.value?.sourceCode) performanceSettings.value = verified
+      }
+      status.value = 'ready'
+      message.value = `已写入并验证 ${settingsList.length} 个按键的性能设置`
     } catch (cause) { fail(cause) }
   }
 
@@ -518,8 +561,11 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     advancedKeyTypes.value = {}
     advancedKeyTypesLoading = false
     performanceReadRevision++
+    performanceMapReadRevision++
     performanceSettings.value = undefined
     performanceLoading.value = false
+    performanceBySourceCode.value = {}
+    performanceMapLoading.value = false
     pollingRate.value = undefined
     travelMatrix.value = []
     travelReading.value = false
@@ -610,5 +656,5 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     status.value = 'error'; error.value = driverError.message; errorCode.value = driverError.code
   }
 
-  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadPerformance, updatePerformance, loadPollingRate, updatePollingRate, readTravelMatrix, startCalibration, finishCalibration, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
+  return { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, performanceBySourceCode, performanceMapLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels, connect, reconnectAuthorized, assignKey, selectLayer, selectMode, selectConfiguration, selectMacroSlot, updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting, loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey, loadPerformance, loadPerformanceMap, updatePerformance, updatePerformances, loadPollingRate, updatePollingRate, readTravelMatrix, startCalibration, finishCalibration, loadMacro, loadMacrosFromDevice, updateMacro, deleteMacro, reload, restoreAllKeyDefaults, restoreKeyDefault, restoreFactory }
 })

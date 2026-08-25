@@ -33,6 +33,7 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   readonly macro = { getMacro: (sourceCode: number) => this.getMacro(sourceCode), setMacro: (settings: MacroSettings) => this.setMacro(settings), deleteMacroBinding: (sourceCode: number) => this.deleteMacroBinding(sourceCode) }
   readonly performance = {
     getPerformance: (sourceCode: number) => this.getPerformance(sourceCode),
+    getPerformances: (sourceCodes: number[]) => this.getPerformances(sourceCodes),
     setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings),
     getPollingRate: () => this.getPollingRate(),
     setPollingRate: (rate: PollingRate) => this.setPollingRate(rate),
@@ -115,6 +116,10 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
   async getPerformance(sourceCode: number) {
     await this.wait()
     return { sourceCode, ...DEFAULT_PERFORMANCE_SETTINGS, ...this.performanceSettings.get(sourceCode), ...this.globalPerformance }
+  }
+  async getPerformances(sourceCodes: number[]) {
+    await this.wait()
+    return sourceCodes.map((sourceCode) => ({ sourceCode, ...DEFAULT_PERFORMANCE_SETTINGS, ...this.performanceSettings.get(sourceCode), ...this.globalPerformance }))
   }
   async setPerformance(settings: KeyPerformanceSettings) {
     await this.wait()

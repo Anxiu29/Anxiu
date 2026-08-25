@@ -202,6 +202,12 @@ export class DeviceSession {
     return this.device.performance.getPerformance(sourceCode)
   }
 
+  /** 批量读取由设备适配器合并同类 Layout 请求，供键盘矩阵展示真实参数。 */
+  async getPerformances(sourceCodes: number[]) {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持性能设置', false, { details: { capability: 'performance' } })
+    return this.device.performance.getPerformances(sourceCodes)
+  }
+
   async updatePerformance(settings: KeyPerformanceSettings) {
     if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持性能设置', false, { details: { capability: 'performance' } })
     await this.device.performance.setPerformance(settings)
