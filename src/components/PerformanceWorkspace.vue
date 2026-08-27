@@ -42,7 +42,11 @@ const draft = ref<KeyPerformanceSettings>()
 type PerformancePanel = 'normal' | 'rt' | 'advanced' | 'calibration'
 const activePanel = ref<PerformancePanel>('normal')
 const lastNormalMode = ref<Extract<PerformanceMode, 'global' | 'single'>>('single')
+const normalModeInitialized = ref(false)
 const selectedPerformancePositionIds = ref<string[]>([])
+const performanceSelectionBox = ref<{ left: number; top: number; width: number; height: number }>()
+let performanceSelectionDrag: { pointerId: number; mode: 'sweep' | 'box'; startX: number; startY: number; latestPositionId?: string } | undefined
+let suppressKeyboardClick = false
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
 const selectedPerformancePositions = computed(() => props.profile.positions.filter((position) => selectedPerformancePositionIds.value.includes(position.id)))
 const busy = computed(() => props.loading || props.mapLoading || ['connecting', 'reading', 'writing'].includes(props.status))
@@ -137,10 +141,14 @@ watch([() => props.settings, () => props.selectedPositionId], ([settings]) => {
   // 设备回读的 mode 描述按键当前配置，不应反向改变用户正在浏览的性能标签页。
   // 当前页只负责把新按键的草稿转换为本页模式，真正写入仍由“保存设置”触发。
   if (activePanel.value === 'rt') draft.value.mode = 'rapid-trigger'
-  else if (activePanel.value === 'normal' && draft.value.mode !== 'rapid-trigger') {
-    lastNormalMode.value = draft.value.mode
+  else if (activePanel.value === 'normal') {
+    // 第一次进入时采用设备模式；用户选过全局/单键后，该编辑工具不再随换键改变。
+    if (!normalModeInitialized.value && draft.value.mode !== 'rapid-trigger') {
+      lastNormalMode.value = draft.value.mode
+      normalModeInitialized.value = true
+    }
+    draft.value.mode = lastNormalMode.value
   }
-  else if (activePanel.value === 'normal') draft.value.mode = lastNormalMode.value
 }, { immediate: true, deep: true })
 watch(() => props.selectedPositionId, (positionId) => {
   if (positionId && !selectedPerformancePositionIds.value.length) selectedPerformancePositionIds.value = [positionId]
@@ -218,6 +226,7 @@ function setMode(mode: PerformanceMode) { if (draft.value) draft.value.mode = mo
 /** 预览轨道统一使用 0–4 mm 比例，避免模板中重复边界处理。 */
 function travelPercent(value: number) { return `${Math.max(0, Math.min(100, value / 4 * 100))}%` }
 function setNormalMode(mode: Extract<PerformanceMode, 'global' | 'single'>) {
+  normalModeInitialized.value = true
   lastNormalMode.value = mode
   setMode(mode)
 }
@@ -243,12 +252,74 @@ function startCalibrationTracking() {
 function selectKeyboardPosition(positionId: string) {
   // 校准操作整个矩阵；其他分类都允许从上方选择要配置和测试的物理键。
   if (activePanel.value === 'calibration') return
+  if (suppressKeyboardClick) return
   const selected = new Set(selectedPerformancePositionIds.value)
   if (selected.has(positionId)) selected.delete(positionId)
   else selected.add(positionId)
   selectedPerformancePositionIds.value = [...selected]
   if (selected.has(positionId)) emit('select-position', positionId)
   else if (props.selectedPositionId === positionId && selectedPerformancePositionIds.value[0]) emit('select-position', selectedPerformancePositionIds.value[0]!)
+}
+
+const performancePositionIdAt = (clientX: number, clientY: number) => document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-position-id]')?.dataset.positionId
+const addPerformancePosition = (positionId: string) => {
+  if (!selectedPerformancePositionIds.value.includes(positionId)) selectedPerformancePositionIds.value = [...selectedPerformancePositionIds.value, positionId]
+}
+/** 左键从键帽开始可连续扫选；右键从任意位置拖动矩形框选。 */
+function beginPerformanceSelection(event: PointerEvent) {
+  if (activePanel.value === 'calibration' || busy.value || (event.button !== 0 && event.button !== 2)) return
+  const host = event.currentTarget as HTMLElement
+  const key = (event.target as HTMLElement).closest<HTMLElement>('[data-position-id]')
+  if (event.button === 0 && !key) return
+  const bounds = host.getBoundingClientRect()
+  const sweep = event.button === 0 && Boolean(key)
+  const positionId = key?.dataset.positionId
+  performanceSelectionDrag = { pointerId: event.pointerId, mode: sweep ? 'sweep' : 'box', startX: event.clientX - bounds.left, startY: event.clientY - bounds.top, latestPositionId: sweep ? positionId : undefined }
+  suppressKeyboardClick = sweep
+  if (sweep && positionId) selectedPerformancePositionIds.value = [positionId]
+  else {
+    selectedPerformancePositionIds.value = []
+    performanceSelectionBox.value = { left: performanceSelectionDrag.startX, top: performanceSelectionDrag.startY, width: 0, height: 0 }
+  }
+  host.setPointerCapture(event.pointerId)
+  event.preventDefault()
+  event.stopImmediatePropagation()
+}
+function movePerformanceSelection(event: PointerEvent) {
+  if (!performanceSelectionDrag || performanceSelectionDrag.pointerId !== event.pointerId) return
+  if (performanceSelectionDrag.mode === 'sweep') {
+    const positionId = performancePositionIdAt(event.clientX, event.clientY)
+    if (positionId) {
+      addPerformancePosition(positionId)
+      performanceSelectionDrag.latestPositionId = positionId
+    }
+    return
+  }
+  const host = event.currentTarget as HTMLElement
+  const bounds = host.getBoundingClientRect()
+  const currentX = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left))
+  const currentY = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top))
+  const left = Math.min(performanceSelectionDrag.startX, currentX)
+  const top = Math.min(performanceSelectionDrag.startY, currentY)
+  const right = Math.max(performanceSelectionDrag.startX, currentX)
+  const bottom = Math.max(performanceSelectionDrag.startY, currentY)
+  performanceSelectionBox.value = { left, top, width: right - left, height: bottom - top }
+  selectedPerformancePositionIds.value = [...host.querySelectorAll<HTMLElement>('[data-position-id]')].filter((key) => {
+    const rect = key.getBoundingClientRect()
+    return rect.right >= bounds.left + left && rect.left <= bounds.left + right && rect.bottom >= bounds.top + top && rect.top <= bounds.top + bottom
+  }).map((key) => key.dataset.positionId!).filter(Boolean)
+}
+function finishPerformanceSelection(event: PointerEvent) {
+  if (!performanceSelectionDrag || performanceSelectionDrag.pointerId !== event.pointerId) return
+  const host = event.currentTarget as HTMLElement
+  const nextCurrent = performanceSelectionDrag.latestPositionId
+    ?? (selectedPerformancePositionIds.value.includes(props.selectedPositionId ?? '') ? props.selectedPositionId : selectedPerformancePositionIds.value[0])
+  if (nextCurrent) emit('select-position', nextCurrent)
+  if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId)
+  performanceSelectionDrag = undefined
+  performanceSelectionBox.value = undefined
+  // 原生 click 在 pointerup 后派发，延迟一拍解除可避免把扫选首键再次反选掉。
+  window.setTimeout(() => { suppressKeyboardClick = false }, 0)
 }
 
 /** 批量选择只操作物理位置，不受用户改键后的目标键值影响。 */
@@ -273,8 +344,9 @@ function resetSelectedTravel() {
 <template>
   <section class="performance-workspace">
     <div class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration', 'bulk-select': activePanel !== 'calibration', 'rt-parameters': activePanel === 'rt' }">
-      <div ref="keyboardContainer" class="performance-keyboard-viewport">
+      <div ref="keyboardContainer" class="performance-keyboard-viewport" @pointerdown="beginPerformanceSelection" @pointermove="movePerformanceSelection" @pointerup="finishPerformanceSelection" @pointercancel="finishPerformanceSelection" @contextmenu.prevent>
         <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected-ids="activePanel !== 'calibration' ? selectedPerformancePositionIds : []" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :top-labels="performanceTopLabels" :bottom-labels="performanceBottomLabels" :auxiliary-labels="performanceAuxiliaryLabels" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
+        <span v-if="performanceSelectionBox" class="performance-selection-box" :style="{ left: `${performanceSelectionBox.left}px`, top: `${performanceSelectionBox.top}px`, width: `${performanceSelectionBox.width}px`, height: `${performanceSelectionBox.height}px` }"></span>
       </div>
       <nav v-if="activePanel !== 'calibration'" class="performance-selection-tools keyboard-selection-tools" aria-label="批量选择性能按键">
         <small>{{ mapLoading ? '正在读取参数…' : `已选 ${selectedPerformancePositionIds.length} 个` }}</small>
