@@ -149,6 +149,13 @@ html[data-theme='light'] .performance-selection-tools button {
   border-color: #c9d4db;
   background: #fff;
 }
+/* 通用键盘在浅色主题下仍需要溢出提示，但不能沿用深色主题的黑色渐变。 */
+html[data-theme='light'] .keyboard-scroll-viewport::before {
+  background: linear-gradient(90deg, rgba(237, 242, 244, .92), transparent);
+}
+html[data-theme='light'] .keyboard-scroll-viewport::after {
+  background: linear-gradient(270deg, rgba(237, 242, 244, .92), transparent);
+}
 
 html[data-theme='light'] .layer-tabs button,
 html[data-theme='light'] .category-tabs button,
