@@ -134,11 +134,13 @@ const normalModes: { id: Extract<PerformanceMode, 'global' | 'single'>; title: s
 watch([() => props.settings, () => props.selectedPositionId], ([settings]) => {
   draft.value = settings && settings.sourceCode === selectedPosition.value?.sourceCode ? clonePerformanceSettings(settings) : undefined
   if (!draft.value) return
-  if (draft.value.mode === 'rapid-trigger' && (activePanel.value === 'normal' || activePanel.value === 'rt')) activePanel.value = 'rt'
-  else if (draft.value.mode !== 'rapid-trigger' && (activePanel.value === 'normal' || activePanel.value === 'rt')) {
+  // 设备回读的 mode 描述按键当前配置，不应反向改变用户正在浏览的性能标签页。
+  // 当前页只负责把新按键的草稿转换为本页模式，真正写入仍由“保存设置”触发。
+  if (activePanel.value === 'rt') draft.value.mode = 'rapid-trigger'
+  else if (activePanel.value === 'normal' && draft.value.mode !== 'rapid-trigger') {
     lastNormalMode.value = draft.value.mode
-    activePanel.value = 'normal'
   }
+  else if (activePanel.value === 'normal') draft.value.mode = lastNormalMode.value
 }, { immediate: true, deep: true })
 watch(() => props.selectedPositionId, (positionId) => {
   if (positionId && !selectedPerformancePositionIds.value.length) selectedPerformancePositionIds.value = [positionId]
