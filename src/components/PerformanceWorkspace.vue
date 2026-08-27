@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyPerformanceSettings, PerformanceMode, PollingRate, TravelMatrix } from '@/domain/performance'
 import { clonePerformanceSettings, DEFAULT_PERFORMANCE_SETTINGS } from '@/domain/performance'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
@@ -93,14 +93,22 @@ const formatParameter = (value: number) => value.toFixed(2).replace(/0+$/, '').r
 const displayedPerformance = (positionId: string, sourceCode: number) => selectedPerformancePositionIds.value.includes(positionId) && draft.value
   ? draft.value
   : props.settingsBySourceCode?.[sourceCode]
-/** 高级设置矩阵的上下角标分别显示设备回读的顶部和底部死区。 */
-const performanceTopLabels = computed(() => activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
+/**
+ * 键帽参数跟随当前分类：普通模式显示有效触发行程，RT 显示按下/释放灵敏度，
+ * 高级设置显示顶部/底部死区。所选键优先显示尚未保存的实时草稿。
+ */
+const performanceTopLabels = computed(() => activePanel.value === 'calibration' ? {} : Object.fromEntries(props.profile.positions.flatMap((position) => {
   const settings = displayedPerformance(position.id, position.sourceCode)
-  return settings ? [[position.id, formatParameter(settings.pressDeadZone)]] : []
-})) : {})
-const performanceBottomLabels = computed(() => activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
+  if (!settings) return []
+  const value = activePanel.value === 'normal'
+    ? settings.mode === 'global' ? settings.globalActuation : settings.actuation
+    : activePanel.value === 'rt' ? settings.rapidPress : settings.pressDeadZone
+  return [[position.id, formatParameter(value)]]
+})))
+const performanceBottomLabels = computed(() => activePanel.value === 'rt' || activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
   const settings = displayedPerformance(position.id, position.sourceCode)
-  return settings ? [[position.id, formatParameter(settings.releaseDeadZone)]] : []
+  if (!settings) return []
+  return [[position.id, formatParameter(activePanel.value === 'rt' ? settings.rapidRelease : settings.releaseDeadZone)]]
 })) : {})
 const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
@@ -126,6 +134,8 @@ watch(() => props.selectedPositionId, (positionId) => {
   if (positionId && props.settings?.sourceCode !== selectedPosition.value?.sourceCode) emit('load', positionId)
 }, { immediate: true })
 watch(() => props.profile.capabilities.pollingRates, (rates) => { if (rates?.length) emit('load-polling-rate') }, { immediate: true })
+// 三个性能分类都需要完整矩阵参数；Store 会缓存结果，后续切页不会重复访问设备。
+onMounted(() => emit('load-all'))
 
 const shouldPollTravel = () => Boolean(props.profile.capabilities.travelTest)
   && (travelTestActive.value || activePanel.value === 'calibration' && props.calibrationActive)
