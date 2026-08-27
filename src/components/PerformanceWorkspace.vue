@@ -45,7 +45,7 @@ const lastNormalMode = ref<Extract<PerformanceMode, 'global' | 'single'>>('singl
 const normalModeInitialized = ref(false)
 const selectedPerformancePositionIds = ref<string[]>([])
 const performanceSelectionBox = ref<{ left: number; top: number; width: number; height: number }>()
-let performanceSelectionDrag: { pointerId: number; mode: 'sweep' | 'box'; startX: number; startY: number; latestPositionId?: string } | undefined
+let performanceSelectionDrag: { pointerId: number; mode: 'sweep' | 'box'; startX: number; startY: number; startPositionId?: string; latestPositionId?: string; dragging: boolean } | undefined
 let suppressKeyboardClick = false
 const selectedPosition = computed(() => props.profile.positions.find((item) => item.id === props.selectedPositionId))
 const selectedPerformancePositions = computed(() => props.profile.positions.filter((position) => selectedPerformancePositionIds.value.includes(position.id)))
@@ -274,25 +274,39 @@ function beginPerformanceSelection(event: PointerEvent) {
   const bounds = host.getBoundingClientRect()
   const sweep = event.button === 0 && Boolean(key)
   const positionId = key?.dataset.positionId
-  performanceSelectionDrag = { pointerId: event.pointerId, mode: sweep ? 'sweep' : 'box', startX: event.clientX - bounds.left, startY: event.clientY - bounds.top, latestPositionId: sweep ? positionId : undefined }
-  suppressKeyboardClick = sweep
-  if (sweep && positionId) selectedPerformancePositionIds.value = [positionId]
-  else {
+  performanceSelectionDrag = { pointerId: event.pointerId, mode: sweep ? 'sweep' : 'box', startX: event.clientX - bounds.left, startY: event.clientY - bounds.top, startPositionId: sweep ? positionId : undefined, latestPositionId: sweep ? positionId : undefined, dragging: !sweep }
+  suppressKeyboardClick = false
+  if (!sweep) {
     selectedPerformancePositionIds.value = []
     performanceSelectionBox.value = { left: performanceSelectionDrag.startX, top: performanceSelectionDrag.startY, width: 0, height: 0 }
   }
-  host.setPointerCapture(event.pointerId)
-  event.preventDefault()
-  event.stopImmediatePropagation()
+  // 左键先保留为普通点击，只有移动超过阈值后才接管为扫选；右键则立即进入框选。
+  if (!sweep) {
+    host.setPointerCapture(event.pointerId)
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
 }
 function movePerformanceSelection(event: PointerEvent) {
   if (!performanceSelectionDrag || performanceSelectionDrag.pointerId !== event.pointerId) return
   if (performanceSelectionDrag.mode === 'sweep') {
     const positionId = performancePositionIdAt(event.clientX, event.clientY)
+    const host = event.currentTarget as HTMLElement
+    const bounds = host.getBoundingClientRect()
+    const moved = Math.hypot(event.clientX - bounds.left - performanceSelectionDrag.startX, event.clientY - bounds.top - performanceSelectionDrag.startY) >= 4
+      || Boolean(positionId && positionId !== performanceSelectionDrag.startPositionId)
+    if (!performanceSelectionDrag.dragging && moved) {
+      performanceSelectionDrag.dragging = true
+      suppressKeyboardClick = true
+      if (!host.hasPointerCapture(event.pointerId)) host.setPointerCapture(event.pointerId)
+      if (performanceSelectionDrag.startPositionId) selectedPerformancePositionIds.value = [performanceSelectionDrag.startPositionId]
+    }
+    if (!performanceSelectionDrag.dragging) return
     if (positionId) {
       addPerformancePosition(positionId)
       performanceSelectionDrag.latestPositionId = positionId
     }
+    event.preventDefault()
     return
   }
   const host = event.currentTarget as HTMLElement
@@ -312,14 +326,17 @@ function movePerformanceSelection(event: PointerEvent) {
 function finishPerformanceSelection(event: PointerEvent) {
   if (!performanceSelectionDrag || performanceSelectionDrag.pointerId !== event.pointerId) return
   const host = event.currentTarget as HTMLElement
-  const nextCurrent = performanceSelectionDrag.latestPositionId
-    ?? (selectedPerformancePositionIds.value.includes(props.selectedPositionId ?? '') ? props.selectedPositionId : selectedPerformancePositionIds.value[0])
-  if (nextCurrent) emit('select-position', nextCurrent)
+  const selectionWasDragged = performanceSelectionDrag.dragging
+  if (selectionWasDragged) {
+    const nextCurrent = performanceSelectionDrag.latestPositionId
+      ?? (selectedPerformancePositionIds.value.includes(props.selectedPositionId ?? '') ? props.selectedPositionId : selectedPerformancePositionIds.value[0])
+    if (nextCurrent) emit('select-position', nextCurrent)
+  }
   if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId)
   performanceSelectionDrag = undefined
   performanceSelectionBox.value = undefined
   // 原生 click 在 pointerup 后派发，延迟一拍解除可避免把扫选首键再次反选掉。
-  window.setTimeout(() => { suppressKeyboardClick = false }, 0)
+  if (selectionWasDragged) window.setTimeout(() => { suppressKeyboardClick = false }, 0)
 }
 
 /** 批量选择只操作物理位置，不受用户改键后的目标键值影响。 */
