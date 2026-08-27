@@ -94,8 +94,8 @@ const displayedPerformance = (positionId: string, sourceCode: number) => selecte
   ? draft.value
   : props.settingsBySourceCode?.[sourceCode]
 /**
- * 键帽参数跟随当前分类：普通模式显示有效触发行程，RT 显示按下/释放灵敏度，
- * 高级设置显示顶部/底部死区。所选键优先显示尚未保存的实时草稿。
+ * 键帽参数跟随当前分类：普通模式显示有效触发行程，RT 同时显示首次触发、
+ * 按下和释放灵敏度，高级设置显示顶部/底部死区。所选键优先显示尚未保存的实时草稿。
  */
 const performanceTopLabels = computed(() => {
   if (activePanel.value === 'calibration') return {}
@@ -108,14 +108,19 @@ const performanceTopLabels = computed(() => {
   if (!settings) return []
   const value = activePanel.value === 'normal'
     ? settings.mode === 'global' ? settings.globalActuation : settings.actuation
-    : activePanel.value === 'rt' ? settings.rapidPress : settings.pressDeadZone
+    : activePanel.value === 'rt' ? settings.actuation : settings.pressDeadZone
   return [[position.id, formatParameter(value)]]
   }))
 })
 const performanceBottomLabels = computed(() => activePanel.value === 'rt' || activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
   const settings = displayedPerformance(position.id, position.sourceCode)
   if (!settings) return []
-  return [[position.id, formatParameter(activePanel.value === 'rt' ? settings.rapidRelease : settings.releaseDeadZone)]]
+  return [[position.id, formatParameter(activePanel.value === 'rt' ? settings.rapidPress : settings.releaseDeadZone)]]
+})) : {})
+// RT 的第三个角标放在右下角，避免首次触发、按下、释放三个值互相覆盖。
+const performanceAuxiliaryLabels = computed(() => activePanel.value === 'rt' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
+  const settings = displayedPerformance(position.id, position.sourceCode)
+  return settings ? [[position.id, formatParameter(settings.rapidRelease)]] : []
 })) : {})
 const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
@@ -260,9 +265,9 @@ function resetSelectedTravel() {
 
 <template>
   <section class="performance-workspace">
-    <div class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration', 'bulk-select': activePanel !== 'calibration' }">
+    <div class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration', 'bulk-select': activePanel !== 'calibration', 'rt-parameters': activePanel === 'rt' }">
       <div ref="keyboardContainer" class="performance-keyboard-viewport">
-        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected-ids="activePanel !== 'calibration' ? selectedPerformancePositionIds : []" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :top-labels="performanceTopLabels" :bottom-labels="performanceBottomLabels" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
+        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected-ids="activePanel !== 'calibration' ? selectedPerformancePositionIds : []" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :top-labels="performanceTopLabels" :bottom-labels="performanceBottomLabels" :auxiliary-labels="performanceAuxiliaryLabels" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
       </div>
       <nav v-if="activePanel !== 'calibration'" class="performance-selection-tools keyboard-selection-tools" aria-label="批量选择性能按键">
         <small>{{ mapLoading ? '正在读取参数…' : `已选 ${selectedPerformancePositionIds.length} 个` }}</small>

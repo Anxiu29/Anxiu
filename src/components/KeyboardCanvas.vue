@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { KeyAssignment, KeyPosition } from '@/domain/keyboard'
 import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 
-const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; selectedIds?: readonly string[]; pressed?: readonly string[]; unit?: number; geometry?: KeyGeometryResolver; badges?: Record<string, string>; topLabels?: Record<string, string>; bottomLabels?: Record<string, string>; keyColors?: Record<string, string> }>(), { unit: 58, defaultAssignments: () => [], selectedIds: () => [], pressed: () => [], geometry: matrixKeyGeometry, badges: () => ({}), topLabels: () => ({}), bottomLabels: () => ({}), keyColors: () => ({}) })
+const props = withDefaults(defineProps<{ positions: KeyPosition[]; assignments: KeyAssignment[]; defaultAssignments?: KeyAssignment[]; keyLabels: Record<number, string>; selected?: string; selectedIds?: readonly string[]; pressed?: readonly string[]; unit?: number; geometry?: KeyGeometryResolver; badges?: Record<string, string>; topLabels?: Record<string, string>; bottomLabels?: Record<string, string>; auxiliaryLabels?: Record<string, string>; keyColors?: Record<string, string> }>(), { unit: 58, defaultAssignments: () => [], selectedIds: () => [], pressed: () => [], geometry: matrixKeyGeometry, badges: () => ({}), topLabels: () => ({}), bottomLabels: () => ({}), auxiliaryLabels: () => ({}), keyColors: () => ({}) })
 const emit = defineEmits<{
   select: [id: string]
   contextmenu: [payload: { positionId: string; clientX: number; clientY: number }]
@@ -46,6 +46,7 @@ const keyStyle = (key: RenderedKey) => ({
         <span>{{ labelFor(assignment(key.id)?.keyCode ?? key.sourceCode) }}</span>
         <small>{{ key.label }}</small>
         <em v-if="bottomLabels[key.id]" class="keycap-bottom-label">{{ bottomLabels[key.id] }}</em>
+        <em v-if="auxiliaryLabels[key.id]" class="keycap-auxiliary-label">{{ auxiliaryLabels[key.id] }}</em>
       </button>
     </div>
   </div>
