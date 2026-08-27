@@ -97,14 +97,21 @@ const displayedPerformance = (positionId: string, sourceCode: number) => selecte
  * 键帽参数跟随当前分类：普通模式显示有效触发行程，RT 显示按下/释放灵敏度，
  * 高级设置显示顶部/底部死区。所选键优先显示尚未保存的实时草稿。
  */
-const performanceTopLabels = computed(() => activePanel.value === 'calibration' ? {} : Object.fromEntries(props.profile.positions.flatMap((position) => {
+const performanceTopLabels = computed(() => {
+  if (activePanel.value === 'calibration') return {}
+  // 0x29 的全局触发行程对整把键盘生效，拖动滑杆时全部键帽应共享同一草稿值。
+  if (activePanel.value === 'normal' && draft.value?.mode === 'global') {
+    return Object.fromEntries(props.profile.positions.map((position) => [position.id, formatParameter(draft.value!.globalActuation)]))
+  }
+  return Object.fromEntries(props.profile.positions.flatMap((position) => {
   const settings = displayedPerformance(position.id, position.sourceCode)
   if (!settings) return []
   const value = activePanel.value === 'normal'
     ? settings.mode === 'global' ? settings.globalActuation : settings.actuation
     : activePanel.value === 'rt' ? settings.rapidPress : settings.pressDeadZone
   return [[position.id, formatParameter(value)]]
-})))
+  }))
+})
 const performanceBottomLabels = computed(() => activePanel.value === 'rt' || activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
   const settings = displayedPerformance(position.id, position.sourceCode)
   if (!settings) return []
