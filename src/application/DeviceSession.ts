@@ -30,6 +30,13 @@ function advancedKeyMatches(expected: Exclude<AdvancedKeySettings, { type: 'none
   return false
 }
 
+function performanceMatches(expected: KeyPerformanceSettings, actual: KeyPerformanceSettings) {
+  return expected.sourceCode === actual.sourceCode && actual.mode === expected.mode
+    && (expected.mode !== 'global' || sameNumbers([actual.globalActuation, actual.pressDeadZone, actual.releaseDeadZone], [expected.globalActuation, expected.pressDeadZone, expected.releaseDeadZone], 0.001))
+    && (expected.mode !== 'single' || sameNumbers([actual.actuation, actual.pressDeadZone, actual.releaseDeadZone], [expected.actuation, expected.pressDeadZone, expected.releaseDeadZone], 0.001))
+    && (expected.mode !== 'rapid-trigger' || sameNumbers([actual.actuation, actual.rapidPress, actual.rapidRelease, actual.pressDeadZone, actual.releaseDeadZone], [expected.actuation, expected.rapidPress, expected.rapidRelease, expected.pressDeadZone, expected.releaseDeadZone], 0.001))
+}
+
 export class DeviceSession {
   // original 是最近一次已验证的设备状态；draft 是允许 UI 修改的工作副本。
   profile?: KeyboardProfile
@@ -218,13 +225,30 @@ export class DeviceSession {
         await wait(delay)
         verified = await this.device.performance.getPerformance(settings.sourceCode)
       }
-      const same = verified.mode === settings.mode
-        && (settings.mode !== 'global' || sameNumbers([verified.globalActuation, verified.pressDeadZone, verified.releaseDeadZone], [settings.globalActuation, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
-        && (settings.mode !== 'single' || sameNumbers([verified.actuation, verified.pressDeadZone, verified.releaseDeadZone], [settings.actuation, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
-        && (settings.mode !== 'rapid-trigger' || sameNumbers([verified.actuation, verified.rapidPress, verified.rapidRelease, verified.pressDeadZone, verified.releaseDeadZone], [settings.actuation, settings.rapidPress, settings.rapidRelease, settings.pressDeadZone, settings.releaseDeadZone], 0.001))
-      if (same) return verified
+      if (performanceMatches(settings, verified)) return verified
     }
     throw new DriverError('VERIFY_FAILED', '性能设置未被设备完整接受', true, { details: { expected: settings, actual: verified } })
+  }
+
+  /** 批量接口让设备适配器合并全局写包，完成后仍对每个物理键进行统一回读验证。 */
+  async updatePerformances(settingsList: KeyPerformanceSettings[]) {
+    if (!this.device.performance) throw new DriverError('UNSUPPORTED_CAPABILITY', '当前设备不支持性能设置', false, { details: { capability: 'performance' } })
+    if (!settingsList.length) return []
+    if (!this.device.performance.setPerformances) {
+      const verified: KeyPerformanceSettings[] = []
+      for (const settings of settingsList) verified.push(await this.updatePerformance(settings))
+      return verified
+    }
+    await this.device.performance.setPerformances(settingsList)
+    let verified = await this.device.performance.getPerformances(settingsList.map((settings) => settings.sourceCode))
+    for (const delay of [0, 60, 100]) {
+      if (delay) {
+        await wait(delay)
+        verified = await this.device.performance.getPerformances(settingsList.map((settings) => settings.sourceCode))
+      }
+      if (settingsList.every((settings, index) => verified[index] && performanceMatches(settings, verified[index]!))) return verified
+    }
+    throw new DriverError('VERIFY_FAILED', '部分按键的性能设置未被设备完整接受', true, { details: { expected: settingsList, actual: verified } })
   }
 
   async getPollingRate() {

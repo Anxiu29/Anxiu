@@ -76,6 +76,8 @@ export interface PerformanceCapability {
   getPerformance(sourceCode: number): Promise<KeyPerformanceSettings>
   getPerformances(sourceCodes: number[]): Promise<KeyPerformanceSettings[]>
   setPerformance(settings: KeyPerformanceSettings): Promise<void>
+  /** 全局模式可由适配器合并公共参数包和矩阵模式写入，避免逐键重复发送。 */
+  setPerformances?(settings: KeyPerformanceSettings[]): Promise<void>
   getPollingRate(): Promise<PollingRate>
   setPollingRate(rate: PollingRate): Promise<PollingRate>
   getTravelMatrix(): Promise<TravelMatrix>

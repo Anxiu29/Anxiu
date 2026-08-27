@@ -336,13 +336,13 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'writing'
     try {
       const next = { ...performanceBySourceCode.value }
-      for (const settings of settingsList) {
-        const verified = await state.session.updatePerformance(settings)
+      const verifiedSettings = await state.session.updatePerformances(settingsList)
+      for (const verified of verifiedSettings) {
         next[verified.sourceCode] = verified
-        // 每个键验证后立即推进缓存；后续键失败时，界面仍准确反映已经落盘的部分。
-        performanceBySourceCode.value = { ...next }
         if (verified.sourceCode === performanceSettings.value?.sourceCode) performanceSettings.value = verified
       }
+      // 整批回读验证成功后一次替换缓存，避免界面在写入期间呈现半套全局状态。
+      performanceBySourceCode.value = next
       status.value = 'ready'
       message.value = `已写入并验证 ${settingsList.length} 个按键的性能设置`
     } catch (cause) { fail(cause) }

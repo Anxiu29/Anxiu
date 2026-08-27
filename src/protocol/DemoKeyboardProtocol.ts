@@ -128,6 +128,9 @@ export class DemoKeyboardProtocol implements KeyboardDevice {
     }
     this.performanceSettings.set(settings.sourceCode, { ...settings })
   }
+  async setPerformances(settingsList: KeyPerformanceSettings[]) {
+    for (const settings of settingsList) await this.setPerformance(settings)
+  }
   async getPollingRate() { await this.wait(); return this.pollingRate }
   async setPollingRate(rate: PollingRate) { await this.wait(); this.pollingRate = rate; return rate }
   async getTravelMatrix() {

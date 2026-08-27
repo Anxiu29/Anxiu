@@ -223,6 +223,11 @@ function setNormalMode(mode: Extract<PerformanceMode, 'global' | 'single'>) {
 }
 function save() {
   if (!draft.value) return
+  // 全局模式的公共参数和每个键的模式位必须一起更新，因此保存范围固定为整把键盘。
+  if (draft.value.mode === 'global') {
+    emit('update-many', props.profile.positions.map((position) => ({ ...clonePerformanceSettings(draft.value!), sourceCode: position.sourceCode })))
+    return
+  }
   if (selectedPerformancePositions.value.length > 1) {
     emit('update-many', selectedPerformancePositions.value.map((position) => ({ ...clonePerformanceSettings(draft.value!), sourceCode: position.sourceCode })))
     return
@@ -292,7 +297,7 @@ function resetSelectedTravel() {
           <button v-if="profile.capabilities.calibration" type="button" :class="{ active: activePanel === 'calibration' }" @click="selectPanel('calibration')">键盘校准</button>
         </nav>
         <div v-if="activePanel !== 'calibration'" class="performance-current"><span>{{ selectedPerformancePositionIds.length > 1 ? '已选择物理按键' : '当前物理按键' }}</span><strong>{{ selectedPerformancePositionIds.length > 1 ? `${selectedPerformancePositionIds.length} 个` : selectedPosition?.label ?? '未选择' }}</strong><code v-if="selectedPosition && selectedPerformancePositionIds.length <= 1">0x{{ selectedPosition.sourceCode.toString(16).padStart(2, '0').toUpperCase() }}</code></div>
-        <button v-if="activePanel !== 'calibration'" class="primary" type="button" :disabled="busy || !draft || !selectedPerformancePositionIds.length" @click="save">{{ status === 'writing' ? '正在保存…' : selectedPerformancePositionIds.length > 1 ? `保存 ${selectedPerformancePositionIds.length} 个按键` : '保存设置' }}</button>
+        <button v-if="activePanel !== 'calibration'" class="primary" type="button" :disabled="busy || !draft || !selectedPerformancePositionIds.length" @click="save">{{ status === 'writing' ? '正在保存…' : draft?.mode === 'global' ? '保存全局设置' : selectedPerformancePositionIds.length > 1 ? `保存 ${selectedPerformancePositionIds.length} 个按键` : '保存设置' }}</button>
       </header>
 
       <div class="performance-editor-body">

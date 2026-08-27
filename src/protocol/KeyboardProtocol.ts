@@ -78,6 +78,7 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     getPerformance: (sourceCode: number) => this.getPerformance(sourceCode),
     getPerformances: (sourceCodes: number[]) => this.getPerformances(sourceCodes),
     setPerformance: (settings: KeyPerformanceSettings) => this.setPerformance(settings),
+    setPerformances: (settings: KeyPerformanceSettings[]) => this.setPerformances(settings),
     getPollingRate: () => this.getPollingRate(),
     setPollingRate: (rate: PollingRate) => this.setPollingRate(rate),
     getTravelMatrix: () => this.getTravelMatrix(),
@@ -287,6 +288,31 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
     await this.writeLayoutValue(settings.sourceCode, ADVANCED_LAYOUT.mode, (mode & 0x0f) | (PERFORMANCE_MODE[settings.mode] << 4))
   }
 
+  /**
+   * 全局触发只需要写一次 0x29 公共参数，再批量把所有键的 MODE 高四位切到全局。
+   * MODE 低四位保存 DKS、宏等高级键类型，批量写入前必须逐键回读并原样保留。
+   */
+  async setPerformances(settingsList: KeyPerformanceSettings[]) {
+    if (!settingsList.length) return
+    for (const settings of settingsList) {
+      const errors = validatePerformanceSettings(settings)
+      if (errors.length) throw new DriverError('INVALID_CONFIGURATION', errors.join('；'))
+    }
+    if (!settingsList.every((settings) => settings.mode === 'global')) {
+      for (const settings of settingsList) await this.setPerformance(settings)
+      return
+    }
+    const global = settingsList[0]!
+    await this.commands.request(XSYD_COMMANDS.performance, encodeGlobalPerformance(global, true))
+    const sourceCodes = [...new Set(settingsList.map((settings) => settings.sourceCode))]
+    const modes = await this.readLayoutValues(sourceCodes, ADVANCED_LAYOUT.mode)
+    await this.writeLayoutValues(sourceCodes.map((sourceCode) => ({
+      sourceCode,
+      layout: ADVANCED_LAYOUT.mode,
+      value: (modes.get(sourceCode) ?? 0) & 0x0f,
+    })))
+  }
+
   async getPollingRate(): Promise<PollingRate> {
     const data = await this.commands.request(XSYD_COMMANDS.action, new Uint8Array([XSYD_ACTIONS.pollingRate]))
     return POLLING_RATES_BY_CODE[data[2] ?? -1] ?? 1000
@@ -494,5 +520,15 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
 
   private async writeLayoutValue(sourceCode: number, layout: number, value: number) {
     await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array([1, sourceCode, layout, ...uint16le(value)]))
+  }
+
+  /** 0x23 写入与读取使用相同的 14 项分片上限。 */
+  private async writeLayoutValues(items: { sourceCode: number; layout: number; value: number }[]) {
+    for (let offset = 0; offset < items.length; offset += 14) {
+      const batch = items.slice(offset, offset + 14)
+      const request = [1]
+      batch.forEach((item) => request.push(item.sourceCode, item.layout, ...uint16le(item.value)))
+      await this.commands.request(XSYD_COMMANDS.keymap, new Uint8Array(request))
+    }
   }
 }
