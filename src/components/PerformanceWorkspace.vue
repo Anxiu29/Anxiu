@@ -94,12 +94,14 @@ const displayedTravel = computed(() => travelTestActive.value && latestTravelPos
 const calibrationBadges = computed(() => Object.fromEntries(props.profile.positions.map((position) => [position.id, `${(calibrationMaxTravel.value[position.id] ?? 0).toFixed(2)} mm`])))
 const calibrationKeyColors = computed(() => Object.fromEntries([...calibratedPositionIds.value].map((id) => [id, '#39d98a'])))
 const formatParameter = (value: number) => value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+/** 普通触发与 RT 参数均支持 0.01 mm；协议写入以微米为单位，无需在 UI 层降为 0.1 mm。 */
+const formatTravel = (value: number) => value.toFixed(2)
 const displayedPerformance = (positionId: string, sourceCode: number) => selectedPerformancePositionIds.value.includes(positionId) && draft.value
   ? draft.value
   : props.settingsBySourceCode?.[sourceCode]
 /**
- * 键帽参数跟随当前分类：普通模式显示有效触发行程，RT 同时显示首次触发、
- * 按下和释放灵敏度，高级设置显示顶部/底部死区。所选键优先显示尚未保存的实时草稿。
+ * 键帽参数跟随当前分类：普通模式显示有效触发行程，RT 显示按下和释放灵敏度，
+ * 高级设置显示顶部/底部死区。所选键优先显示尚未保存的实时草稿。
  */
 const performanceTopLabels = computed(() => {
   if (activePanel.value === 'calibration') return {}
@@ -112,19 +114,14 @@ const performanceTopLabels = computed(() => {
   if (!settings) return []
   const value = activePanel.value === 'normal'
     ? settings.mode === 'global' ? settings.globalActuation : settings.actuation
-    : activePanel.value === 'rt' ? settings.actuation : settings.pressDeadZone
+    : activePanel.value === 'rt' ? settings.rapidPress : settings.pressDeadZone
   return [[position.id, formatParameter(value)]]
   }))
 })
 const performanceBottomLabels = computed(() => activePanel.value === 'rt' || activePanel.value === 'advanced' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
   const settings = displayedPerformance(position.id, position.sourceCode)
   if (!settings) return []
-  return [[position.id, formatParameter(activePanel.value === 'rt' ? settings.rapidPress : settings.releaseDeadZone)]]
-})) : {})
-// RT 的第三个角标放在右下角，避免首次触发、按下、释放三个值互相覆盖。
-const performanceAuxiliaryLabels = computed(() => activePanel.value === 'rt' ? Object.fromEntries(props.profile.positions.flatMap((position) => {
-  const settings = displayedPerformance(position.id, position.sourceCode)
-  return settings ? [[position.id, formatParameter(settings.rapidRelease)]] : []
+  return [[position.id, formatParameter(activePanel.value === 'rt' ? settings.rapidRelease : settings.releaseDeadZone)]]
 })) : {})
 const calibrationProgress = computed(() => props.profile.positions.length ? calibratedPositionIds.value.size / props.profile.positions.length * 100 : 0)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { minUnit: 28 })
@@ -226,6 +223,7 @@ function setMode(mode: PerformanceMode) { if (draft.value) draft.value.mode = mo
 /** 预览轨道统一使用 0–4 mm 比例，避免模板中重复边界处理。 */
 function travelPercent(value: number) { return `${Math.max(0, Math.min(100, value / 4 * 100))}%` }
 function setNormalMode(mode: Extract<PerformanceMode, 'global' | 'single'>) {
+  if (mode === 'single' && !selectedPerformancePositionIds.value.length) return
   normalModeInitialized.value = true
   lastNormalMode.value = mode
   setMode(mode)
@@ -362,7 +360,7 @@ function resetSelectedTravel() {
   <section class="performance-workspace">
     <div class="panel performance-keyboard-panel" :class="{ 'travel-active': activePanel !== 'calibration' && travelTestActive, 'calibration-tracking': activePanel === 'calibration', 'bulk-select': activePanel !== 'calibration', 'rt-parameters': activePanel === 'rt' }">
       <div ref="keyboardContainer" class="performance-keyboard-viewport" @pointerdown="beginPerformanceSelection" @pointermove="movePerformanceSelection" @pointerup="finishPerformanceSelection" @pointercancel="finishPerformanceSelection" @contextmenu.prevent>
-        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected-ids="activePanel !== 'calibration' ? selectedPerformancePositionIds : []" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :top-labels="performanceTopLabels" :bottom-labels="performanceBottomLabels" :auxiliary-labels="performanceAuxiliaryLabels" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
+        <KeyboardCanvas :positions="profile.positions" :assignments="assignments" :key-labels="keyLabels" :selected-ids="activePanel !== 'calibration' ? selectedPerformancePositionIds : []" :pressed="activePanel !== 'calibration' ? activeTravelPositionIds : []" :badges="activePanel === 'calibration' ? calibrationBadges : travelBadges" :top-labels="performanceTopLabels" :bottom-labels="performanceBottomLabels" :key-colors="activePanel === 'calibration' ? calibrationKeyColors : travelKeyColors" :unit="keyboardUnit" :geometry="keyGeometry" @select="selectKeyboardPosition" />
         <span v-if="performanceSelectionBox" class="performance-selection-box" :style="{ left: `${performanceSelectionBox.left}px`, top: `${performanceSelectionBox.top}px`, width: `${performanceSelectionBox.width}px`, height: `${performanceSelectionBox.height}px` }"></span>
       </div>
       <nav v-if="activePanel !== 'calibration'" class="performance-selection-tools keyboard-selection-tools" aria-label="批量选择性能按键">
@@ -399,18 +397,18 @@ function resetSelectedTravel() {
                 <section class="performance-mode-section">
                   <div class="performance-section-title"><h3>普通触发模式</h3><p>可使用整把键盘统一的行程，或为当前按键单独设置触发点。</p></div>
                   <div class="performance-modes horizontal">
-                    <button v-for="mode in normalModes" :key="mode.id" type="button" :class="{ active: draft.mode === mode.id }" :disabled="busy" @click="setNormalMode(mode.id)"><i></i><strong>{{ mode.title }}</strong><small>{{ mode.description }}</small></button>
+                    <button v-for="mode in normalModes" :key="mode.id" type="button" :class="{ active: draft.mode === mode.id }" :disabled="busy || mode.id === 'single' && !selectedPerformancePositionIds.length" @click="setNormalMode(mode.id)"><i></i><strong>{{ mode.title }}</strong><small>{{ mode.description }}</small></button>
                   </div>
                 </section>
                 <div class="performance-control-group primary-control">
                   <h3>{{ draft.mode === 'global' ? '全局触发行程' : '单键触发行程' }}</h3>
-                  <label v-if="draft.mode === 'global'" class="performance-slider"><span>触发行程</span><input v-model.number="draft.globalActuation" type="range" min="0.1" max="4" step="0.1" /><output>{{ draft.globalActuation.toFixed(1) }} mm</output></label>
-                  <label v-else class="performance-slider"><span>触发行程</span><input v-model.number="draft.actuation" type="range" min="0.1" max="4" step="0.1" /><output>{{ draft.actuation.toFixed(1) }} mm</output></label>
+                  <label v-if="draft.mode === 'global'" class="performance-slider"><span>触发行程</span><input v-model.number="draft.globalActuation" type="range" min="0.01" max="4" step="0.01" /><output>{{ formatTravel(draft.globalActuation) }} mm</output></label>
+                  <label v-else class="performance-slider"><span>触发行程</span><input v-model.number="draft.actuation" type="range" min="0.01" max="4" step="0.01" :disabled="!selectedPerformancePositionIds.length" /><output>{{ formatTravel(draft.actuation) }} mm</output></label>
                 </div>
                 <section class="performance-logic-preview normal-preview">
                   <header><div><span>触发逻辑预览</span><strong>固定触发点</strong></div><p>按键下压越过设定行程后输出按键</p></header>
                   <div class="logic-scale">
-                    <div class="logic-track"><i :style="{ width: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }"></i><b :style="{ left: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }"></b><output :style="{ left: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }">{{ (draft.mode === 'global' ? draft.globalActuation : draft.actuation).toFixed(1) }} mm</output></div>
+                    <div class="logic-track"><i :style="{ width: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }"></i><b :style="{ left: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }"></b><output :style="{ left: travelPercent(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }">{{ formatTravel(draft.mode === 'global' ? draft.globalActuation : draft.actuation) }} mm</output></div>
                     <div class="logic-scale-labels"><span>0 mm<br /><small>未按下</small></span><span>2 mm</span><span>4 mm<br /><small>按到底</small></span></div>
                   </div>
                   <div class="logic-flow"><span><i></i>开始下压</span><b>→</b><span class="active"><i></i>越过触发点</span><b>→</b><span><i></i>发送按键</span></div>
@@ -418,19 +416,17 @@ function resetSelectedTravel() {
               </template>
 
               <template v-else-if="activePanel === 'rt'">
-                <div class="performance-section-title"><h3>RT 快速触发</h3><p>首次按下到达触发行程后，根据按键移动方向动态触发和复位。</p></div>
+                <div class="performance-section-title"><h3>RT 快速触发</h3><p>根据按键移动方向动态触发和复位。</p></div>
                 <div class="performance-control-group rt-controls">
-                  <h3>触发行程与灵敏度</h3>
-                  <label class="performance-slider"><span>首次触发行程</span><input v-model.number="draft.actuation" type="range" min="0.1" max="4" step="0.1" /><output>{{ draft.actuation.toFixed(1) }} mm</output></label>
-                  <label class="performance-slider"><span>按下灵敏度</span><input v-model.number="draft.rapidPress" type="range" min="0.1" max="2" step="0.1" /><output>{{ draft.rapidPress.toFixed(1) }} mm</output></label>
-                  <label class="performance-slider"><span>释放灵敏度</span><input v-model.number="draft.rapidRelease" type="range" min="0.1" max="2" step="0.1" /><output>{{ draft.rapidRelease.toFixed(1) }} mm</output></label>
+                  <h3>触发灵敏度</h3>
+                  <label class="performance-slider"><span>按下灵敏度</span><input v-model.number="draft.rapidPress" type="range" min="0.01" max="2" step="0.01" /><output>{{ formatTravel(draft.rapidPress) }} mm</output></label>
+                  <label class="performance-slider"><span>释放灵敏度</span><input v-model.number="draft.rapidRelease" type="range" min="0.01" max="2" step="0.01" /><output>{{ formatTravel(draft.rapidRelease) }} mm</output></label>
                 </div>
                 <section class="performance-logic-preview rt-preview">
-                  <header><div><span>触发逻辑预览</span><strong>动态触发与复位</strong></div><p>首次触发后，根据移动方向持续计算下一次触发位置</p></header>
+                  <header><div><span>触发逻辑预览</span><strong>动态触发与复位</strong></div><p>根据移动方向持续计算下一次触发位置</p></header>
                   <div class="rt-preview-grid">
-                    <article><span>首次触发</span><div class="mini-travel-track"><i :style="{ width: travelPercent(draft.actuation) }"></i><b :style="{ left: travelPercent(draft.actuation) }"></b></div><strong>{{ draft.actuation.toFixed(1) }} mm</strong></article>
-                    <article class="press"><span>继续下压</span><i>↓</i><strong>移动 {{ draft.rapidPress.toFixed(1) }} mm 再次触发</strong></article>
-                    <article class="release"><span>向上抬起</span><i>↑</i><strong>移动 {{ draft.rapidRelease.toFixed(1) }} mm 动态复位</strong></article>
+                    <article class="press"><span>继续下压</span><i>↓</i><strong>移动 {{ formatTravel(draft.rapidPress) }} mm 再次触发</strong></article>
+                    <article class="release"><span>向上抬起</span><i>↑</i><strong>移动 {{ formatTravel(draft.rapidRelease) }} mm 动态复位</strong></article>
                   </div>
                 </section>
               </template>
@@ -439,8 +435,16 @@ function resetSelectedTravel() {
                 <div class="performance-section-title"><h3>高级设置</h3><p>调整当前模式使用的顶部、底部死区，以及键盘的 USB 回报率。</p></div>
                 <div class="performance-control-group dead-zone">
                   <h3>{{ draft.mode === 'global' ? '全局死区' : '当前按键死区' }}</h3>
-                  <label class="performance-slider"><span>顶部死区</span><input v-model.number="draft.pressDeadZone" type="range" min="0" max="1" step="0.05" /><output>{{ draft.pressDeadZone.toFixed(2) }} mm</output></label>
-                  <label class="performance-slider"><span>底部死区</span><input v-model.number="draft.releaseDeadZone" type="range" min="0" max="1" step="0.05" /><output>{{ draft.releaseDeadZone.toFixed(2) }} mm</output></label>
+                  <label class="performance-slider">
+                    <span>顶部死区</span>
+                    <input v-model.number="draft.pressDeadZone" type="range" min="0" max="1" step="0.01" />
+                    <output>{{ draft.pressDeadZone.toFixed(2) }} mm</output>
+                  </label>
+                  <label class="performance-slider">
+                    <span>底部死区</span>
+                    <input v-model.number="draft.releaseDeadZone" type="range" min="0" max="1" step="0.01" />
+                    <output>{{ draft.releaseDeadZone.toFixed(2) }} mm</output>
+                  </label>
                 </div>
                 <section v-if="profile.capabilities.pollingRates?.length" class="performance-polling-panel">
                   <div><h3>USB 回报率</h3><p>更高回报率可以降低延迟，但会增加 USB、CPU 与内存负载。</p></div>

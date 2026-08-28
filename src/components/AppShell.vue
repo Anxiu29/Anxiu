@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'select-configuration': [configuration: KeyboardConfiguration]
   'restore-factory': []
   'update:theme': [theme: AppTheme]
+  navigate: [view: WorkspaceView]
 }>()
 
 const activeView = ref<WorkspaceView>('device')
@@ -33,7 +34,11 @@ let sidebarAutoCollapsed = false
 let narrowScreen: MediaQueryList | undefined
 const settingsOpen = ref(false)
 const configurations: KeyboardConfiguration[] = [1, 2, 3, 4]
-const navigate = (view: WorkspaceView) => { activeView.value = view }
+const navigate = (view: WorkspaceView) => {
+  // 先通知父级准备目标工作区状态，再挂载插槽，避免高级键/性能页沿用改键页的 ESC 选中态。
+  emit('navigate', view)
+  activeView.value = view
+}
 const toggleSidebar = () => {
   // 用户手动操作后解除本轮自动状态，宽度恢复时不会擅自覆盖用户选择。
   sidebarAutoCollapsed = false
