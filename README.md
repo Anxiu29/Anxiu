@@ -18,6 +18,8 @@ npm install
 npm run dev
 ```
 
+启动脚本先检查 5173 是否空闲，已占用则向后寻找空闲端口，成功启动后打开实际地址，以终端输出为准。请使用 `npm run dev` 启动，以执行端口检查。
+
 WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支持桌面 Chrome/Edge。
 
 ## 包头校验
@@ -54,4 +56,12 @@ WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支�
 
 协议层使用 0–3 表示四个布局层，UI 按官方 SDK 术语显示为 Fn1–Fn4。保存时只下发相对设备原始配置发生变化的键位，随后执行手动保存并完整回读验证。恢复出厂设置会导致设备断开并重新枚举，页面不会尝试复用旧 HID 会话。
 
-设备筛选参数集中在 `src/config/devices.ts`。当前参数来自 `doc/C98.txt`。
+设备筛选参数集中在 `src/devices/c98/device.ts`，驱动在 `src/devices/catalog.ts` 注册。当前参数来自 `doc/C98.txt`。
+
+## 开发验证
+
+提交前运行 `npm test` 和 `npm run build`（包含类型检查）。`tests/` 随仓库维护，GitHub Actions 在 push 和 pull request 时执行相同验证；本地演示测试不能替代真机通信验证。
+
+测试默认运行于 Node；需要 DOM 的组件测试在文件头声明 `// @vitest-environment jsdom`。依赖边界测试解析 TypeScript 和 Vue 的模块引用，覆盖相对路径、多行导入、动态导入及再导出。
+
+产品图保留 `src/assets/c98-keyboard-transparent.png` 作为原始素材。页面分别使用 2000px 的 `c98-keyboard-overview.webp` 和 400px 的 `c98-keyboard-sidebar.webp`，保留透明背景，避免侧栏下载原始大图。
