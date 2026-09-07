@@ -11,6 +11,7 @@ import { DEFAULT_LIGHTING_SETTINGS, type LightingSettings } from '@/domain/light
 import { DEFAULT_PERFORMANCE_SETTINGS, type KeyPerformanceSettings, type TravelMatrix } from '@/domain/performance'
 import { HID_KEY_CATALOG } from '@/domain/keycodes'
 import { createAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
+import { createEmptyMacro, type MacroSettings } from '@/domain/macro'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -48,6 +49,67 @@ async function setup() {
 
 describe('driver async context', () => {
   beforeEach(() => setActivePinia(createPinia()))
+
+  it('stops a macro scan after the in-flight response when disconnected', async () => {
+    const { store, session, profile, disconnect } = await setup()
+    profile.capabilities.macro = true
+    const pending = deferred<MacroSettings>()
+    const read = vi.spyOn(session, 'getMacro').mockReturnValue(pending.promise)
+    const scanning = store.loadMacrosFromDevice()
+    disconnect()
+    pending.resolve(createEmptyMacro())
+    await scanning
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(store.macroSlots).toEqual({})
+    expect(store.macroLoading).toBe(false)
+  })
+
+  it('prevents an old macro scan from replacing a newly saved local draft', async () => {
+    const { store, session, profile } = await setup()
+    profile.capabilities.macro = true
+    const pending = deferred<MacroSettings>()
+    const read = vi.spyOn(session, 'getMacro').mockReturnValue(pending.promise)
+    const scanning = store.loadMacrosFromDevice()
+    const draft = { ...createEmptyMacro(), actions: [{ keyCode: 4, pressed: true, delay: 10 }] }
+    await store.updateMacro(draft)
+    pending.resolve(createEmptyMacro())
+    await scanning
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(store.macroSlots[0]?.actions).toEqual(draft.actions)
+    expect(store.messageWarning).toBe(true)
+  })
+
+  it.each(['resolve', 'reject'] as const)('stops multi-key macro writes when a disconnected request %s', async (outcome) => {
+    const { store, session, profile, disconnect } = await setup()
+    profile.capabilities.macro = true
+    const pending = deferred<MacroSettings>()
+    const write = vi.spyOn(session, 'updateMacro').mockReturnValue(pending.promise)
+    const settings = { ...createEmptyMacro(0, 4), boundSourceCodes: [4, 5] }
+    const writing = store.updateMacro(settings)
+    disconnect()
+    if (outcome === 'resolve') pending.resolve(settings)
+    else pending.reject(new Error('stale write'))
+    await writing
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(store.status).toBe('disconnected')
+    expect(store.error).toContain('断开')
+    expect(store.macroSlots).toEqual({})
+  })
+
+  it('stops removing macro bindings after disconnect', async () => {
+    const { store, session, profile, disconnect } = await setup()
+    profile.capabilities.macro = true
+    store.macroSlots = { 0: { ...createEmptyMacro(0, 4), boundSourceCodes: [4, 5] } }
+    const pending = deferred<void>()
+    const remove = vi.spyOn(session, 'deleteMacroBinding').mockReturnValue(pending.promise)
+    const deleting = store.deleteMacro(0)
+    disconnect()
+    pending.resolve()
+    await deleting
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(store.status).toBe('disconnected')
+    expect(store.message).toBe('')
+  })
 
   it.each(['resolve', 'reject'] as const)('keeps cached A selected when a pending B read %s', async (outcome) => {
     const { store, session, profile } = await setup()
