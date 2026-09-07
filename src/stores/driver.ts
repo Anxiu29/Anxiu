@@ -3,7 +3,8 @@ import type { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardConfiguration, KeyboardMode } from '@/domain/keyboard'
 import { toDriverError } from '@/application/DriverError'
 import { createDriverState } from './driverState'
-import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
+import { createRequestScope } from './requestScope'
+import { createLightingActions } from './lightingActions'
 import type { AdvancedKeySettings } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 import type { KeyPerformanceSettings, PollingRate } from '@/domain/performance'
@@ -22,25 +23,32 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   let macroReadRevision = 0
   let loadingMacroSourceCode: number | undefined
   let performanceReadRevision = 0
+  let loadingPerformanceSourceCode: number | undefined
+  const lightingActions = createLightingActions(state, { clearFeedback, fail })
+  const { updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting } = lightingActions
+  const pollingRateRequests = createRequestScope()
+  const travelRequests = createRequestScope()
+  const profileRequests = createRequestScope()
   let performanceMapReadRevision = 0
   let consecutiveTravelReadFailures = 0
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false) {
     removeDeviceStateListeners()
+    invalidateDeviceCaches()
     clearFeedback(); status.value = 'connecting'; demo.value = useDemo; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       state.session = await driverService.connect({ demo: useDemo, onDisconnect: handleDisconnect })
       observeDeviceStateChanges()
       driverId.value = driverService.driverId
-      await readProfile()
-      message.value = useDemo ? '已进入演示模式' : '键盘连接成功'
+      if (await readProfile()) message.value = useDemo ? '已进入演示模式' : '键盘连接成功'
     } catch (cause) { fail(cause) }
   }
 
   /** 浏览器只允许无提示重连已经授权过的 HID 设备；没有授权设备不是错误。 */
   async function reconnectAuthorized() {
     removeDeviceStateListeners()
+    invalidateDeviceCaches()
     clearFeedback(); status.value = 'connecting'; mode.value = 'win'; layer.value = 0; activeConfiguration.value = 1
     try {
       state.session = await driverService.reconnectAuthorized({ onDisconnect: handleDisconnect })
@@ -52,18 +60,26 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   }
 
   async function readProfile() {
-    if (!state.session) return
+    const session = state.session
+    if (!session) return false
+    const isCurrent = profileRequests.begin()
     status.value = 'reading'
-    profile.value = await state.session.load()
-    lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
-    // 逐键颜色属于当前设备配置，Profile/模式/配置槽变化后必须按需重新读取。
-    customLighting.value = []
-    invalidateAdvancedKeyCache()
-    mode.value = profile.value.mode ?? mode.value
-    revision.value++
-    status.value = 'ready'
-    // 默认选中第一个真实物理键，避免 UI 初次进入时出现无键位上下文。
-    selectedPositionId.value = profile.value.positions[0]?.id
+    try {
+      const nextProfile = await session.load()
+      if (!isCurrent() || state.session !== session) return false
+      const nextLighting = nextProfile.capabilities.lighting ? await session.getLighting() : undefined
+      if (!isCurrent() || state.session !== session) return false
+      profile.value = nextProfile
+      lighting.value = nextLighting
+      mode.value = nextProfile.mode ?? mode.value
+      revision.value++
+      status.value = 'ready'
+      selectedPositionId.value = nextProfile.positions[0]?.id
+      return true
+    } catch (cause) {
+      if (!isCurrent() || state.session !== session) return false
+      throw cause
+    }
   }
 
   /** 单键选择采用即时写入：更新草稿、保存、回读验证是同一个应用事务。 */
@@ -87,7 +103,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   async function reload() {
     if (!state.session) return
-    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
+    clearFeedback(); invalidateDeviceCaches(); status.value = 'reading'
     try { profile.value = await state.session.reload(); lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined; customLighting.value = []; revision.value++; status.value = 'ready'; message.value = '已重新读取设备配置' }
     catch (cause) { fail(cause) }
   }
@@ -112,7 +128,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       const snapshotContext = macroSnapshotContext()
       await state.session.restoreFactory()
       clearDeviceMacroSnapshots(snapshotContext)
-      invalidateMacroCache()
+      invalidateDeviceCaches()
       await driverService.disconnect()
       removeDeviceStateListeners()
       state.session = undefined
@@ -135,7 +151,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function selectMode(targetMode: KeyboardMode) {
     if (!state.session || !profile.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
     if (mode.value === targetMode) { layer.value = 0; return }
-    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
+    clearFeedback(); invalidateDeviceCaches(); status.value = 'reading'
     try {
       profile.value = await state.session.switchMode(targetMode)
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
@@ -153,7 +169,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   /** 四个配置槽是设备端状态，切换成功后回到 FN1 并重建当前 Profile。 */
   async function selectConfiguration(configuration: KeyboardConfiguration) {
     if (!state.session || !profile.value || activeConfiguration.value === configuration || ['connecting', 'reading', 'writing'].includes(status.value)) return
-    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
+    clearFeedback(); invalidateDeviceCaches(); status.value = 'reading'
     try {
       profile.value = await state.session.switchConfiguration(configuration)
       lighting.value = profile.value.capabilities.lighting ? await state.session.getLighting() : undefined
@@ -178,47 +194,6 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       profile.value = result.profile; revision.value++; status.value = 'ready'
       message.value = result.changedAssignments === 0 ? '该按键已经是默认映射' : '已恢复当前按键默认映射并通过回读验证'
     } catch (cause) { revision.value++; fail(cause) }
-  }
-
-  async function updateLighting(settings: LightingSettings) {
-    if (!state.session || !profile.value?.capabilities.lighting || !['ready', 'error'].includes(status.value)) return
-    clearFeedback(); status.value = 'writing'
-    try {
-      lighting.value = await state.session.updateLighting(settings)
-      status.value = 'ready'
-      message.value = '灯光设置已写入并通过回读验证'
-    } catch (cause) { fail(cause) }
-  }
-
-  async function reloadLighting() {
-    if (!state.session || !profile.value?.capabilities.lighting || ['connecting', 'reading', 'writing'].includes(status.value)) return
-    clearFeedback(); status.value = 'reading'
-    try { lighting.value = await state.session.getLighting(); status.value = 'ready'; message.value = '已重新读取灯光设置' }
-    catch (cause) { fail(cause) }
-  }
-
-  async function loadCustomLighting() {
-    if (!state.session || !profile.value?.capabilities.customLighting || customLightingLoading.value) return
-    customLightingLoading.value = true
-    clearFeedback()
-    try {
-      customLighting.value = await state.session.getCustomLighting(profile.value.positions.map((position) => position.sourceCode))
-    } catch (cause) { fail(cause) }
-    finally { customLightingLoading.value = false }
-  }
-
-  async function updateCustomLighting(items: CustomKeyLighting[]) {
-    if (!state.session || !profile.value?.capabilities.customLighting || !['ready', 'error'].includes(status.value)) return
-    clearFeedback(); status.value = 'writing'
-    try {
-      const verified = await state.session.updateCustomLighting(items)
-      // 自动保存只回读本次变化的键，必须合并进完整颜色表，不能用局部结果覆盖其余键。
-      const merged = new Map(customLighting.value.map((item) => [item.sourceCode, item]))
-      verified.forEach((item) => merged.set(item.sourceCode, item))
-      customLighting.value = [...merged.values()]
-      status.value = 'ready'
-      message.value = `已自动保存并回读验证 ${items.length} 个按键的自定义颜色`
-    } catch (cause) { fail(cause) }
   }
 
   async function loadAdvancedKey(positionId = selectedPositionId.value, force = false) {
@@ -282,13 +257,18 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   }
 
   async function loadPerformance(positionId = selectedPositionId.value, force = false) {
-    if (!state.session || !profile.value?.capabilities.performance || !positionId || performanceLoading.value || ['connecting', 'writing'].includes(status.value)) return
+    if (!state.session || !profile.value?.capabilities.performance || !positionId || !['ready', 'error'].includes(status.value)) return
     const position = profile.value.positions.find((item) => item.id === positionId)
-    if (!position || !force && performanceSettings.value?.sourceCode === position.sourceCode) return
+    if (!position || performanceLoading.value && loadingPerformanceSourceCode === position.sourceCode) return
+    // 即使命中缓存，也要使之前另一按键的读取失效。
+    const readRevision = ++performanceReadRevision
+    performanceLoading.value = false
+    loadingPerformanceSourceCode = undefined
+    if (!force && performanceSettings.value?.sourceCode === position.sourceCode) return
     const cached = performanceBySourceCode.value[position.sourceCode]
     if (!force && cached) { performanceSettings.value = { ...cached }; return }
     const observedSession = state.session
-    const readRevision = ++performanceReadRevision
+    loadingPerformanceSourceCode = position.sourceCode
     performanceLoading.value = true
     clearFeedback()
     try {
@@ -298,7 +278,12 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
         performanceBySourceCode.value = { ...performanceBySourceCode.value, [result.sourceCode]: result }
       }
     } catch (cause) { if (state.session === observedSession && readRevision === performanceReadRevision) fail(cause) }
-    finally { if (readRevision === performanceReadRevision) performanceLoading.value = false }
+    finally {
+      if (readRevision === performanceReadRevision) {
+        performanceLoading.value = false
+        loadingPerformanceSourceCode = undefined
+      }
+    }
   }
 
   async function updatePerformance(settings: KeyPerformanceSettings) {
@@ -350,12 +335,17 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   async function loadPollingRate() {
     if (!state.session || !profile.value?.capabilities.pollingRates?.length) return
-    try { pollingRate.value = await state.session.getPollingRate() }
-    catch (cause) { fail(cause) }
+    const observedSession = state.session
+    const isCurrent = pollingRateRequests.begin()
+    try {
+      const result = await observedSession.getPollingRate()
+      if (isCurrent() && state.session === observedSession) pollingRate.value = result
+    } catch (cause) { if (isCurrent() && state.session === observedSession) fail(cause) }
   }
 
   async function updatePollingRate(rate: PollingRate) {
     if (!state.session || !profile.value?.capabilities.pollingRates?.includes(rate) || !['ready', 'error'].includes(status.value)) return
+    pollingRateRequests.invalidate()
     clearFeedback(); status.value = 'writing'
     try { pollingRate.value = await state.session.updatePollingRate(rate); status.value = 'ready'; message.value = `回报率已设置为 ${rate} Hz` }
     catch (cause) { fail(cause) }
@@ -364,9 +354,13 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   async function readTravelMatrix() {
     // 性能参数读取会连续访问布局字段；此时不再追加矩阵轮询，避免无意义排队和页面切键延迟。
     if (!state.session || !profile.value?.capabilities.travelTest || status.value !== 'ready' || performanceLoading.value || travelReading.value) return
+    const observedSession = state.session
+    const isCurrent = travelRequests.begin()
     travelReading.value = true
     try {
-      travelMatrix.value = await state.session.getTravelMatrix()
+      const result = await observedSession.getTravelMatrix()
+      if (!isCurrent() || state.session !== observedSession) return
+      travelMatrix.value = result
       consecutiveTravelReadFailures = 0
       // 行程采样曾短暂失败但随后恢复时，清掉仅由采样产生的协议提示。
       if (['PROTOCOL_CRC_ERROR', 'PROTOCOL_REJECTED', 'PROTOCOL_TIMEOUT'].includes(errorCode.value ?? '')) {
@@ -374,6 +368,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
         errorCode.value = undefined
       }
     } catch (cause) {
+      if (!isCurrent() || state.session !== observedSession) return
       const driverError = toDriverError(cause)
       const recoverableSamplingError = driverError.recoverable
         && ['PROTOCOL_CRC_ERROR', 'PROTOCOL_REJECTED', 'PROTOCOL_TIMEOUT'].includes(driverError.code)
@@ -384,7 +379,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
         errorCode.value = driverError.code
       }
     }
-    finally { travelReading.value = false }
+    finally { if (isCurrent()) travelReading.value = false }
   }
 
   async function startCalibration() {
@@ -477,7 +472,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
 
   function handleDisconnect() {
     removeDeviceStateListeners()
-    invalidateAdvancedKeyCache()
+    invalidateDeviceCaches()
     // 保留 profile/draft 供用户查看；操作入口会根据 disconnected 状态被禁用。
     status.value = 'disconnected'
     error.value = '键盘已断开连接，未保存的草稿仍保留在页面中'
@@ -513,20 +508,24 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       setTimeout(() => void syncExternalMode(observedSession, targetMode), 100)
       return
     }
-    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
+    clearFeedback(); invalidateDeviceCaches(); status.value = 'reading'
+    const isCurrent = profileRequests.begin()
     try {
-      profile.value = await observedSession.load()
-      lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
-      customLighting.value = []
-      if (state.session !== observedSession) return
+      const nextProfile = await observedSession.load()
+      if (!isCurrent() || state.session !== observedSession) return
+      const nextLighting = nextProfile.capabilities.lighting ? await observedSession.getLighting() : undefined
+      if (!isCurrent() || state.session !== observedSession) return
+      profile.value = nextProfile
+      lighting.value = nextLighting
       mode.value = profile.value.mode ?? targetMode
       await loadMacrosFromDevice()
+      if (!isCurrent() || state.session !== observedSession) return
       layer.value = 0
       selectedPositionId.value = profile.value.positions[0]?.id
       revision.value++
       status.value = 'ready'
       message.value = mode.value === 'mac' ? '检测到键盘已切换至 Mac 模式，已同步四层映射' : '检测到键盘已切换至 Windows 模式，已同步四层映射'
-    } catch (cause) { fail(cause) }
+    } catch (cause) { if (isCurrent() && state.session === observedSession) fail(cause) }
   }
 
   /** 键盘快捷键切换配置槽后，重读该槽的四层映射并同步左侧配置按钮。 */
@@ -536,23 +535,35 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       setTimeout(() => void syncExternalConfiguration(observedSession, configuration), 100)
       return
     }
-    clearFeedback(); invalidateAdvancedKeyCache(); status.value = 'reading'
+    clearFeedback(); invalidateDeviceCaches(); status.value = 'reading'
+    const isCurrent = profileRequests.begin()
     try {
-      profile.value = await observedSession.load()
-      lighting.value = profile.value.capabilities.lighting ? await observedSession.getLighting() : undefined
-      customLighting.value = []
-      if (state.session !== observedSession) return
+      const nextProfile = await observedSession.load()
+      if (!isCurrent() || state.session !== observedSession) return
+      const nextLighting = nextProfile.capabilities.lighting ? await observedSession.getLighting() : undefined
+      if (!isCurrent() || state.session !== observedSession) return
+      profile.value = nextProfile
+      lighting.value = nextLighting
       layer.value = 0
       await loadMacrosFromDevice()
+      if (!isCurrent() || state.session !== observedSession) return
       selectedPositionId.value = profile.value.positions[0]?.id
       revision.value++
       status.value = 'ready'
       message.value = `检测到键盘已切换到配置 ${configuration}，已同步四层映射`
-    } catch (cause) { fail(cause) }
+    } catch (cause) { if (isCurrent() && state.session === observedSession) fail(cause) }
   }
   function clearFeedback() { error.value = ''; errorCode.value = undefined; message.value = ''; messageWarning.value = false }
   /** 模式、配置槽或设备会话改变后，上一上下文的单键缓存和在途结果都必须失效。 */
-  function invalidateAdvancedKeyCache() {
+  function invalidateDeviceCaches() {
+    profileRequests.invalidate()
+    lightingActions.invalidate()
+    pollingRateRequests.invalidate()
+    travelRequests.invalidate()
+    customLighting.value = []
+    customLightingLoading.value = false
+    consecutiveTravelReadFailures = 0
+    loadingPerformanceSourceCode = undefined
     advancedKeyReadRevision++
     advancedKeyTypesReadRevision++
     advancedKey.value = undefined
