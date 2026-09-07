@@ -73,6 +73,12 @@ export const c98KeyGeometry: KeyGeometryResolver = (key: KeyPosition) =>
 
 /** C98 的所有 UI 专用知识集中在设备目录，共享组件只接收 DevicePresentation。 */
 export const C98_PRESENTATION: DevicePresentation = {
+  firmwareDownload: {
+    url: 'https://drive.rkgaming.com/down/work/RKWEB/firmware/C98(739)/1_MODE/XS105_RK739X_C98_App_v1.0.1_20250515a.bin',
+    fileName: 'XS105_RK739X_C98_App_v1.0.1_20250515a.bin',
+    version: '1.0.1 · 20250515a',
+    target: 'C98(739) 单模 · XS105 / RK739X',
+  },
   keyGeometry: c98KeyGeometry,
   extendedKeyCodes: C98_EXTENDED_KEY_CODES,
   overviewImageUrl: keyboardImageUrl,

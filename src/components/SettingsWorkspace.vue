@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { KeyboardProfile } from '@/domain/keyboard'
 import type { AppTheme } from '@/ui/theme'
+import type { FirmwareDownload } from '@/ui/DevicePresentation'
 
 type SettingsSection = 'appearance' | 'device' | 'firmware' | 'about'
 
@@ -9,6 +10,7 @@ const props = withDefaults(defineProps<{
   profile: KeyboardProfile
   theme?: AppTheme
   busy?: boolean
+  firmwareDownload?: FirmwareDownload
 }>(), { theme: 'dark', busy: false })
 
 const emit = defineEmits<{
@@ -22,7 +24,6 @@ const resetConfirmationVisible = ref(false)
 const firmwareFile = ref<File>()
 const firmwareError = ref('')
 const firmwareInput = ref<HTMLInputElement>()
-const firmwareUpdateSupported = computed(() => !!props.profile.capabilities.firmwareUpdate)
 const deviceModeLabel = computed(() => ({ app: '应用模式', boot: 'Bootloader', unknown: '未知模式' })[props.profile.device.runMode])
 const formatHex = (value: number) => `0x${value.toString(16).toUpperCase().padStart(4, '0')}`
 const formatFileSize = (bytes: number) => bytes < 1024
@@ -124,21 +125,25 @@ function requestFactoryReset() {
         </section>
 
         <section v-else-if="activeSection === 'firmware'" class="settings-section">
-          <div class="settings-section-title"><span>FIRMWARE UPDATE</span><h3>固件升级</h3><p>使用厂商提供的原始固件包。升级过程中请勿断开键盘或关闭页面。</p></div>
+          <div class="settings-section-title"><span>FIRMWARE UPDATE</span><h3>固件下载与升级</h3><p>下载官方固件，查看当前版本和本地文件信息。</p></div>
           <div class="firmware-version-card">
             <div><small>当前固件</small><strong>{{ profile.device.firmwareVersion }}</strong><span>{{ profile.device.productName }}</span></div>
-            <span class="firmware-status" :class="{ available: firmwareUpdateSupported }">{{ firmwareUpdateSupported ? '支持网页升级' : '当前驱动未开放刷写' }}</span>
+            <span class="firmware-status">网页升级暂未实现</span>
+          </div>
+          <div v-if="firmwareDownload" class="settings-action-card firmware-download-card">
+            <div><strong>官方固件下载</strong><p>{{ firmwareDownload.target }}</p><p>文件标注版本：{{ firmwareDownload.version }}</p><p class="firmware-download-name">{{ firmwareDownload.fileName }}</p></div>
+            <a class="settings-secondary-button firmware-download-link" :href="firmwareDownload.url" :download="firmwareDownload.fileName" target="_blank" rel="noopener noreferrer">下载官方固件</a>
           </div>
           <div class="firmware-upload-card" :class="{ selected: firmwareFile }" @click="firmwareInput?.click()">
             <input ref="firmwareInput" type="file" accept=".bin,application/octet-stream" @change="selectFirmware" />
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5"/></svg>
-            <div v-if="firmwareFile"><strong>{{ firmwareFile.name }}</strong><p>{{ formatFileSize(firmwareFile.size) }} · 已完成本地文件校验</p></div>
+            <div v-if="firmwareFile"><strong>{{ firmwareFile.name }}</strong><p>{{ formatFileSize(firmwareFile.size) }} · 非空 .bin 文件，尚未验证设备适配性</p></div>
             <div v-else><strong>选择本地固件包</strong><p>点击选择厂商提供的 .bin 文件</p></div>
             <button type="button" tabindex="-1">{{ firmwareFile ? '重新选择' : '浏览文件' }}</button>
           </div>
           <p v-if="firmwareError" class="firmware-error" role="alert">{{ firmwareError }}</p>
-          <div v-if="!firmwareUpdateSupported" class="firmware-unavailable"><strong>暂不能从网页写入此设备</strong><p>当前驱动还没有声明 Bootloader 传输能力。固件文件只在浏览器本地读取，不会上传或写入键盘；待设备协议适配完成后，此处会开放升级操作。</p></div>
-          <div class="firmware-footer"><p>仅使用与当前型号、板卡完全匹配的官方固件。</p><button class="primary" type="button" :disabled="!firmwareFile || !firmwareUpdateSupported || busy">开始升级</button></div>
+          <div class="firmware-unavailable"><strong>当前版本尚未实现网页升级</strong><p>下载和选择固件不会将其写入键盘。当前版本仅支持查看文件信息，升级请使用厂商提供的适配工具；网页刷写流程完成后才会开放此按钮。</p></div>
+          <div class="firmware-footer"><p>仅使用与当前型号、板卡完全匹配的官方固件。</p><button class="primary" type="button" disabled title="当前版本尚未实现固件写入流程">开始升级</button></div>
         </section>
 
         <section v-else class="settings-section">

@@ -89,6 +89,9 @@
 .firmware-footer { margin-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .firmware-footer p { margin: 0; color: #687482; font-size: 9px; }
 .firmware-footer .primary { min-width: 108px; font-size: 10px; }
+.firmware-download-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.firmware-download-link:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.firmware-download-name { overflow-wrap: anywhere; }
 .settings-about-brand { min-height: 88px; padding: 18px; display: flex; align-items: center; gap: 13px; }
 .settings-about-brand > div:nth-child(2) { display: flex; flex-direction: column; letter-spacing: .15em; }
 .settings-about-brand > div strong { font-size: 14px; }

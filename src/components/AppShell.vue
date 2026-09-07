@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 import type { AppTheme } from '@/ui/theme'
+import type { FirmwareDownload } from '@/ui/DevicePresentation'
 import SettingsWorkspace from './SettingsWorkspace.vue'
 
 type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'performance' | 'macro' | 'key-test' | 'settings'
@@ -15,6 +16,7 @@ const props = withDefaults(defineProps<{
   messageWarning?: boolean
   sidebarImageUrl?: string
   theme?: AppTheme
+  firmwareDownload?: FirmwareDownload
 }>(), { activeConfiguration: 1, theme: 'dark' })
 
 const emit = defineEmits<{
@@ -151,7 +153,7 @@ onBeforeUnmount(() => {
       <slot v-else-if="activeView === 'performance'" name="performance" />
       <slot v-else-if="activeView === 'macro'" name="macro" />
       <slot v-else-if="activeView === 'key-test'" name="key-test" />
-      <SettingsWorkspace v-else :profile="profile" :theme="theme" :busy="navigationDisabled" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
+      <SettingsWorkspace v-else :profile="profile" :theme="theme" :busy="navigationDisabled" :firmware-download="firmwareDownload" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
     </div>
 
     <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error, warning: !error && messageWarning }" role="status">

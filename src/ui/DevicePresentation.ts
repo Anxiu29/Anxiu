@@ -12,8 +12,17 @@ export interface LightingRangePresentation {
   step: number
 }
 
+/** 型号提供的官方下载资源；文件名版本不代表已验证适配或最新版本。 */
+export interface FirmwareDownload {
+  url: string
+  fileName: string
+  version: string
+  target: string
+}
+
 /** 设备在 Vue UI 中的纯表现资源；由组合根选择，不进入领域或协议模型。 */
 export interface DevicePresentation {
+  firmwareDownload?: FirmwareDownload
   keyGeometry: KeyGeometryResolver
   /** 当前型号允许在改键 UI 中选择的扩展键；具体清单由设备目录维护。 */
   extendedKeyCodes: ReadonlySet<number>

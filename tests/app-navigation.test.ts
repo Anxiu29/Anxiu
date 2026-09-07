@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { expect, it, vi } from 'vitest'
 import App from '@/App.vue'
 import { keyboardDriverService, useDriverStore } from '@/composition/root'
+import { C98_PRESENTATION } from '@/devices/c98/presentation'
 
 it('loads every lazy workspace and returns to the overview with the same session', async () => {
   const pinia = createPinia()
@@ -33,6 +34,9 @@ it('loads every lazy workspace and returns to the overview with the same session
     await wrapper.get('.sidebar-nav button[title="设备首页"]').trigger('click')
     expect(wrapper.find('.overview-image').exists()).toBe(true)
     expect(wrapper.find('.key-test-workspace').exists()).toBe(false)
+    await wrapper.get('.sidebar-settings').trigger('click')
+    await wrapper.findAll('.settings-navigation button')[2]!.trigger('click')
+    expect(wrapper.get('.firmware-download-link').attributes('href')).toBe(C98_PRESENTATION.firmwareDownload?.url)
   } finally {
     wrapper.unmount()
     mocks.forEach((mock) => mock.mockRestore())
