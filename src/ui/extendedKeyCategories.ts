@@ -20,6 +20,16 @@ export const isSelectableExtendedKey = ({ code, label }: KeyDefinition, supporte
   supportedCodes.has(code) && label.trim() !== '' && label.trim() !== '-'
 
 /**
+ * 所有键值选择器共用同一套型号白名单和占位符过滤规则。
+ * excludedCodes 用于排除已经在当前选择器键盘区域展示的键值，避免重复入口。
+ */
+export const selectableExtendedKeys = (
+  definitions: readonly KeyDefinition[],
+  supportedCodes: ReadonlySet<number>,
+  excludedCodes: ReadonlySet<number> = new Set<number>(),
+) => definitions.filter((item) => !excludedCodes.has(item.code) && isSelectableExtendedKey(item, supportedCodes))
+
+/**
  * 分类仅用于 UI 浏览，不改变 KeyDefinition.category 或协议键码。
  * 优先使用文档中稳定的厂商键码范围，名称规则只作为未来新增同类键值的补充。
  */

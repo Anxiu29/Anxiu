@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { KeyAssignment, KeyDefinition, KeyboardProfile } from '@/domain/keyboard'
+import { selectableExtendedKeys } from '@/ui/extendedKeyCategories'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
 import KeyboardCanvas from './KeyboardCanvas.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   profile: KeyboardProfile
   modelValue: number
   keyOptions: readonly KeyDefinition[]
   keyLabels: Record<number, string>
+  extendedKeyCodes?: ReadonlySet<number>
   keyGeometry?: KeyGeometryResolver
-}>()
+}>(), { extendedKeyCodes: () => new Set<number>() })
 const emit = defineEmits<{ close: []; confirm: [keyCode: number] }>()
 const pendingCode = ref(props.modelValue)
 const { container: keyboardContainer, unit: keyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, { maxUnit: 44, minUnit: 28, horizontalPadding: 34, verticalPadding: 28 })
@@ -31,7 +33,8 @@ const keyboardAssignments = computed<KeyAssignment[]>(() => props.profile.positi
 })))
 const selectedPositionId = computed(() => props.profile.positions.find((position) => position.sourceCode === pendingCode.value)?.id)
 const physicalCodes = computed(() => new Set(props.profile.positions.map((position) => position.sourceCode)))
-const extraOptions = computed(() => props.keyOptions.filter((item) => !physicalCodes.value.has(item.code) && item.label !== '-'))
+// 与改键页“扩展按键”共用型号白名单；物理键盘已经展示的键值不在下拉框中重复出现。
+const extraOptions = computed(() => selectableExtendedKeys(props.keyOptions, props.extendedKeyCodes, physicalCodes.value))
 const choosePosition = (positionId: string) => {
   const position = props.profile.positions.find((item) => item.id === positionId)
   if (position) pendingCode.value = position.sourceCode
@@ -47,7 +50,7 @@ const choosePosition = (positionId: string) => {
           <KeyboardCanvas :positions="profile.positions" :assignments="keyboardAssignments" :key-labels="keyLabels" :selected="selectedPositionId" :unit="keyboardUnit" :geometry="keyGeometry" @select="choosePosition" />
         </div>
         <footer>
-          <label>更多键值<select v-model.number="pendingCode"><option v-for="key in extraOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select></label>
+          <label v-if="extraOptions.length">更多键值<select v-model.number="pendingCode"><option v-for="key in extraOptions" :key="key.code" :value="key.code">{{ key.label }}</option></select></label>
           <div class="key-code-dialog-current"><span>当前选择</span><strong>{{ keyLabels[pendingCode] ?? `0x${pendingCode.toString(16).toUpperCase()}` }}</strong></div>
           <button class="ghost" type="button" @click="emit('close')">取消</button>
           <button class="primary" type="button" @click="emit('confirm', pendingCode)">确认</button>

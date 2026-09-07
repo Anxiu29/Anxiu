@@ -264,6 +264,12 @@ main {
   background: #141922;
 }
 
+.sidebar-settings.active {
+  color: var(--cyan);
+  border-color: rgba(69, 230, 208, .2);
+  background: rgba(69, 230, 208, .08);
+}
+
 .sidebar-settings:disabled {
   cursor: wait;
   opacity: .5;

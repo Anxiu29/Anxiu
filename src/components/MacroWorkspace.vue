@@ -19,13 +19,15 @@ const props = defineProps<{
   assignments: KeyAssignment[]
   keyOptions: readonly KeyDefinition[]
   keyLabels: Record<number, string>
+  extendedKeyCodes?: ReadonlySet<number>
   keyGeometry?: KeyGeometryResolver
 }>()
 const emit = defineEmits<{ 'select-slot': [index: number]; update: [settings: MacroSettings]; clear: [index: number]; load: [] }>()
 
 const draft = ref<MacroSettings>()
 const recording = ref(false)
-const keyPickerIndex = ref<number>()
+type KeyPickerTarget = { kind: 'action'; index: number } | { kind: 'new-pair' }
+const keyPickerTarget = ref<KeyPickerTarget>()
 const bindingDialogOpen = ref(false)
 const macroSequence = ref<HTMLElement>()
 // 宏槽位较多时允许收起列表，把横向空间让给设置和录制区域。
@@ -45,6 +47,17 @@ const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
 const actionsUnavailable = computed(() => draft.value?.actionsAvailable === false)
+const pairingIssue = computed(() => {
+  const heldKeyCounts = new Map<number, number>()
+  for (const action of draft.value?.actions ?? []) {
+    const heldCount = heldKeyCounts.get(action.keyCode) ?? 0
+    if (action.pressed) heldKeyCounts.set(action.keyCode, heldCount + 1)
+    else if (heldCount > 0) heldKeyCounts.set(action.keyCode, heldCount - 1)
+    else return `${keyLabel(action.keyCode)} 缺少对应的按下动作`
+  }
+  for (const [keyCode, heldCount] of heldKeyCounts) if (heldCount > 0) return `${keyLabel(keyCode)} 缺少对应的抬起动作`
+  return ''
+})
 // 宏列表收缩和执行模式压缩后，允许矩阵继续利用新增空间放大，而不是停在原来的 30px 上限。
 const { container: bindingKeyboardContainer, unit: bindingKeyboardUnit } = useFittedKeyboardUnit(() => props.profile.positions, () => props.keyGeometry, {
   maxUnit: 42,
@@ -63,6 +76,7 @@ const modeOptions: { value: MacroMode; title: string; description: string }[] = 
 
 watch([() => props.selectedSlot, () => props.macroSlots], ([index]) => {
   stopRecording()
+  keyPickerTarget.value = undefined
   draft.value = cloneMacroSettings(props.macroSlots?.[Number(index)] ?? createEmptyMacro(Number(index), EMPTY_MACRO_SOURCE))
 }, { immediate: true, deep: true })
 
@@ -89,12 +103,50 @@ function toggleBindingPosition(positionId: string) {
   if (sourceCode === undefined) return
   applyBindings(bindingCodes.value.includes(sourceCode) ? bindingCodes.value.filter((code) => code !== sourceCode) : [...bindingCodes.value, sourceCode])
 }
-function addKeyPair() {
-  if (!draft.value || draft.value.actions.length + 2 > maxMacroActions.value) return
+function defaultNewKeyCode() {
   const sourceCode = bindingCodes.value[0]
   const positionId = props.profile.positions.find((position) => position.sourceCode === sourceCode)?.id
-  const fallback = props.assignments.find((item) => item.positionId === positionId)?.keyCode ?? 4
-  draft.value.actions.push({ keyCode: fallback, pressed: true, delay: 0 }, { keyCode: fallback, pressed: false, delay: 50 })
+  return props.assignments.find((item) => item.positionId === positionId)?.keyCode ?? 4
+}
+const keyPickerValue = computed(() => {
+  if (keyPickerTarget.value?.kind === 'action') return draft.value?.actions[keyPickerTarget.value.index]?.keyCode ?? 0
+  return defaultNewKeyCode()
+})
+function openNewKeyPicker() {
+  if (!draft.value || draft.value.actions.length + 2 > maxMacroActions.value) return
+  keyPickerTarget.value = { kind: 'new-pair' }
+}
+/**
+ * 宏录制可能产生 A↓、B↓、A↑、B↑ 这类交错序列，配对不能只看相邻行。
+ * 同键动作按嵌套深度向前或向后匹配，兼容连续重复按下同一键的序列。
+ */
+function pairedActionIndex(index: number) {
+  const actions = draft.value?.actions
+  const selected = actions?.[index]
+  if (!actions || !selected) return undefined
+  let nested = 0
+  if (selected.pressed) {
+    for (let cursor = index + 1; cursor < actions.length; cursor++) {
+      const candidate = actions[cursor]!
+      if (candidate.keyCode !== selected.keyCode) continue
+      if (candidate.pressed) nested++
+      else if (nested > 0) nested--
+      else return cursor
+    }
+  } else {
+    for (let cursor = index - 1; cursor >= 0; cursor--) {
+      const candidate = actions[cursor]!
+      if (candidate.keyCode !== selected.keyCode) continue
+      if (!candidate.pressed) nested++
+      else if (nested > 0) nested--
+      else return cursor
+    }
+  }
+  // 旧版编辑器只修改单行，可能留下“鼠标↓、A↑”这种相邻错配；同键匹配失败后兼容修复该历史数据。
+  const adjacentIndex = selected.pressed ? index + 1 : index - 1
+  const adjacent = actions[adjacentIndex]
+  if (adjacent && adjacent.pressed !== selected.pressed) return adjacentIndex
+  return undefined
 }
 function removeAction(index: number) { draft.value?.actions.splice(index, 1) }
 function adjustActionDelay(index: number, delta: number) {
@@ -154,11 +206,25 @@ function captureKeyEvent(event: KeyboardEvent) {
   revealLatestRecordedAction()
 }
 function confirmKeyPicker(keyCode: number) {
-  if (draft.value && keyPickerIndex.value !== undefined && draft.value.actions[keyPickerIndex.value]) draft.value.actions[keyPickerIndex.value]!.keyCode = keyCode
-  keyPickerIndex.value = undefined
+  if (!draft.value || !keyPickerTarget.value) return
+  if (keyPickerTarget.value.kind === 'new-pair') {
+    if (draft.value.actions.length + 2 <= maxMacroActions.value) {
+      draft.value.actions.push({ keyCode, pressed: true, delay: 0 }, { keyCode, pressed: false, delay: 50 })
+    }
+  } else {
+    const index = keyPickerTarget.value.index
+    const pairIndex = pairedActionIndex(index)
+    const action = draft.value.actions[index]
+    if (action) action.keyCode = keyCode
+    if (pairIndex !== undefined) {
+      const pair = draft.value.actions[pairIndex]!
+      pair.keyCode = keyCode
+    }
+  }
+  keyPickerTarget.value = undefined
 }
 function save() {
-  if (!draft.value?.actions.length) return
+  if (!draft.value?.actions.length || pairingIssue.value) return
   // 官方网页驱动：单次模式写 num=1，三种循环模式写 65530，由模式本身决定点击/松键停止。
   // 该值是固件循环哨兵而不是用户可调次数，因此 UI 不再暴露无效的次数输入框。
   emit('update', { ...cloneMacroSettings(draft.value), repeatCount: draft.value.mode === 0 ? 1 : 65530 })
@@ -204,18 +270,18 @@ onMounted(() => emit('load'))
       <header class="macro-sequence-heading">
         <div><h2>宏录制</h2><small>{{ draft?.actions.length ?? 0 }} / {{ maxMacroActions }} 个动作</small></div>
       </header>
-      <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || (!draft?.actions.length && !bindingCodes.length)" @click="clearMacro">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
+      <div class="macro-record-controls"><button class="macro-record-button" :class="{ recording }" :disabled="busy" @click="recording ? stopRecording() : startRecording()"><span>{{ recording ? '■' : '▶' }}</span>{{ recording ? '停止录制' : '开始录制' }}</button><div><button class="ghost" :disabled="busy || (!draft?.actions.length && !bindingCodes.length)" @click="clearMacro">清除数据</button><button class="primary" :disabled="busy || !draft?.actions.length || !!pairingIssue" @click="save">{{ status === 'writing' ? '正在保存…' : '保存' }}</button></div></div>
       <div v-if="actionsUnavailable" class="macro-placeholder macro-unavailable"><strong>已从键盘读取到该宏</strong><span>当前方案只能回读绑定、槽位和执行参数，不能还原动作正文；可重新录制覆盖 M{{ selectedSlot + 1 }}。</span></div>
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
       <TransitionGroup v-else tag="ol" name="macro-action" class="macro-action-list">
         <li v-for="(action, index) in draft.actions" :key="actionRenderKey(action)" :class="{ dragging: draggedActionIndex === index }" draggable="true" @dragstart="startDraggingAction(index, $event)" @dragenter.prevent="previewActionOrder(index)" @dragover.prevent @drop.prevent="finishDraggingAction" @dragend="finishDraggingAction">
-          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerIndex = index">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><div class="macro-action-time"><button title="减少 1 ms" @click="adjustActionDelay(index, -1)"><span class="macro-control-symbol">−</span></button><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /><span class="macro-number-unit">ms</span><button title="增加 1 ms" @click="adjustActionDelay(index, 1)"><span class="macro-control-symbol">+</span></button></div><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
+          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerTarget = { kind: 'action', index }">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><div class="macro-action-time"><button title="减少 1 ms" @click="adjustActionDelay(index, -1)"><span class="macro-control-symbol">−</span></button><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /><span class="macro-number-unit">ms</span><button title="增加 1 ms" @click="adjustActionDelay(index, 1)"><span class="macro-control-symbol">+</span></button></div><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
         </li>
       </TransitionGroup>
-      <footer class="macro-add-footer"><button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="addKeyPair"><span>＋</span>添加按键</button></footer>
+      <footer class="macro-add-footer"><button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="openNewKeyPicker"><span>＋</span>添加按键</button><small v-if="pairingIssue">{{ pairingIssue }}，请补齐或重新选择键值</small></footer>
     </section>
 
     <MacroBindingDialog :open="bindingDialogOpen" :profile="profile" :assignments="assignments" :model-value="bindingCodes" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="bindingDialogOpen = false" @confirm="applyBindings" />
-    <KeyCodeKeyboardDialog :open="keyPickerIndex !== undefined" :profile="profile" :model-value="keyPickerIndex === undefined ? 0 : draft?.actions[keyPickerIndex]?.keyCode ?? 0" :key-options="keyOptions" :key-labels="keyLabels" :key-geometry="keyGeometry" @close="keyPickerIndex = undefined" @confirm="confirmKeyPicker" />
+    <KeyCodeKeyboardDialog :open="!!keyPickerTarget" :profile="profile" :model-value="keyPickerValue" :key-options="keyOptions" :key-labels="keyLabels" :extended-key-codes="extendedKeyCodes" :key-geometry="keyGeometry" @close="keyPickerTarget = undefined" @confirm="confirmKeyPicker" />
   </section>
 </template>

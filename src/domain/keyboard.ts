@@ -66,6 +66,8 @@ export interface DeviceCapabilities {
   pollingRates?: number[]
   travelTest?: boolean
   calibration?: boolean
+  /** true 时设备适配器已实现进入 Bootloader、写入固件和重连流程。 */
+  firmwareUpdate?: boolean
   /** 宏容量由设备层声明，公共 UI 不假定所有型号都有 16 个槽位。 */
   macroSlots?: number
   macroMaxActions?: number

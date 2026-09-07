@@ -5,7 +5,7 @@ export interface MacroAction {
   keyCode: number
   /** 领域层使用易懂的布尔值；协议层再转换为 0x01/0x08 状态位。 */
   pressed: boolean
-  /** 当前动作结束后到下一动作的间隔，单位毫秒。 */
+  /** 距离上一个动作的间隔，单位毫秒；释放动作的 delay 也就是该键的保持时长。 */
   delay: number
 }
 

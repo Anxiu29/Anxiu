@@ -2,8 +2,9 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 import type { AppTheme } from '@/ui/theme'
+import SettingsWorkspace from './SettingsWorkspace.vue'
 
-type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'performance' | 'macro' | 'key-test'
+type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'performance' | 'macro' | 'key-test' | 'settings'
 
 const props = withDefaults(defineProps<{
   profile: KeyboardProfile
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'select-configuration': [configuration: KeyboardConfiguration]
   'restore-factory': []
+  reload: []
   'update:theme': [theme: AppTheme]
   navigate: [view: WorkspaceView]
 }>()
@@ -32,7 +34,6 @@ let feedbackTimer: number | undefined
 const sidebarCollapsed = ref(false)
 let sidebarAutoCollapsed = false
 let narrowScreen: MediaQueryList | undefined
-const settingsOpen = ref(false)
 const configurations: KeyboardConfiguration[] = [1, 2, 3, 4]
 const navigate = (view: WorkspaceView) => {
   // 先通知父级准备目标工作区状态，再挂载插槽，避免高级键/性能页沿用改键页的 ESC 选中态。
@@ -53,13 +54,6 @@ const syncSidebarWithScreen = () => {
     sidebarCollapsed.value = false
     sidebarAutoCollapsed = false
   }
-}
-const requestFactoryReset = () => {
-  // 恢复出厂是不可逆设备操作，确认留在最靠近用户交互的 UI 层。
-  const confirmed = window.confirm('恢复出厂设置会清除全部改键、灯光和宏配置，键盘随后需要重新连接。是否继续？')
-  if (!confirmed) return
-  settingsOpen.value = false
-  emit('restore-factory')
 }
 const closeFeedback = () => {
   feedbackVisible.value = false
@@ -142,7 +136,7 @@ onBeforeUnmount(() => {
         </button>
       </nav>
 
-      <button class="sidebar-settings" type="button" :disabled="navigationDisabled" title="设置" @click="settingsOpen = true">
+      <button class="sidebar-settings" :class="{ active: activeView === 'settings' }" type="button" :disabled="navigationDisabled" title="设置" @click="navigate('settings')">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.52-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.05V3h4v.05a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" /></svg>
         <span>设置</span>
       </button>
@@ -156,7 +150,8 @@ onBeforeUnmount(() => {
       <slot v-else-if="activeView === 'advanced'" name="advanced" />
       <slot v-else-if="activeView === 'performance'" name="performance" />
       <slot v-else-if="activeView === 'macro'" name="macro" />
-      <slot v-else name="key-test" />
+      <slot v-else-if="activeView === 'key-test'" name="key-test" />
+      <SettingsWorkspace v-else :profile="profile" :theme="theme" :busy="navigationDisabled" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
     </div>
 
     <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error, warning: !error && messageWarning }" role="status">
@@ -164,21 +159,5 @@ onBeforeUnmount(() => {
       <button aria-label="关闭提示" title="关闭提示" @click="closeFeedback">×</button>
     </div>
 
-    <div v-if="settingsOpen" class="settings-backdrop" @click.self="settingsOpen = false">
-      <section class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <header><div><span class="eyebrow">DEVICE SETTINGS</span><h2 id="settings-title">设置</h2></div><button type="button" aria-label="关闭设置" title="关闭设置" @click="settingsOpen = false">×</button></header>
-        <div class="settings-appearance">
-          <div><strong>界面主题</strong><p>选择更适合当前环境的显示外观，设置会保存在此浏览器中。</p></div>
-          <div class="theme-options" role="radiogroup" aria-label="界面主题">
-            <button type="button" role="radio" :aria-checked="theme === 'light'" :class="{ active: theme === 'light' }" @click="emit('update:theme', 'light')"><span class="theme-preview light"><i></i><i></i></span>浅色</button>
-            <button type="button" role="radio" :aria-checked="theme === 'dark'" :class="{ active: theme === 'dark' }" @click="emit('update:theme', 'dark')"><span class="theme-preview dark"><i></i><i></i></span>深色</button>
-          </div>
-        </div>
-        <div v-if="profile.capabilities.restoreFactory" class="settings-danger-zone">
-          <div><strong>恢复出厂设置</strong><p>清除全部改键、灯光、宏和配置数据，恢复后需重新连接键盘。</p></div>
-          <button class="factory-reset-button" type="button" :disabled="navigationDisabled" @click="requestFactoryReset">恢复出厂设置</button>
-        </div>
-      </section>
-    </div>
   </section>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { KeyDefinition } from '@/domain/keyboard'
-import { EXTENDED_KEY_CATEGORIES, extendedCategoryFor, isSelectableExtendedKey, type ExtendedKeyCategory } from '@/ui/extendedKeyCategories'
+import { EXTENDED_KEY_CATEGORIES, extendedCategoryFor, selectableExtendedKeys, type ExtendedKeyCategory } from '@/ui/extendedKeyCategories'
 
 const props = defineProps<{ current?: number; hint?: string; keys: readonly KeyDefinition[]; extendedKeyCodes: ReadonlySet<number>; disabled?: boolean }>()
 const emit = defineEmits<{ select: [code: number] }>()
@@ -61,7 +61,7 @@ const matches = (code: number) => {
   // 同时支持名称、十进制键码和 0x 十六进制键码搜索。
   return definition?.label.toLowerCase().includes(query.value) || String(code).includes(query.value) || code.toString(16).includes(query.value.replace(/^0x/, ''))
 }
-const allExtendedKeys = computed(() => props.keys.filter((item) => !visualCodes.has(item.code) && isSelectableExtendedKey(item, props.extendedKeyCodes)))
+const allExtendedKeys = computed(() => selectableExtendedKeys(props.keys, props.extendedKeyCodes, visualCodes))
 const categoryCounts = computed(() => Object.fromEntries(EXTENDED_KEY_CATEGORIES.map(({ id }) => [id, allExtendedKeys.value.filter((item) => extendedCategoryFor(item) === id && matches(item.code)).length])) as Record<ExtendedKeyCategory, number>)
 const extendedKeys = computed(() => allExtendedKeys.value.filter((item) => extendedCategoryFor(item) === extendedCategory.value && matches(item.code)))
 const labelFor = (item: PickerItem) => item.label ?? (item.code === undefined ? '' : byCode.value.get(item.code)?.label ?? `0x${item.code.toString(16).toUpperCase()}`)
