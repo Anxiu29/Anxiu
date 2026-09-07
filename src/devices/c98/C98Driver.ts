@@ -9,15 +9,23 @@ import { C98_DEMO_KEYS, resolveC98PhysicalLayout } from './layout'
 import { C98_CAPABILITIES } from './capabilities'
 import { resolveC98DefaultKeymap } from './factoryKeymap'
 import { C98_DEMO_DEVICE, C98_DEVICE } from './device'
+import { upgradeC98Firmware, validateC98Firmware, requestC98UpgradeDevice } from './firmware'
+import type { FirmwareUpdateOptions } from '@/application/FirmwareUpdate'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
 export class C98Driver implements DeviceDriver {
+  private selectedDevice?: HIDDevice
+  validateFirmware = validateC98Firmware
+  requestUpgradeDevice = requestC98UpgradeDevice
+  async upgradeFirmware(image: Uint8Array, options: FirmwareUpdateOptions) {
+    this.selectedDevice = await upgradeC98Firmware(this.selectedDevice, image, options)
+  }
   readonly manifest = {
     id: 'rk-c98-xsyd-webhid',
     displayName: 'RK-C98',
     protocolId: 'xsyd-keyboard-v1',
     transportId: 'webhid',
-    capabilities: ['device-profile', 'keymap', 'configuration', 'factory-reset', 'system-mode', 'configuration-switch', 'lighting', 'custom-lighting', 'advanced-key', 'performance', 'macro'],
+    capabilities: ['device-profile', 'keymap', 'configuration', 'factory-reset', 'system-mode', 'configuration-switch', 'lighting', 'custom-lighting', 'advanced-key', 'performance', 'macro', 'firmware-update'],
     hid: {
       vendorId: C98_DEVICE.vendorId,
       productIds: [C98_DEVICE.productId],
@@ -33,9 +41,17 @@ export class C98Driver implements DeviceDriver {
     return this.createSession(transport)
   }
 
+  async connectForFirmware(onDisconnect: () => void) {
+    const device = await requestC98UpgradeDevice()
+    const transport = this.createTransport(onDisconnect)
+    transport.setDevice(device)
+    await transport.open()
+    return this.createSession(transport)
+  }
+
   async reconnectAuthorized(onDisconnect: () => void) {
     const transport = this.createTransport(onDisconnect)
-    if (!await transport.reconnectAuthorized()) return undefined
+    if (!await transport.reconnectAuthorized(this.selectedDevice)) return undefined
     await transport.open()
     return this.createSession(transport)
   }
@@ -53,6 +69,7 @@ export class C98Driver implements DeviceDriver {
   }
 
   private createSession(transport: WebHidTransport) {
+    this.selectedDevice = transport.hidDevice
     // 设备层是具体实现相遇的位置：传输、协议、能力和 C98 默认数据都在这里注入。
     return new DeviceSession(new XsydKeyboardProtocol(
       transport,

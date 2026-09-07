@@ -23,12 +23,12 @@ const devicePresentation = computed(() => getDevicePresentation(driverId.value))
 const shellRevision = ref(0)
 const labels: Record<string, string> = { idle: '待连接', connecting: '连接中', reading: '读取中', ready: '已就绪', writing: '写入中', disconnected: '已断开', error: '发生错误', unsupported: '不支持' }
 const busy = () => ['connecting', 'reading', 'writing'].includes(status.value)
-const connect = async (useDemo: boolean) => { shellRevision.value++; await store.connect(useDemo) }
+const connect = async (useDemo: boolean, firmwareRecovery = false) => { shellRevision.value++; await store.connect(useDemo, firmwareRecovery) }
 const prepareWorkspace = (view: string) => {
   if (view === 'advanced' || view === 'performance') selectedPositionId.value = undefined
 }
-// 浏览器关闭保护只关心尚未确认写入的草稿，不阻止已经回读验证成功的配置离开页面。
-const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }
+// 未保存草稿及尚未结束的固件升级需要关闭保护。
+const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty.value || store.firmwareUpdating) { event.preventDefault(); event.returnValue = '' } }
 onMounted(() => { window.addEventListener('beforeunload', beforeUnload); store.reconnectAuthorized() })
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
@@ -44,6 +44,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 15.1A8.5 8.5 0 0 1 8.9 3.6 8.5 8.5 0 1 0 20.4 15.1Z" /></svg>
           <span>{{ theme === 'dark' ? '浅色' : '深色' }}</span>
         </button>
+        <button class="ghost" :disabled="busy()" @click="connect(false, true)">固件恢复</button>
         <button class="ghost" :disabled="busy()" @click="connect(true)">演示模式</button>
         <button class="primary" :disabled="busy()" @click="connect(false)">{{ profile && !demo ? '重新连接' : '连接键盘' }}</button>
       </div>
@@ -59,7 +60,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div v-if="error || message" class="notice" :class="{ error }">{{ error || message }}</div>
     </section>
 
-    <AppShell v-else :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :message-warning="messageWarning" :sidebar-image-url="devicePresentation.sidebarImageUrl" :firmware-download="devicePresentation.firmwareDownload" :theme="theme" @update:theme="setTheme" @navigate="prepareWorkspace" @select-configuration="store.selectConfiguration" @reload="store.reload" @restore-factory="store.restoreFactory">
+    <AppShell v-else :can-upgrade-firmware="store.canUpgradeFirmware" :firmware-progress="store.firmwareProgress" @upgrade-firmware="store.upgradeFirmware" @authorize-firmware="store.authorizeFirmwareDevice" @cancel-firmware-authorization="store.cancelFirmwareAuthorization" :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :message-warning="messageWarning" :sidebar-image-url="devicePresentation.sidebarImageUrl" :firmware-download="devicePresentation.firmwareDownload" :theme="theme" @update:theme="setTheme" @navigate="prepareWorkspace" @select-configuration="store.selectConfiguration" @reload="store.reload" @restore-factory="store.restoreFactory">
       <template #device="{ openKeymap }"><DeviceOverview :profile="profile" :busy="busy()" :image-url="devicePresentation.overviewImageUrl" :image-alt="devicePresentation.overviewImageAlt" :solution-name="devicePresentation.solutionName" @reload="store.reload" @open-keymap="openKeymap" /></template>
       <template #keymap>
         <KeymapWorkspace :profile="profile" :status="status" :layer="layer" :mode="mode" :selected-position-id="selectedPositionId" :dirty="dirty" :assignments="assignments" :selected-assignment="selectedAssignment" :key-options="keyOptions" :extended-key-codes="devicePresentation.extendedKeyCodes" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-layer="store.selectLayer" @select-mode="store.selectMode" @select-position="selectedPositionId = $event" @assign-key="store.assignKey" @restore-defaults="store.restoreAllKeyDefaults" @restore-key="store.restoreKeyDefault" />

@@ -1,12 +1,17 @@
 import type { DeviceSession } from './DeviceSession'
 import type { DeviceManifest } from '@/domain/deviceManifest'
+import type { FirmwareUpdateOptions } from './FirmwareUpdate'
 
 /** 外层设备插件必须实现的应用端口。 */
 export interface DeviceDriver {
   readonly manifest: DeviceManifest
   connect(onDisconnect: () => void): Promise<DeviceSession>
+  connectForFirmware?(onDisconnect: () => void): Promise<DeviceSession>
   reconnectAuthorized(onDisconnect: () => void): Promise<DeviceSession | undefined>
   createDemoSession(): DeviceSession
+  validateFirmware?(image: Uint8Array): Promise<void>
+  requestUpgradeDevice?(): Promise<HIDDevice>
+  upgradeFirmware?(image: Uint8Array, options: FirmwareUpdateOptions): Promise<void>
 }
 
 export class DeviceDriverRegistry {

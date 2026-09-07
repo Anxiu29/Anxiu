@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { KeyboardConfiguration, KeyboardProfile } from '@/domain/keyboard'
 import type { AppTheme } from '@/ui/theme'
 import type { FirmwareDownload } from '@/ui/DevicePresentation'
+import type { FirmwareProgress } from '@/application/FirmwareUpdate'
 import SettingsWorkspace from './SettingsWorkspace.vue'
 
 type WorkspaceView = 'device' | 'keymap' | 'lighting' | 'advanced' | 'performance' | 'macro' | 'key-test' | 'settings'
@@ -17,17 +18,22 @@ const props = withDefaults(defineProps<{
   sidebarImageUrl?: string
   theme?: AppTheme
   firmwareDownload?: FirmwareDownload
+  canUpgradeFirmware?: boolean
+  firmwareProgress?: FirmwareProgress
 }>(), { activeConfiguration: 1, theme: 'dark' })
 
 const emit = defineEmits<{
   'select-configuration': [configuration: KeyboardConfiguration]
   'restore-factory': []
+  'upgrade-firmware': [file: File]
+  'authorize-firmware': []
+  'cancel-firmware-authorization': []
   reload: []
   'update:theme': [theme: AppTheme]
   navigate: [view: WorkspaceView]
 }>()
 
-const activeView = ref<WorkspaceView>('device')
+const activeView = ref<WorkspaceView>(props.profile.device.runMode === 'boot' ? 'settings' : 'device')
 // 这些状态只影响应用壳外观，不进入全局 Store；切换工作区不会丢失设备会话和改键草稿。
 const feedbackVisible = ref(true)
 const FEEDBACK_AUTO_CLOSE_MS = 5000
@@ -153,7 +159,7 @@ onBeforeUnmount(() => {
       <slot v-else-if="activeView === 'performance'" name="performance" />
       <slot v-else-if="activeView === 'macro'" name="macro" />
       <slot v-else-if="activeView === 'key-test'" name="key-test" />
-      <SettingsWorkspace v-else :profile="profile" :theme="theme" :busy="navigationDisabled" :firmware-download="firmwareDownload" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
+      <SettingsWorkspace v-else :can-upgrade-firmware="canUpgradeFirmware" :firmware-progress="firmwareProgress" @upgrade-firmware="emit('upgrade-firmware', $event)" @authorize-firmware="emit('authorize-firmware')" @cancel-firmware-authorization="emit('cancel-firmware-authorization')" :profile="profile" :theme="theme" :busy="navigationDisabled" :firmware-download="firmwareDownload" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
     </div>
 
     <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error, warning: !error && messageWarning }" role="status">
