@@ -1,7 +1,8 @@
 import type { KeyPosition } from '@/domain/keyboard'
 import { matrixKeyGeometry, type KeyGeometry, type KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import type { DevicePresentation } from '@/ui/DevicePresentation'
-import keyboardImageUrl from '@/assets/c98-keyboard-transparent.png'
+import keyboardImageUrl from '@/assets/c98-keyboard-overview.webp'
+import sidebarImageUrl from '@/assets/c98-keyboard-sidebar.webp'
 import { C98_EXTENDED_KEY_CODES } from './extendedKeys'
 import { C98_LIGHTING_MODES } from './lightingModes'
 
@@ -75,7 +76,7 @@ export const C98_PRESENTATION: DevicePresentation = {
   keyGeometry: c98KeyGeometry,
   extendedKeyCodes: C98_EXTENDED_KEY_CODES,
   overviewImageUrl: keyboardImageUrl,
-  sidebarImageUrl: keyboardImageUrl,
+  sidebarImageUrl,
   overviewImageAlt: 'C98(739) 单模 US 带旋钮键盘大图',
   solutionName: '星闪',
   lightingModes: C98_LIGHTING_MODES,
