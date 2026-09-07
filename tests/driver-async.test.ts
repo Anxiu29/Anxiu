@@ -10,6 +10,7 @@ import type { CustomKeyLighting } from '@/domain/lighting'
 import { DEFAULT_LIGHTING_SETTINGS, type LightingSettings } from '@/domain/lighting'
 import { DEFAULT_PERFORMANCE_SETTINGS, type KeyPerformanceSettings, type TravelMatrix } from '@/domain/performance'
 import { HID_KEY_CATALOG } from '@/domain/keycodes'
+import { createAdvancedKeySettings, type AdvancedKeySettings } from '@/domain/advancedKey'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -47,6 +48,57 @@ async function setup() {
 
 describe('driver async context', () => {
   beforeEach(() => setActivePinia(createPinia()))
+
+  it.each(['resolve', 'reject'] as const)('keeps cached A selected when a pending B read %s', async (outcome) => {
+    const { store, session, profile } = await setup()
+    profile.capabilities.advancedKey = true
+    const cached = createAdvancedKeySettings('tgl', 4, 4)
+    store.advancedKey = cached
+    const pending = deferred<AdvancedKeySettings>()
+    vi.spyOn(session, 'getAdvancedKey').mockReturnValue(pending.promise)
+    const reading = store.loadAdvancedKey('5')
+    await store.loadAdvancedKey('4')
+    if (outcome === 'resolve') pending.resolve(createAdvancedKeySettings('tgl', 5, 5))
+    else pending.reject(new Error('stale B failed'))
+    await reading
+    expect(store.advancedKey).toEqual(cached)
+    expect(store.advancedKeyLoading).toBe(false)
+    expect(store.error).toBe('')
+  })
+
+  it('does not overwrite a verified advanced-key write with an earlier scan', async () => {
+    const { store, session, profile } = await setup()
+    profile.capabilities.advancedKey = true
+    const pending = deferred<Awaited<ReturnType<DeviceSession['getAdvancedKeyTypes']>>>()
+    vi.spyOn(session, 'getAdvancedKeyTypes').mockReturnValue(pending.promise)
+    const selectedRead = vi.spyOn(session, 'getAdvancedKey')
+    const verified = createAdvancedKeySettings('tgl', 4, 4)
+    vi.spyOn(session, 'updateAdvancedKey').mockResolvedValue(verified)
+    const scanning = store.loadAdvancedKeyTypes()
+    await store.updateAdvancedKey(verified)
+    pending.resolve({ 4: 'mt' })
+    await scanning
+    expect(store.advancedKeyTypes).toEqual({ 4: 'TGL' })
+    expect(store.advancedKey).toEqual(verified)
+    expect(selectedRead).not.toHaveBeenCalled()
+  })
+
+  it.each(['update', 'delete'] as const)('does not restore ready after advanced-key %s completes on a disconnected session', async (operation) => {
+    const { store, session, profile, disconnect } = await setup()
+    profile.capabilities.advancedKey = true
+    const pending = deferred<AdvancedKeySettings>()
+    vi.spyOn(session, 'updateAdvancedKey').mockReturnValue(pending.promise)
+    vi.spyOn(session, 'deleteAdvancedKey').mockReturnValue(pending.promise)
+    const writing = operation === 'update'
+      ? store.updateAdvancedKey(createAdvancedKeySettings('tgl', 4, 4))
+      : store.deleteAdvancedKey(4)
+    disconnect()
+    pending.resolve({ type: 'none', sourceCode: 4 })
+    await writing
+    expect(store.status).toBe('disconnected')
+    expect(store.advancedKey).toBeUndefined()
+    expect(store.advancedKeyTypes).toEqual({})
+  })
 
   it.each(['resolve', 'reject'] as const)('does not revive a disconnected session when connection profile %s', async (outcome) => {
     const { store, session, profile, disconnect } = await setup()

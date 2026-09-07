@@ -5,7 +5,7 @@ import { toDriverError } from '@/application/DriverError'
 import { createDriverState } from './driverState'
 import { createRequestScope } from './requestScope'
 import { createLightingActions } from './lightingActions'
-import type { AdvancedKeySettings } from '@/domain/advancedKey'
+import { createAdvancedKeyActions } from './advancedKeyActions'
 import type { MacroSettings } from '@/domain/macro'
 import type { KeyPerformanceSettings, PollingRate } from '@/domain/performance'
 import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
@@ -16,14 +16,12 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, performanceBySourceCode, performanceMapLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
-  let advancedKeyReadRevision = 0
-  let loadingAdvancedSourceCode: number | undefined
-  let advancedKeyTypesReadRevision = 0
-  let advancedKeyTypesLoading = false
   let macroReadRevision = 0
   let loadingMacroSourceCode: number | undefined
   let performanceReadRevision = 0
   let loadingPerformanceSourceCode: number | undefined
+  const advancedKeyActions = createAdvancedKeyActions(state, { clearFeedback, fail })
+  const { loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey } = advancedKeyActions
   const lightingActions = createLightingActions(state, { clearFeedback, fail })
   const { updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting } = lightingActions
   const pollingRateRequests = createRequestScope()
@@ -194,66 +192,6 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       profile.value = result.profile; revision.value++; status.value = 'ready'
       message.value = result.changedAssignments === 0 ? '该按键已经是默认映射' : '已恢复当前按键默认映射并通过回读验证'
     } catch (cause) { revision.value++; fail(cause) }
-  }
-
-  async function loadAdvancedKey(positionId = selectedPositionId.value, force = false) {
-    if (!state.session || !profile.value?.capabilities.advancedKey || !positionId || ['connecting', 'writing'].includes(status.value)) return
-    const position = profile.value.positions.find((item) => item.id === positionId)
-    if (!position) return
-    // 页面重新挂载或同一键被重复点击时复用已有数据/请求，不再向 HID 队列追加相同命令。
-    if ((!force && advancedKey.value?.sourceCode === position.sourceCode) || (advancedKeyLoading.value && loadingAdvancedSourceCode === position.sourceCode)) return
-    const observedSession = state.session
-    const readRevision = ++advancedKeyReadRevision
-    loadingAdvancedSourceCode = position.sourceCode
-    advancedKeyLoading.value = true
-    clearFeedback()
-    try {
-      const result = await observedSession.getAdvancedKey(position.sourceCode)
-      // 用户可能已经选择另一键或切换设备；过期结果不能覆盖当前页面。
-      if (state.session === observedSession && readRevision === advancedKeyReadRevision) {
-        advancedKey.value = result
-        rememberAdvancedKeyType(result)
-      }
-    } catch (cause) {
-      if (state.session === observedSession && readRevision === advancedKeyReadRevision) fail(cause)
-    } finally {
-      if (readRevision === advancedKeyReadRevision) {
-        advancedKeyLoading.value = false
-        loadingAdvancedSourceCode = undefined
-      }
-    }
-  }
-
-  async function loadAdvancedKeyTypes() {
-    if (!state.session || !profile.value?.capabilities.advancedKey || advancedKeyTypesLoading) return
-    const observedSession = state.session
-    const readRevision = ++advancedKeyTypesReadRevision
-    advancedKeyTypesLoading = true
-    try {
-      const types = await observedSession.getAdvancedKeyTypes(profile.value.positions.map((position) => position.sourceCode))
-      if (state.session !== observedSession || readRevision !== advancedKeyTypesReadRevision) return
-      advancedKeyTypes.value = Object.fromEntries(Object.entries(types).map(([sourceCode, type]) => [Number(sourceCode), type.toUpperCase()]))
-      // 每次进入页面都重新扫描类型，并强制刷新当前键的完整参数，避免展示设备外部修改前的旧缓存。
-      await loadAdvancedKey(selectedPositionId.value, true)
-    } catch (cause) {
-      if (state.session === observedSession && readRevision === advancedKeyTypesReadRevision) fail(cause)
-    } finally {
-      if (readRevision === advancedKeyTypesReadRevision) advancedKeyTypesLoading = false
-    }
-  }
-
-  async function updateAdvancedKey(settings: Exclude<AdvancedKeySettings, { type: 'none' }>) {
-    if (!state.session || !profile.value?.capabilities.advancedKey || !['ready', 'error'].includes(status.value)) return
-    clearFeedback(); status.value = 'writing'
-    try { advancedKey.value = await state.session.updateAdvancedKey(settings); rememberAdvancedKeyType(advancedKey.value); status.value = 'ready'; message.value = '高级键已写入并通过回读验证' }
-    catch (cause) { fail(cause) }
-  }
-
-  async function deleteAdvancedKey(sourceCode: number) {
-    if (!state.session || !profile.value?.capabilities.advancedKey || !['ready', 'error'].includes(status.value)) return
-    clearFeedback(); status.value = 'writing'
-    try { advancedKey.value = await state.session.deleteAdvancedKey(sourceCode); rememberAdvancedKeyType(advancedKey.value); status.value = 'ready'; message.value = '已删除当前按键的高级键设置' }
-    catch (cause) { fail(cause) }
   }
 
   async function loadPerformance(positionId = selectedPositionId.value, force = false) {
@@ -564,13 +502,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     customLightingLoading.value = false
     consecutiveTravelReadFailures = 0
     loadingPerformanceSourceCode = undefined
-    advancedKeyReadRevision++
-    advancedKeyTypesReadRevision++
-    advancedKey.value = undefined
-    advancedKeyLoading.value = false
-    loadingAdvancedSourceCode = undefined
-    advancedKeyTypes.value = {}
-    advancedKeyTypesLoading = false
+    advancedKeyActions.invalidate()
     performanceReadRevision++
     performanceMapReadRevision++
     performanceSettings.value = undefined
@@ -653,13 +585,6 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     }
     macroSlots.value = nextSlots
     rebuildMacroBindings()
-  }
-  /** 角标只依据设备回读结果更新，未保存的 UI 草稿不会污染键盘状态。 */
-  function rememberAdvancedKeyType(settings: AdvancedKeySettings) {
-    const next = { ...advancedKeyTypes.value }
-    if (settings.type === 'none') delete next[settings.sourceCode]
-    else next[settings.sourceCode] = settings.type.toUpperCase()
-    advancedKeyTypes.value = next
   }
   function fail(cause: unknown) {
     // 所有外层异常在这里收敛为稳定错误码，Vue 组件只处理展示，不解析底层异常。
