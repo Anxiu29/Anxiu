@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { getDevicePresentation, useDriverStore } from '@/composition/root'
 import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
-import KeymapWorkspace from '@/components/KeymapWorkspace.vue'
-import LightingWorkspace from '@/components/LightingWorkspace.vue'
-import AdvancedKeyWorkspace from '@/components/AdvancedKeyWorkspace.vue'
-import PerformanceWorkspace from '@/components/PerformanceWorkspace.vue'
-import KeyTestWorkspace from '@/components/KeyTestWorkspace.vue'
-import MacroWorkspace from '@/components/MacroWorkspace.vue'
 import { useTheme } from '@/ui/theme'
+
+const KeymapWorkspace = defineAsyncComponent(() => import('@/components/KeymapWorkspace.vue'))
+const LightingWorkspace = defineAsyncComponent(() => import('@/components/LightingWorkspace.vue'))
+const AdvancedKeyWorkspace = defineAsyncComponent(() => import('@/components/AdvancedKeyWorkspace.vue'))
+const PerformanceWorkspace = defineAsyncComponent(() => import('@/components/PerformanceWorkspace.vue'))
+const KeyTestWorkspace = defineAsyncComponent(() => import('@/components/KeyTestWorkspace.vue'))
+const MacroWorkspace = defineAsyncComponent(() => import('@/components/MacroWorkspace.vue'))
 
 const store = useDriverStore()
 const { theme, setTheme, toggleTheme } = useTheme()
