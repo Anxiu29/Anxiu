@@ -13,7 +13,7 @@ const MAX_DEV_PORT = DEFAULT_DEV_PORT + 100
 /**
  * 通过一次短暂的 TCP 监听判断端口是否可用。
  *
- * 只检查 127.0.0.1 即可识别占用 0.0.0.0 的 Vite 进程；检查完成后会立即
+ * 使用与开发服务器相同的 0.0.0.0 地址检查占用；检查完成后会立即
  * 关闭临时服务，不会长期占用端口。
  */
 export function isPortAvailable(port) {
@@ -22,7 +22,7 @@ export function isPortAvailable(port) {
 
     probe.unref()
     probe.once('error', () => resolveAvailability(false))
-    probe.listen({ host: '127.0.0.1', port, exclusive: true }, () => {
+    probe.listen({ host: '0.0.0.0', port, exclusive: true }, () => {
       probe.close(() => resolveAvailability(true))
     })
   })
@@ -46,7 +46,7 @@ export async function findAvailablePort(
  * strictPort 可以防止“检查后端口恰好被其他进程抢占”时 Vite 再次静默换端口；
  * open 使用最终选中的绝对地址，确保浏览器不会误开另一个项目的 5173 页面。
  */
-export async function startDevServer() {
+export async function startDevServer({ open = true } = {}) {
   const port = await findAvailablePort()
 
   if (port !== DEFAULT_DEV_PORT) {
@@ -58,13 +58,14 @@ export async function startDevServer() {
       host: '0.0.0.0',
       port,
       strictPort: true,
-      open: `http://localhost:${port}`,
+      open: open ? `http://localhost:${port}` : false,
     },
   })
 
   await server.listen()
   server.printUrls()
   server.bindCLIShortcuts({ print: true })
+  return server
 }
 
 // 导入本文件做自动化测试时不启动服务；只有 npm run dev 执行入口才启动。
