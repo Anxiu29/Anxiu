@@ -104,8 +104,14 @@ export class XsydKeyboardProtocol implements KeyboardDevice {
   }
 
   async getProfile(): Promise<KeyboardProfile> {
-    // 设备身份与协议版本互不依赖，可以并行查询；能力需要两者齐备后才能解析。
-    const [device, protocolVersion, mode] = await Promise.all([this.sync(), this.queryProtocolVersion(), this.queryMode()])
+    // Bootloader 只实现升级协议：先检查 SYNC，避免配置查询超时导致恢复入口无法显示。
+    const device = await this.sync()
+    if (device.runMode === 'boot') return {
+      device,
+      capabilities: { layers: 0, remap: false, restoreFactory: false, layoutRows: 0, layoutColumns: 0 },
+      positions: [], assignments: [], defaultAssignments: [],
+    }
+    const [protocolVersion, mode] = await Promise.all([this.queryProtocolVersion(), this.queryMode()])
     this.protocolVersion = protocolVersion
     this.currentMode = mode
     const capabilities = this.capabilityDescriptor.resolve({ device: { ...device, protocolVersion }, protocolVersion })

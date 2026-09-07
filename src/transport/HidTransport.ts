@@ -33,6 +33,8 @@ export class WebHidTransport implements DeviceTransport {
   }
 
   get connected() { return this.device?.opened === true }
+  /** 仅供设备适配器在普通会话与升级独占会话之间交接同一授权设备。 */
+  get hidDevice() { return this.device }
   get productName() { return this.device?.productName ?? 'Unknown HID device' }
   get vendorId() { return this.device?.vendorId ?? this.config.vendorId }
   get productId() { return this.device?.productId ?? this.config.productId }
@@ -45,10 +47,11 @@ export class WebHidTransport implements DeviceTransport {
     this.setDevice(devices[0])
   }
 
-  async reconnectAuthorized() {
+  async reconnectAuthorized(preferred?: HIDDevice) {
     this.ensureSupported()
     const devices = await navigator.hid.getDevices()
-    const match = devices.find((device) => device.vendorId === this.config.vendorId && device.productId === this.config.productId)
+    const matches = devices.filter((device) => device.vendorId === this.config.vendorId && device.productId === this.config.productId)
+    const match = preferred && matches.includes(preferred) ? preferred : matches[0]
     if (!match) return false
     this.setDevice(match)
     return true
@@ -61,12 +64,14 @@ export class WebHidTransport implements DeviceTransport {
 
   async close() {
     // 释放设备的同时移除浏览器级监听，避免多次连接后重复触发回调。
-    if (this.device?.opened) await this.device.close()
-    this.device?.removeEventListener('inputreport', this.reportHandler)
-    navigator.hid?.removeEventListener('disconnect', this.disconnectHandler)
-    this.reportListeners.clear()
-    this.disconnectListeners.clear()
-    this.device = undefined
+    try { if (this.device?.opened) await this.device.close() }
+    finally {
+      this.device?.removeEventListener('inputreport', this.reportHandler)
+      navigator.hid?.removeEventListener('disconnect', this.disconnectHandler)
+      this.reportListeners.clear()
+      this.disconnectListeners.clear()
+      this.device = undefined
+    }
   }
 
   async send(report: Uint8Array) {
@@ -88,7 +93,7 @@ export class WebHidTransport implements DeviceTransport {
     return () => this.disconnectListeners.delete(listener)
   }
 
-  private setDevice(device: HIDDevice) {
+  setDevice(device: HIDDevice) {
     // 切换设备前先解绑旧实例，确保一个 transport 只消费当前设备报告。
     this.device?.removeEventListener('inputreport', this.reportHandler)
     this.device = device
