@@ -52,6 +52,8 @@ describe('firmware session ownership', () => {
     expect(upgradeFirmware).not.toHaveBeenCalled()
     expect(store.firmwareUpdating).toBe(false)
     expect(store.firmwareProgress?.message).toBe('bad image')
+    expect(store.firmwareLogAvailable).toBe(true)
+    expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({ kind: 'result', outcome: 'failure', stage: 'validating', message: 'bad image' })
   })
 
   it('closes ordinary traffic before flashing, blocks duplicate upgrades and reconnects afterward', async () => {
@@ -69,6 +71,8 @@ describe('firmware session ownership', () => {
     expect(service.session).not.toBe(old)
     expect(store.status).toBe('ready')
     expect(store.firmwareUpdating).toBe(false)
+    expect(store.firmwareProgress?.stage).toBe('complete')
+    expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({ kind: 'result', outcome: 'success' })
   })
 
   it('waits for an explicit authorization click, then passes the selected device to the updater', async () => {

@@ -50,6 +50,56 @@ async function setup() {
 describe('driver async context', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
+  describe.each(['assign', 'reset-key', 'reset-all', 'reload', 'mode', 'configuration', 'factory'] as const)('%s ordinary operation', (operation) => {
+    it.each(['resolve', 'reject'] as const)('ignores a late %s after disconnect', async (outcome) => {
+      const { store, session, profile, disconnect } = await setup()
+      const pending = deferred<void>()
+      const nextProfile = { ...profile, mode: 'mac' as const }
+      const result = { profile: nextProfile, changedAssignments: 1 }
+      vi.spyOn(session, 'updateAndSave').mockImplementation(async () => { await pending.promise; return result })
+      vi.spyOn(session, 'restoreKeyDefaultAndSave').mockImplementation(async () => { await pending.promise; return result })
+      vi.spyOn(session, 'restoreAllKeyDefaults').mockImplementation(async () => { await pending.promise; return result })
+      vi.spyOn(session, 'reload').mockImplementation(async () => { await pending.promise; return nextProfile })
+      vi.spyOn(session, 'switchMode').mockImplementation(async () => { await pending.promise; return nextProfile })
+      vi.spyOn(session, 'switchConfiguration').mockImplementation(async () => { await pending.promise; return nextProfile })
+      vi.spyOn(session, 'restoreFactory').mockImplementation(() => pending.promise)
+      const running = operation === 'assign' ? store.assignKey(4)
+        : operation === 'reset-key' ? store.restoreKeyDefault('4', 0)
+        : operation === 'reset-all' ? store.restoreAllKeyDefaults()
+        : operation === 'reload' ? store.reload()
+        : operation === 'mode' ? store.selectMode('mac')
+        : operation === 'configuration' ? store.selectConfiguration(2) : store.restoreFactory()
+      expect(['reading', 'writing']).toContain(store.status)
+      disconnect()
+      const error = store.error
+      if (outcome === 'resolve') pending.resolve()
+      else pending.reject(new Error('late failure'))
+      await running
+      expect(store.status).toBe('disconnected')
+      expect(store.profile).toEqual(profile)
+      expect(store.error).toBe(error)
+      expect(store.message).toBe('')
+      expect(store.activeConfiguration).toBe(1)
+    })
+  })
+
+  it('does not publish key-save progress after disconnect', async () => {
+    const { store, session, profile, disconnect } = await setup()
+    const pending = deferred<void>()
+    let notify: import('@/application/SaveConfiguration').SaveProgressObserver = () => {}
+    vi.spyOn(session, 'updateAndSave').mockImplementation(async (_position, _layer, _code, _category, onProgress) => {
+      notify = onProgress!
+      await pending.promise
+      return { profile, changedAssignments: 1 }
+    })
+    const writing = store.assignKey(4)
+    disconnect()
+    notify({ phase: 'completed', completed: 1, total: 1 })
+    pending.resolve(); await writing
+    expect(store.saveProgress).toBeUndefined()
+    expect(store.status).toBe('disconnected')
+  })
+
   describe.each(['single', 'batch', 'rate', 'start', 'finish'] as const)('%s performance write', (operation) => {
     it.each(['resolve', 'reject'] as const)('ignores a late %s after disconnect', async (outcome) => {
       const { store, session, profile, disconnect } = await setup()
