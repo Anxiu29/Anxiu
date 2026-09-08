@@ -32,7 +32,7 @@ export async function upgradeC98Firmware(device: HIDDevice | undefined, image: U
     transport = new WebHidTransport(C98_DEVICE)
     transport.setDevice(target)
     await transport.open()
-    return new FirmwareChannel(transport)
+    return new FirmwareChannel(transport, options.onDiagnostic)
   }
   const authorize = async () => {
     options.onProgress({ stage: 'authorizing', current: 0, total: image.length, message: '请点击“授权升级设备”，选择重新出现的 C98；保持键盘供电' })
@@ -49,7 +49,9 @@ export async function upgradeC98Firmware(device: HIDDevice | undefined, image: U
           const identity = await readFirmwareIdentity(channel)
           assertFirmwareIdentity(identity, expected, Math.ceil(image.length / 512) * 512)
           if (identity.mode === mode) return channel
-        } catch { /* 只读身份查询失败可重试；绝不重发固件命令。 */ }
+        } catch (cause) {
+          options.onDiagnostic?.({ kind: 'connection', outcome: 'failure', message: cause instanceof Error ? cause.message : String(cause) })
+        }
         await release()
       }
       await firmwareDelay(500)

@@ -55,7 +55,7 @@ export async function updateFirmware(
     await erase(0)
     await unlock(4)
     // 重启可能没有 ACK：发送成功后必须通过重新枚举、SYNC 和身份核对确认结果。
-    await channel.transport.send(commands.blREBOOT())
+    await channel.sendRestart(commands.blREBOOT())
     progress('reconnecting', '等待 Bootloader 重新连接')
     await delay(4000)
     channel = await reconnect(identity, 255)
@@ -81,7 +81,7 @@ export async function updateFirmware(
   if (data.length < 11 || u32(data, 1) !== 0 || u32(data, 5) !== padded.length || readUint16le(data, 9) !== crc) throw new Error('固件 CRC 校验失败，未跳转应用')
   await unlock(5)
   progress('restarting', '校验通过，等待键盘重启', padded.length)
-  await channel.transport.send(commands.blTOAPP(padded.length, crc))
+  await channel.sendRestart(commands.blTOAPP(padded.length, crc))
   await delay(4000)
   channel = await reconnect(identity, 0)
   const app = await readFirmwareIdentity(channel)

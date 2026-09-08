@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { createFirmwareDiagnostics } from '@/application/FirmwareDiagnostics'
 import type { FirmwareProgress } from '@/application/FirmwareUpdate'
 import type { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { createDriverState } from './driverState'
@@ -20,6 +21,9 @@ export function createFirmwareActions(
   lifecycle: FirmwareLifecycle,
 ) {
   const { status, driverId, message } = state
+  const diagnostics = createFirmwareDiagnostics()
+  const firmwareLogAvailable = ref(false)
+  const exportFirmwareLog = () => diagnostics.export()
   const firmwareProgress = ref<FirmwareProgress>()
   const firmwareUpdating = ref(false)
   let pendingAuthorization: { resolve(device: HIDDevice): void; reject(error: Error): void } | undefined
@@ -28,6 +32,9 @@ export function createFirmwareActions(
 
   async function upgradeFirmware(file: File) {
     if (firmwareUpdating.value || !canUpgradeFirmware.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
+    diagnostics.reset()
+    firmwareLogAvailable.value = true
+    diagnostics.record({ kind: 'stage', outcome: 'started', stage: 'validating', total: file.size })
     firmwareUpdating.value = true
     lifecycle.clearFeedback(); status.value = 'writing'
     firmwareProgress.value = { stage: 'validating', current: 0, total: file.size, message: '正在验证官方固件文件' }
@@ -38,18 +45,27 @@ export function createFirmwareActions(
       lifecycle.invalidateDeviceCaches()
       state.session = undefined
       await driverService.upgradeFirmware(image, {
-        onProgress: (progress) => { firmwareProgress.value = progress },
+        onProgress: (progress) => {
+          firmwareProgress.value = progress
+          diagnostics.record({ kind: 'stage', outcome: 'started', ...progress })
+        },
+        onDiagnostic: (event) => diagnostics.record(event),
         authorizeDevice: () => new Promise<HIDDevice>((resolve, reject) => { pendingAuthorization = { resolve, reject } }),
       })
+      firmwareProgress.value = { stage: 'reading-configuration', current: image.length, total: image.length, message: '固件已启动，正在重新读取配置' }
+      diagnostics.record({ kind: 'stage', outcome: 'started', ...firmwareProgress.value })
       state.session = await driverService.reconnectAuthorized({ driverId: driverId.value, onDisconnect: lifecycle.handleDisconnect })
       if (!state.session) throw new Error('固件已校验并启动，请重新连接以读取配置')
       lifecycle.observeDeviceStateChanges()
-      await lifecycle.readProfile()
+      if (!await lifecycle.readProfile()) throw new Error('固件写入后配置读取已中断，请重新连接')
+      diagnostics.record({ kind: 'result', outcome: 'success', message: '固件及配置回读完成' })
+      firmwareProgress.value = { stage: 'complete', current: image.length, total: image.length, message: '固件升级及配置回读完成' }
       message.value = '固件升级完成，已校验并重新读取设备配置'
     } catch (cause) {
       state.session = driverService.session
       if (state.session) lifecycle.observeDeviceStateChanges()
       const detail = cause instanceof Error ? cause.message : String(cause)
+      diagnostics.record({ kind: 'result', outcome: 'failure', stage: firmwareProgress.value?.stage, message: detail })
       firmwareProgress.value = { stage: 'failed', current: firmwareProgress.value?.current ?? 0, total: file.size, message: detail }
       lifecycle.fail(cause)
     } finally { pendingAuthorization = undefined; firmwareUpdating.value = false }
@@ -67,5 +83,5 @@ export function createFirmwareActions(
     pendingAuthorization?.reject(new Error('已停止等待授权；如键盘处于 Bootloader，请保持供电并重新选择固件恢复'))
   }
 
-  return { firmwareProgress, firmwareUpdating, canUpgradeFirmware, upgradeFirmware, authorizeFirmwareDevice, cancelFirmwareAuthorization }
+  return { firmwareLogAvailable, exportFirmwareLog, firmwareProgress, firmwareUpdating, canUpgradeFirmware, upgradeFirmware, authorizeFirmwareDevice, cancelFirmwareAuthorization }
 }
