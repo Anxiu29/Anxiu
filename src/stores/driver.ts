@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import type { FirmwareProgress } from '@/application/FirmwareUpdate'
 import type { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import type { KeyboardConfiguration, KeyboardMode } from '@/domain/keyboard'
 import { toDriverError } from '@/application/DriverError'
 import { createDriverState } from './driverState'
 import { createRequestScope } from './requestScope'
 import { createLightingActions } from './lightingActions'
+import { createFirmwareActions } from './firmwareActions'
 import { createAdvancedKeyActions } from './advancedKeyActions'
 import type { MacroSettings } from '@/domain/macro'
 import type { KeyPerformanceSettings, PollingRate } from '@/domain/performance'
@@ -15,11 +14,6 @@ import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, rep
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
   const state = createDriverState()
-  const firmwareProgress = ref<FirmwareProgress>()
-  const firmwareUpdating = ref(false)
-  let pendingAuthorization: { resolve(device: HIDDevice): void; reject(error: Error): void } | undefined
-  let authorizationInProgress = false
-  const canUpgradeFirmware = computed(() => !state.demo.value && !!state.profile.value && driverService.canUpgradeFirmware)
   const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, performanceBySourceCode, performanceMapLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
@@ -37,47 +31,9 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   const profileRequests = createRequestScope()
   let performanceMapReadRevision = 0
   let consecutiveTravelReadFailures = 0
-
-  async function upgradeFirmware(file: File) {
-    if (firmwareUpdating.value || !canUpgradeFirmware.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
-    firmwareUpdating.value = true
-    clearFeedback(); status.value = 'writing'
-    firmwareProgress.value = { stage: 'validating', current: 0, total: file.size, message: '正在验证官方固件文件' }
-    try {
-      if (file.size > 16 * 1024 * 1024 || !file.name.toLowerCase().endsWith('.bin')) throw new Error('请选择有效的官方 .bin 固件')
-      const image = new Uint8Array(await file.arrayBuffer())
-      removeDeviceStateListeners()
-      invalidateDeviceCaches()
-      state.session = undefined
-      await driverService.upgradeFirmware(image, {
-        onProgress: (progress) => { firmwareProgress.value = progress },
-        authorizeDevice: () => new Promise<HIDDevice>((resolve, reject) => { pendingAuthorization = { resolve, reject } }),
-      })
-      state.session = await driverService.reconnectAuthorized({ driverId: driverId.value, onDisconnect: handleDisconnect })
-      if (!state.session) throw new Error('固件已校验并启动，请重新连接以读取配置')
-      observeDeviceStateChanges()
-      await readProfile()
-      message.value = '固件升级完成，已校验并重新读取设备配置'
-    } catch (cause) {
-      state.session = driverService.session
-      if (state.session) observeDeviceStateChanges()
-      const detail = cause instanceof Error ? cause.message : String(cause)
-      firmwareProgress.value = { stage: 'failed', current: firmwareProgress.value?.current ?? 0, total: file.size, message: detail }
-      fail(cause)
-    } finally { pendingAuthorization = undefined; firmwareUpdating.value = false }
-  }
-
-  async function authorizeFirmwareDevice() {
-    const pending = pendingAuthorization
-    if (!pending || authorizationInProgress) return
-    authorizationInProgress = true
-    try { pending.resolve(await driverService.requestUpgradeDevice()) }
-    catch (cause) { pending.reject(cause instanceof Error ? cause : new Error(String(cause))) }
-    finally { authorizationInProgress = false }
-  }
-  function cancelFirmwareAuthorization() {
-    pendingAuthorization?.reject(new Error('已停止等待授权；如键盘处于 Bootloader，请保持供电并重新选择固件恢复'))
-  }
+  const { firmwareProgress, firmwareUpdating, canUpgradeFirmware, upgradeFirmware, authorizeFirmwareDevice, cancelFirmwareAuthorization } = createFirmwareActions(state, driverService, {
+    clearFeedback, removeDeviceStateListeners, invalidateDeviceCaches, handleDisconnect, observeDeviceStateChanges, readProfile, fail,
+  })
 
   /** 建立新会话后统一读取 Profile；真机和演示模式共用后续状态流。 */
   async function connect(useDemo = false, firmwareRecovery = false) {
