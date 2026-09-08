@@ -50,6 +50,69 @@ async function setup() {
 describe('driver async context', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
+  describe.each(['single', 'batch', 'rate', 'start', 'finish'] as const)('%s performance write', (operation) => {
+    it.each(['resolve', 'reject'] as const)('ignores a late %s after disconnect', async (outcome) => {
+      const { store, session, profile, disconnect } = await setup()
+      profile.capabilities.calibration = true
+      store.calibrationActive = true
+      const pending = deferred<void>()
+      vi.spyOn(session, 'updatePerformance').mockImplementation(async (settings) => { await pending.promise; return settings })
+      vi.spyOn(session, 'updatePerformances').mockImplementation(async (settings) => { await pending.promise; return settings })
+      vi.spyOn(session, 'updatePollingRate').mockImplementation(async (rate) => { await pending.promise; return rate })
+      vi.spyOn(session, 'startCalibration').mockImplementation(() => pending.promise)
+      vi.spyOn(session, 'finishCalibration').mockImplementation(() => pending.promise)
+      const settings = { ...DEFAULT_PERFORMANCE_SETTINGS, sourceCode: 4 }
+      const writing = operation === 'single' ? store.updatePerformance(settings)
+        : operation === 'batch' ? store.updatePerformances([settings])
+        : operation === 'rate' ? store.updatePollingRate(1000)
+        : operation === 'start' ? store.startCalibration() : store.finishCalibration()
+      expect(store.status).toBe('writing')
+      disconnect()
+      const disconnectedError = store.error
+      if (outcome === 'resolve') pending.resolve()
+      else pending.reject(new Error('late device failure'))
+      await writing
+      expect(store.status).toBe('disconnected')
+      expect(store.error).toBe(disconnectedError)
+      expect(store.message).toBe('')
+      expect(store.performanceSettings).toBeUndefined()
+      expect(store.performanceBySourceCode).toEqual({})
+      expect(store.pollingRate).toBeUndefined()
+      expect(store.calibrationActive).toBe(false)
+    })
+  })
+
+  it('does not let a pre-write performance read overwrite the verified write', async () => {
+    const { store, session } = await setup()
+    const pending = deferred<KeyPerformanceSettings>()
+    vi.spyOn(session, 'getPerformance').mockReturnValue(pending.promise)
+    const reading = store.loadPerformance('4')
+    const verified = { ...DEFAULT_PERFORMANCE_SETTINGS, sourceCode: 4 }
+    vi.spyOn(session, 'updatePerformance').mockResolvedValue(verified)
+    await store.updatePerformance(verified)
+    pending.resolve({ ...DEFAULT_PERFORMANCE_SETTINGS, sourceCode: 5 })
+    await reading
+    expect(store.performanceSettings).toEqual(verified)
+    expect(store.performanceBySourceCode).toEqual({ 4: verified })
+    expect(store.performanceLoading).toBe(false)
+    expect(store.status).toBe('ready')
+  })
+
+  it('blocks a second calibration completion while the first request is pending', async () => {
+    const { store, session, profile } = await setup()
+    profile.capabilities.calibration = true
+    store.calibrationActive = true
+    const pending = deferred<void>()
+    const finish = vi.spyOn(session, 'finishCalibration').mockReturnValue(pending.promise)
+    const first = store.finishCalibration()
+    await store.finishCalibration()
+    expect(finish).toHaveBeenCalledOnce()
+    pending.resolve()
+    await first
+    expect(store.calibrationActive).toBe(false)
+    expect(store.status).toBe('ready')
+  })
+
   it('stops a macro scan after the in-flight response when disconnected', async () => {
     const { store, session, profile, disconnect } = await setup()
     profile.capabilities.macro = true

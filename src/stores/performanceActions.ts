@@ -14,8 +14,29 @@ export function createPerformanceActions(
   let loadingPerformanceSourceCode: number | undefined
   const pollingRateRequests = createRequestScope()
   const travelRequests = createRequestScope()
+  const writeRequests = createRequestScope()
   let performanceMapReadRevision = 0
   let consecutiveTravelReadFailures = 0
+
+  /** 写入开始后旧读取不再可信；写入结果也必须属于当前设备上下文。 */
+  function beginWrite() {
+    const session = state.session!
+    const currentWrite = writeRequests.begin()
+    invalidateReads()
+    feedback.clearFeedback(); status.value = 'writing'
+    return { session, isCurrent: () => currentWrite() && state.session === session }
+  }
+
+  function invalidateReads() {
+    performanceReadRevision++
+    performanceMapReadRevision++
+    pollingRateRequests.invalidate()
+    travelRequests.invalidate()
+    loadingPerformanceSourceCode = undefined
+    performanceLoading.value = false
+    performanceMapLoading.value = false
+    travelReading.value = false
+  }
 
   async function loadPerformance(positionId = selectedPositionId.value, force = false) {
     if (!state.session || !profile.value?.capabilities.performance || !positionId || !['ready', 'error'].includes(status.value)) return
@@ -49,13 +70,15 @@ export function createPerformanceActions(
 
   async function updatePerformance(settings: KeyPerformanceSettings) {
     if (!state.session || !profile.value?.capabilities.performance || !['ready', 'error'].includes(status.value)) return
-    feedback.clearFeedback(); status.value = 'writing'
+    const { session, isCurrent } = beginWrite()
     try {
-      performanceSettings.value = await state.session.updatePerformance(settings)
+      const verified = await session.updatePerformance(settings)
+      if (!isCurrent()) return
+      performanceSettings.value = verified
       performanceBySourceCode.value = { ...performanceBySourceCode.value, [performanceSettings.value.sourceCode]: performanceSettings.value }
       status.value = 'ready'
       message.value = '性能设置已写入并通过回读验证'
-    } catch (cause) { feedback.fail(cause) }
+    } catch (cause) { if (isCurrent()) feedback.fail(cause) }
   }
 
   /** 批量读取全部键位参数；协议适配器会把相同 Layout 合并成每包 14 键。 */
@@ -79,10 +102,11 @@ export function createPerformanceActions(
   /** 批量写入仍逐键执行设备回读验证，任何键失败都会停止并显示真实错误。 */
   async function updatePerformances(settingsList: KeyPerformanceSettings[]) {
     if (!state.session || !profile.value?.capabilities.performance || !settingsList.length || !['ready', 'error'].includes(status.value)) return
-    feedback.clearFeedback(); status.value = 'writing'
+    const { session, isCurrent } = beginWrite()
     try {
       const next = { ...performanceBySourceCode.value }
-      const verifiedSettings = await state.session.updatePerformances(settingsList)
+      const verifiedSettings = await session.updatePerformances(settingsList)
+      if (!isCurrent()) return
       for (const verified of verifiedSettings) {
         next[verified.sourceCode] = verified
         if (verified.sourceCode === performanceSettings.value?.sourceCode) performanceSettings.value = verified
@@ -91,11 +115,11 @@ export function createPerformanceActions(
       performanceBySourceCode.value = next
       status.value = 'ready'
       message.value = `已写入并验证 ${settingsList.length} 个按键的性能设置`
-    } catch (cause) { feedback.fail(cause) }
+    } catch (cause) { if (isCurrent()) feedback.fail(cause) }
   }
 
   async function loadPollingRate() {
-    if (!state.session || !profile.value?.capabilities.pollingRates?.length) return
+    if (!state.session || !profile.value?.capabilities.pollingRates?.length || !['ready', 'error'].includes(status.value)) return
     const observedSession = state.session
     const isCurrent = pollingRateRequests.begin()
     try {
@@ -106,10 +130,12 @@ export function createPerformanceActions(
 
   async function updatePollingRate(rate: PollingRate) {
     if (!state.session || !profile.value?.capabilities.pollingRates?.includes(rate) || !['ready', 'error'].includes(status.value)) return
-    pollingRateRequests.invalidate()
-    feedback.clearFeedback(); status.value = 'writing'
-    try { pollingRate.value = await state.session.updatePollingRate(rate); status.value = 'ready'; message.value = `回报率已设置为 ${rate} Hz` }
-    catch (cause) { feedback.fail(cause) }
+    const { session, isCurrent } = beginWrite()
+    try {
+      const verified = await session.updatePollingRate(rate)
+      if (!isCurrent()) return
+      pollingRate.value = verified; status.value = 'ready'; message.value = `回报率已设置为 ${rate} Hz`
+    } catch (cause) { if (isCurrent()) feedback.fail(cause) }
   }
 
   async function readTravelMatrix() {
@@ -145,32 +171,32 @@ export function createPerformanceActions(
 
   async function startCalibration() {
     if (!state.session || !profile.value?.capabilities.calibration || !['ready', 'error'].includes(status.value)) return
-    feedback.clearFeedback(); status.value = 'writing'
-    try { await state.session.startCalibration(); calibrationActive.value = true; status.value = 'ready'; message.value = '校准已开始，请依次将所有按键按到底' }
-    catch (cause) { feedback.fail(cause) }
+    const { session, isCurrent } = beginWrite()
+    try {
+      await session.startCalibration()
+      if (!isCurrent()) return
+      calibrationActive.value = true; status.value = 'ready'; message.value = '校准已开始，请依次将所有按键按到底'
+    } catch (cause) { if (isCurrent()) feedback.fail(cause) }
   }
 
   async function finishCalibration() {
-    if (!state.session || !profile.value?.capabilities.calibration || !calibrationActive.value) return
-    feedback.clearFeedback(); status.value = 'writing'
-    try { await state.session.finishCalibration(); calibrationActive.value = false; status.value = 'ready'; message.value = '键盘校准已完成' }
-    catch (cause) { feedback.fail(cause) }
+    if (!state.session || !profile.value?.capabilities.calibration || !calibrationActive.value || !['ready', 'error'].includes(status.value)) return
+    const { session, isCurrent } = beginWrite()
+    try {
+      await session.finishCalibration()
+      if (!isCurrent()) return
+      calibrationActive.value = false; status.value = 'ready'; message.value = '键盘校准已完成'
+    } catch (cause) { if (isCurrent()) feedback.fail(cause) }
   }
 
   function invalidate() {
-    pollingRateRequests.invalidate()
-    travelRequests.invalidate()
+    writeRequests.invalidate()
+    invalidateReads()
     consecutiveTravelReadFailures = 0
-    loadingPerformanceSourceCode = undefined
-    performanceReadRevision++
-    performanceMapReadRevision++
     performanceSettings.value = undefined
-    performanceLoading.value = false
     performanceBySourceCode.value = {}
-    performanceMapLoading.value = false
     pollingRate.value = undefined
     travelMatrix.value = []
-    travelReading.value = false
     calibrationActive.value = false
   }
 
