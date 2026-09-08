@@ -7,9 +7,8 @@ import { createRequestScope } from './requestScope'
 import { createLightingActions } from './lightingActions'
 import { createFirmwareActions } from './firmwareActions'
 import { createAdvancedKeyActions } from './advancedKeyActions'
-import type { MacroSettings } from '@/domain/macro'
 import { createPerformanceActions } from './performanceActions'
-import { clearDeviceMacroSnapshots, deleteMacroSnapshot, listMacroSnapshots, replaceMacroSnapshots, restoreMacroSnapshot, saveMacroSnapshot, type MacroSnapshotContext } from './macroSnapshots'
+import { createMacroActions } from './macroActions'
 
 /** 由组合根注入应用服务，Store 不再知道具体设备和全局单例。 */
 export const createDriverStore = (driverService: KeyboardDriverService) => defineStore('driver', () => {
@@ -17,15 +16,14 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
   const { status, profile, layer, mode, activeConfiguration, selectedPositionId, error, errorCode, message, messageWarning, demo, driverId, revision, saveProgress, lighting, customLighting, customLightingLoading, advancedKey, advancedKeyLoading, advancedKeyTypes, macro, macroSlots, selectedMacroSlot, macroBindings, macroLoading, performanceSettings, performanceLoading, performanceBySourceCode, performanceMapLoading, pollingRate, travelMatrix, travelReading, calibrationActive, connected, dirty, assignments, selectedAssignment, keyOptions, keyLabels } = state
   let removeModeListener: () => void = () => undefined
   let removeConfigurationListener: () => void = () => undefined
-  let macroReadRevision = 0
-  const macroWrites = createRequestScope()
-  let loadingMacroSourceCode: number | undefined
   const advancedKeyActions = createAdvancedKeyActions(state, { clearFeedback, fail })
   const { loadAdvancedKey, loadAdvancedKeyTypes, updateAdvancedKey, deleteAdvancedKey } = advancedKeyActions
   const lightingActions = createLightingActions(state, { clearFeedback, fail })
   const { updateLighting, reloadLighting, loadCustomLighting, updateCustomLighting } = lightingActions
   const performanceActions = createPerformanceActions(state, { clearFeedback, fail })
   const { loadPerformance, updatePerformance, loadPerformanceMap, updatePerformances, loadPollingRate, updatePollingRate, readTravelMatrix, startCalibration, finishCalibration } = performanceActions
+  const macroActions = createMacroActions(state, { clearFeedback, fail })
+  const { loadMacro, updateMacro, deleteMacro, loadMacrosFromDevice, selectMacroSlot } = macroActions
   const profileRequests = createRequestScope()
   const { firmwareProgress, firmwareUpdating, canUpgradeFirmware, upgradeFirmware, authorizeFirmwareDevice, cancelFirmwareAuthorization } = createFirmwareActions(state, driverService, {
     clearFeedback, removeDeviceStateListeners, invalidateDeviceCaches, handleDisconnect, observeDeviceStateChanges, readProfile, fail,
@@ -125,9 +123,9 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     clearFeedback(); status.value = 'writing'
     try {
       // restoreFactory 成功后 profile 会被释放，必须先保留设备身份用于清理全部配置的宏快照。
-      const snapshotContext = macroSnapshotContext()
+      const clearSnapshots = macroActions.prepareSnapshotCleanup()
       await state.session.restoreFactory()
-      clearDeviceMacroSnapshots(snapshotContext)
+      clearSnapshots()
       invalidateDeviceCaches()
       await driverService.disconnect()
       removeDeviceStateListeners()
@@ -194,101 +192,6 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
       profile.value = result.profile; revision.value++; status.value = 'ready'
       message.value = result.changedAssignments === 0 ? '该按键已经是默认映射' : '已恢复当前按键默认映射并通过回读验证'
     } catch (cause) { revision.value++; fail(cause) }
-  }
-
-  async function loadMacro(positionId = selectedPositionId.value, force = false) {
-    if (!state.session || !profile.value?.capabilities.macro || !positionId || ['connecting', 'writing'].includes(status.value)) return
-    const position = profile.value.positions.find((item) => item.id === positionId)
-    if (!position) return
-    if (!force && (macro.value?.sourceCode === position.sourceCode || macroLoading.value && loadingMacroSourceCode === position.sourceCode)) return
-    const observedSession = state.session
-    const readRevision = ++macroReadRevision
-    loadingMacroSourceCode = position.sourceCode
-    macroLoading.value = true
-    clearFeedback()
-    try {
-      const result = await observedSession.getMacro(position.sourceCode)
-      if (state.session === observedSession && readRevision === macroReadRevision) {
-        macro.value = restoreMacroSnapshot(macroSnapshotContext(), result)
-        if (macro.value.sourceCode !== 0xff) macroSlots.value = { ...macroSlots.value, [macro.value.index]: macro.value }
-        rememberMacroBinding(macro.value)
-      }
-    } catch (cause) {
-      if (state.session === observedSession && readRevision === macroReadRevision) fail(cause)
-    } finally {
-      if (readRevision === macroReadRevision) { macroLoading.value = false; loadingMacroSourceCode = undefined }
-    }
-  }
-
-  async function updateMacro(settings: MacroSettings) {
-    if (!state.session || !profile.value?.capabilities.macro || !['ready', 'error'].includes(status.value)) return
-    const session = state.session
-    const context = macroSnapshotContext()
-    const isCurrent = macroWrites.begin()
-    macroReadRevision++
-    macroLoading.value = false
-    loadingMacroSourceCode = undefined
-    clearFeedback(); status.value = 'writing'
-    try {
-      const bindings = [...new Set(settings.boundSourceCodes ?? [])]
-      const previous = macroSlots.value[settings.index]
-      const removedBindings = (previous?.boundSourceCodes ?? []).filter((sourceCode) => !bindings.includes(sourceCode))
-      for (const sourceCode of removedBindings) {
-        await session.deleteMacroBinding(sourceCode)
-        if (!isCurrent() || state.session !== session) return
-      }
-      let verified: MacroSettings | undefined
-      // 同一 index 是同一套宏正文；逐键发送 0x21 只是建立多份“物理键 → 槽位”绑定。
-      for (const sourceCode of bindings) {
-        verified = await session.updateMacro({ ...settings, sourceCode, boundSourceCodes: bindings })
-        if (!isCurrent() || state.session !== session) return
-      }
-      // 没有绑定键时固件没有可寻址入口，先保存为网页草稿；首次绑定时再写入设备。
-      const saved = { ...(verified ?? settings), sourceCode: bindings[0] ?? 0xff, boundSourceCodes: bindings, actions: settings.actions, storedActionCount: settings.actions.length, actionsAvailable: true }
-      saveMacroSnapshot(context, saved)
-      // 一个物理键只能指向一个宏槽位，从其他槽位的本地绑定索引中移除它。
-      const nextSlots = { ...macroSlots.value, [settings.index]: saved }
-      for (const [slotIndex, slot] of Object.entries(nextSlots)) {
-        if (Number(slotIndex) === settings.index) continue
-        const remaining = (slot.boundSourceCodes ?? []).filter((sourceCode) => !bindings.includes(sourceCode))
-        if (remaining.length === (slot.boundSourceCodes ?? []).length) continue
-        nextSlots[Number(slotIndex)] = { ...slot, sourceCode: remaining[0] ?? 0xff, boundSourceCodes: remaining }
-        saveMacroSnapshot(context, nextSlots[Number(slotIndex)]!)
-      }
-      macroSlots.value = nextSlots
-      macro.value = saved
-      rebuildMacroBindings()
-      status.value = 'ready'
-      messageWarning.value = !bindings.length
-      message.value = bindings.length ? '宏已写入，槽位和执行参数已通过设备回读验证' : '宏已保存为未绑定草稿，绑定按键并保存后可写入键盘'
-    }
-    catch (cause) { if (isCurrent() && state.session === session) fail(cause) }
-  }
-
-  /** 清除当前槽位：先解除真机上的全部入口，再删除网页保存的动作正文。 */
-  async function deleteMacro(index: number) {
-    if (!state.session || !profile.value?.capabilities.macro || !['ready', 'error'].includes(status.value)) return
-    const session = state.session
-    const context = macroSnapshotContext()
-    const isCurrent = macroWrites.begin()
-    macroReadRevision++
-    macroLoading.value = false
-    loadingMacroSourceCode = undefined
-    clearFeedback(); status.value = 'writing'
-    try {
-      const settings = macroSlots.value[index]
-      for (const sourceCode of settings?.boundSourceCodes ?? []) {
-        await session.deleteMacroBinding(sourceCode)
-        if (!isCurrent() || state.session !== session) return
-      }
-      deleteMacroSnapshot(context, index)
-      const nextSlots = { ...macroSlots.value }
-      delete nextSlots[index]
-      macroSlots.value = nextSlots
-      if (selectedMacroSlot.value === index) macro.value = undefined
-      rebuildMacroBindings()
-      status.value = 'ready'; message.value = `已清除 M${index + 1} 的动作和全部按键绑定`
-    } catch (cause) { if (isCurrent() && state.session === session) fail(cause) }
   }
 
   function handleDisconnect() {
@@ -384,84 +287,7 @@ export const createDriverStore = (driverService: KeyboardDriverService) => defin
     customLighting.value = []
     customLightingLoading.value = false
     advancedKeyActions.invalidate()
-    invalidateMacroCache()
-  }
-  function invalidateMacroCache() {
-    macroWrites.invalidate()
-    macroReadRevision++
-    macro.value = undefined
-    macroSlots.value = {}
-    macroLoading.value = false
-    loadingMacroSourceCode = undefined
-    macroBindings.value = {}
-  }
-  function macroSnapshotContext(): MacroSnapshotContext {
-    if (!profile.value) throw new Error('尚未读取设备配置')
-    return { driverId: driverId.value, profile: profile.value, configuration: activeConfiguration.value, mode: mode.value }
-  }
-  /**
-   * 进入宏页面或切换设备配置后扫描每个物理键的 0x21 元数据。
-   * 本地快照只能补足协议无法回读的动作正文，绝不能凭自己创建宏槽和绑定。
-   */
-  async function loadMacrosFromDevice() {
-    // 模式/配置同步会在 reading 期间调用；writing、disconnected 不得启动新扫描。
-    if (!state.session || !profile.value?.capabilities.macro || macroLoading.value || !['ready', 'error', 'reading'].includes(status.value)) return
-    const observedSession = state.session
-    const observedProfile = profile.value
-    const context = macroSnapshotContext()
-    // 未绑定宏在固件中没有物理键入口，只能作为网页草稿保留；有绑定的旧快照必须由设备确认。
-    const localUnbound = listMacroSnapshots(context).filter((settings) => !(settings.boundSourceCodes?.length))
-    const readRevision = ++macroReadRevision
-    macroLoading.value = true
-    try {
-      const results: MacroSettings[] = []
-      // 协议没有事务序号，同命令必须逐键串行读取，避免 0xA1 响应对应错物理键。
-      for (const position of observedProfile.positions) {
-        results.push(await observedSession.getMacro(position.sourceCode))
-        // 不仅丢弃最终结果，也在当前响应结束后停止向旧上下文继续追加命令。
-        if (state.session !== observedSession || readRevision !== macroReadRevision) return
-      }
-      if (state.session !== observedSession || readRevision !== macroReadRevision) return
-      const nextSlots: Record<number, MacroSettings> = {}
-      for (const deviceSettings of results) {
-        if (deviceSettings.sourceCode === 0xff) continue
-        const restored = restoreMacroSnapshot(context, deviceSettings)
-        const existing = nextSlots[restored.index]
-        if (!existing) nextSlots[restored.index] = restored
-        else nextSlots[restored.index] = {
-          // 一个槽位可由多个键触发，但本次扫描中的每个物理键只会落入一个槽位。
-          ...(existing.actionsAvailable ? existing : restored),
-          boundSourceCodes: [...new Set([...(existing.boundSourceCodes ?? []), restored.sourceCode])],
-        }
-      }
-      for (const draft of localUnbound) if (!nextSlots[draft.index]) nextSlots[draft.index] = draft
-      macroSlots.value = nextSlots
-      replaceMacroSnapshots(context, Object.values(nextSlots))
-      rebuildMacroBindings()
-    } catch (cause) {
-      if (state.session === observedSession && readRevision === macroReadRevision) fail(cause)
-    } finally {
-      if (readRevision === macroReadRevision) macroLoading.value = false
-    }
-  }
-  function rebuildMacroBindings() {
-    macroBindings.value = Object.fromEntries(Object.values(macroSlots.value).flatMap((settings) => (settings.boundSourceCodes ?? []).map((sourceCode) => [sourceCode, `M${settings.index + 1}`])))
-  }
-  function selectMacroSlot(index: number) {
-    const slotCount = profile.value?.capabilities.macroSlots ?? 0
-    if (Number.isInteger(index) && index >= 0 && index < slotCount) selectedMacroSlot.value = index
-  }
-  /** 设备回读为空时移除过期角标；绑定是否存在只看 0x21 的 sourceCode，不能依赖缺失的动作数。 */
-  function rememberMacroBinding(settings: MacroSettings) {
-    const nextSlots = { ...macroSlots.value }
-    if (settings.sourceCode !== 0xff) {
-      const slot = nextSlots[settings.index] ?? settings
-      nextSlots[settings.index] = { ...slot, boundSourceCodes: [...new Set([...(slot.boundSourceCodes ?? []), settings.sourceCode])] }
-    } else {
-      for (const [index, slot] of Object.entries(nextSlots)) nextSlots[Number(index)] = { ...slot, boundSourceCodes: (slot.boundSourceCodes ?? []).filter((code) => code !== settings.sourceCode) }
-    }
-    macroSlots.value = nextSlots
-    rebuildMacroBindings()
+    macroActions.invalidate()
   }
   function fail(cause: unknown) {
     // 所有外层异常在这里收敛为稳定错误码，Vue 组件只处理展示，不解析底层异常。
