@@ -5,6 +5,7 @@ import { getDevicePresentation, useDriverStore } from '@/composition/root'
 import AppShell from '@/components/AppShell.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import { useTheme } from '@/ui/theme'
+import { downloadText } from '@/ui/downloadText'
 
 const KeymapWorkspace = defineAsyncComponent(() => import('@/components/KeymapWorkspace.vue'))
 const LightingWorkspace = defineAsyncComponent(() => import('@/components/LightingWorkspace.vue'))
@@ -60,7 +61,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div v-if="error || message" class="notice" :class="{ error }">{{ error || message }}</div>
     </section>
 
-    <AppShell v-else :can-upgrade-firmware="store.canUpgradeFirmware" :firmware-progress="store.firmwareProgress" @upgrade-firmware="store.upgradeFirmware" @authorize-firmware="store.authorizeFirmwareDevice" @cancel-firmware-authorization="store.cancelFirmwareAuthorization" :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :message-warning="messageWarning" :sidebar-image-url="devicePresentation.sidebarImageUrl" :firmware-download="devicePresentation.firmwareDownload" :theme="theme" @update:theme="setTheme" @navigate="prepareWorkspace" @select-configuration="store.selectConfiguration" @reload="store.reload" @restore-factory="store.restoreFactory">
+    <AppShell v-else :firmware-log-available="store.firmwareLogAvailable" @export-firmware-log="downloadText(store.exportFirmwareLog(), 'firmware-diagnostics.json')" :can-upgrade-firmware="store.canUpgradeFirmware" :firmware-progress="store.firmwareProgress" @upgrade-firmware="store.upgradeFirmware" @authorize-firmware="store.authorizeFirmwareDevice" @cancel-firmware-authorization="store.cancelFirmwareAuthorization" :key="shellRevision" :profile="profile" :active-configuration="activeConfiguration" :navigation-disabled="busy()" :error="error" :message="message" :message-warning="messageWarning" :sidebar-image-url="devicePresentation.sidebarImageUrl" :firmware-download="devicePresentation.firmwareDownload" :theme="theme" @update:theme="setTheme" @navigate="prepareWorkspace" @select-configuration="store.selectConfiguration" @reload="store.reload" @restore-factory="store.restoreFactory">
       <template #device="{ openKeymap }"><DeviceOverview :profile="profile" :busy="busy()" :image-url="devicePresentation.overviewImageUrl" :image-alt="devicePresentation.overviewImageAlt" :solution-name="devicePresentation.solutionName" @reload="store.reload" @open-keymap="openKeymap" /></template>
       <template #keymap>
         <KeymapWorkspace :profile="profile" :status="status" :layer="layer" :mode="mode" :selected-position-id="selectedPositionId" :dirty="dirty" :assignments="assignments" :selected-assignment="selectedAssignment" :key-options="keyOptions" :extended-key-codes="devicePresentation.extendedKeyCodes" :key-labels="keyLabels" :key-geometry="devicePresentation.keyGeometry" @select-layer="store.selectLayer" @select-mode="store.selectMode" @select-position="selectedPositionId = $event" @assign-key="store.assignKey" @restore-defaults="store.restoreAllKeyDefaults" @restore-key="store.restoreKeyDefault" />

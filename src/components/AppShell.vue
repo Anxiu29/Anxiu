@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
   firmwareDownload?: FirmwareDownload
   canUpgradeFirmware?: boolean
   firmwareProgress?: FirmwareProgress
+  firmwareLogAvailable?: boolean
 }>(), { activeConfiguration: 1, theme: 'dark' })
 
 const emit = defineEmits<{
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   'upgrade-firmware': [file: File]
   'authorize-firmware': []
   'cancel-firmware-authorization': []
+  'export-firmware-log': []
   reload: []
   'update:theme': [theme: AppTheme]
   navigate: [view: WorkspaceView]
@@ -159,7 +161,7 @@ onBeforeUnmount(() => {
       <slot v-else-if="activeView === 'performance'" name="performance" />
       <slot v-else-if="activeView === 'macro'" name="macro" />
       <slot v-else-if="activeView === 'key-test'" name="key-test" />
-      <SettingsWorkspace v-else :can-upgrade-firmware="canUpgradeFirmware" :firmware-progress="firmwareProgress" @upgrade-firmware="emit('upgrade-firmware', $event)" @authorize-firmware="emit('authorize-firmware')" @cancel-firmware-authorization="emit('cancel-firmware-authorization')" :profile="profile" :theme="theme" :busy="navigationDisabled" :firmware-download="firmwareDownload" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
+      <SettingsWorkspace v-else :firmware-log-available="firmwareLogAvailable" @export-firmware-log="emit('export-firmware-log')" :can-upgrade-firmware="canUpgradeFirmware" :firmware-progress="firmwareProgress" @upgrade-firmware="emit('upgrade-firmware', $event)" @authorize-firmware="emit('authorize-firmware')" @cancel-firmware-authorization="emit('cancel-firmware-authorization')" :profile="profile" :theme="theme" :busy="navigationDisabled" :firmware-download="firmwareDownload" @update:theme="emit('update:theme', $event)" @reload="emit('reload')" @restore-factory="emit('restore-factory')" />
     </div>
 
     <div v-if="feedbackVisible && (error || message)" class="feedback-toast" :class="{ error: !!error, warning: !error && messageWarning }" role="status">

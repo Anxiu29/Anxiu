@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<{
   firmwareDownload?: FirmwareDownload
   canUpgradeFirmware?: boolean
   firmwareProgress?: FirmwareProgress
+  firmwareLogAvailable?: boolean
 }>(), { theme: 'dark', busy: false })
 
 const emit = defineEmits<{
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   'upgrade-firmware': [file: File]
   'authorize-firmware': []
   'cancel-firmware-authorization': []
+  'export-firmware-log': []
 }>()
 
 const activeSection = ref<SettingsSection>(props.profile.device.runMode === 'boot' ? 'firmware' : 'appearance')
@@ -120,6 +122,8 @@ function requestFactoryReset() {
             :firmware-download="firmwareDownload"
             :can-upgrade-firmware="canUpgradeFirmware"
             :firmware-progress="firmwareProgress"
+            :firmware-log-available="firmwareLogAvailable"
+            @export-firmware-log="emit('export-firmware-log')"
             @upgrade-firmware="emit('upgrade-firmware', $event)"
             @authorize-firmware="emit('authorize-firmware')"
             @cancel-firmware-authorization="emit('cancel-firmware-authorization')"

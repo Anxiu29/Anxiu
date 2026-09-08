@@ -11,12 +11,14 @@ withDefaults(defineProps<{
   firmwareDownload?: FirmwareDownload
   canUpgradeFirmware?: boolean
   firmwareProgress?: FirmwareProgress
+  firmwareLogAvailable?: boolean
 }>(), { busy: false })
 
 const emit = defineEmits<{
   'upgrade-firmware': [file: File]
   'authorize-firmware': []
   'cancel-firmware-authorization': []
+  'export-firmware-log': []
 }>()
 
 const firmwareFile = ref<File>()
@@ -81,6 +83,7 @@ function selectFirmware(event: Event) {
       <button type="button" class="settings-secondary-button" @click="emit('cancel-firmware-authorization')">停止等待</button>
     </template>
   </div>
+  <button v-if="firmwareLogAvailable" type="button" class="settings-secondary-button" @click="emit('export-firmware-log')">导出升级诊断日志</button>
   <div class="firmware-footer"><p>仅使用与当前型号、板卡完全匹配的官方固件。</p><button class="primary" type="button" :disabled="busy || !canUpgradeFirmware || !firmwareFile || !firmwareConfirmed" @click="firmwareFile && emit('upgrade-firmware', firmwareFile)">{{ busy ? '升级处理中' : '开始升级' }}</button></div>
 </section>
 </template>

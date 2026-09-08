@@ -21,6 +21,14 @@ async function openFirmware(props = {}) {
 }
 
 describe('firmware settings', () => {
+  it('exports available diagnostic logs even while an upgrade is busy', async () => {
+    const wrapper = await openFirmware({ busy: true, firmwareLogAvailable: true })
+    const button = wrapper.findAll('button').find((item) => item.text() === '导出升级诊断日志')!
+    expect(button.attributes('disabled')).toBeUndefined()
+    await button.trigger('click')
+    expect(wrapper.emitted('export-firmware-log')).toHaveLength(1)
+    wrapper.unmount()
+  })
   it('provides the device download independently of hardware busy state', async () => {
     const wrapper = await openFirmware({ firmwareDownload: firmware, busy: true })
     const link = wrapper.get('.firmware-download-link')
