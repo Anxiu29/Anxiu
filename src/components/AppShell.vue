@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'select-configuration': [configuration: KeyboardConfiguration]
   'restore-factory': []
-  'upgrade-firmware': [file: File]
+  'upgrade-firmware': [file?: File]
   'authorize-firmware': []
   'cancel-firmware-authorization': []
   'export-firmware-log': []

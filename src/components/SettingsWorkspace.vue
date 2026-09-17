@@ -22,7 +22,7 @@ const emit = defineEmits<{
   reload: []
   'restore-factory': []
   'update:theme': [theme: AppTheme]
-  'upgrade-firmware': [file: File]
+  'upgrade-firmware': [file?: File]
   'authorize-firmware': []
   'cancel-firmware-authorization': []
   'export-firmware-log': []
@@ -60,7 +60,7 @@ function requestFactoryReset() {
         </button>
         <button type="button" :class="{ active: activeSection === 'firmware' }" @click="activeSection = 'firmware'">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
-          <span><strong>固件升级</strong><small>本地固件包与版本</small></span>
+          <span><strong>固件升级</strong><small>在线更新与本地升级</small></span>
         </button>
         <button type="button" :class="{ active: activeSection === 'about' }" @click="activeSection = 'about'">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></svg>
@@ -113,7 +113,7 @@ function requestFactoryReset() {
           <div class="settings-card about-copy"><strong>本地优先</strong><p>键位、灯光和固件文件均在当前浏览器与设备之间处理。此页面不会上传所选择的固件包。</p></div>
           <dl class="settings-device-details compact"><div><dt>连接方式</dt><dd>WebHID</dd></div><div><dt>当前协议</dt><dd>{{ profile.device.protocolVersion }}</dd></div><div><dt>浏览器要求</dt><dd>Chrome / Edge 89+</dd></div><div><dt>运行环境</dt><dd>HTTPS 或本机</dd></div></dl>
         </section>
-        <!-- KeepAlive 保留设置分栏切换前选择的文件和确认状态，与拆分前一致。 -->
+        <!-- KeepAlive 保留设置分栏切换前升级确认状态，与拆分前一致。 -->
         <KeepAlive>
           <FirmwareSettings
             v-if="activeSection === 'firmware'"

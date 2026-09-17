@@ -36,7 +36,7 @@ it('loads every lazy workspace and returns to the overview with the same session
     expect(wrapper.find('.key-test-workspace').exists()).toBe(false)
     await wrapper.get('.sidebar-settings').trigger('click')
     await wrapper.findAll('.settings-navigation button')[2]!.trigger('click')
-    expect(wrapper.get('.firmware-download-link').attributes('href')).toBe(C98_PRESENTATION.firmwareDownload?.url)
+    expect(wrapper.get('.firmware-download-card').text()).toContain(C98_PRESENTATION.firmwareDownload!.version)
   } finally {
     wrapper.unmount()
     mocks.forEach((mock) => mock.mockRestore())
