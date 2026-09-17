@@ -9,6 +9,7 @@ export interface DeviceDriver {
   connectForFirmware?(onDisconnect: () => void): Promise<DeviceSession>
   reconnectAuthorized(onDisconnect: () => void): Promise<DeviceSession | undefined>
   createDemoSession(): DeviceSession
+  downloadFirmware?(onProgress: FirmwareUpdateOptions['onProgress']): Promise<Uint8Array>
   validateFirmware?(image: Uint8Array): Promise<void>
   requestUpgradeDevice?(): Promise<HIDDevice>
   upgradeFirmware?(image: Uint8Array, options: FirmwareUpdateOptions): Promise<void>

@@ -1,5 +1,5 @@
 export interface FirmwareProgress {
-  stage: 'validating' | 'boot' | 'reconnecting' | 'authorizing' | 'erasing' | 'writing' | 'verifying' | 'restarting' | 'reading-configuration' | 'complete' | 'failed'
+  stage: 'downloading' | 'validating' | 'boot' | 'reconnecting' | 'authorizing' | 'erasing' | 'writing' | 'verifying' | 'restarting' | 'reading-configuration' | 'complete' | 'failed'
   current: number
   total: number
   message: string

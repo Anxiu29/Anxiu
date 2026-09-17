@@ -30,17 +30,21 @@ export function createFirmwareActions(
   let authorizationInProgress = false
   const canUpgradeFirmware = computed(() => !state.demo.value && !!state.profile.value && driverService.canUpgradeFirmware)
 
-  async function upgradeFirmware(file: File) {
+  async function upgradeFirmware(file?: File) {
     if (firmwareUpdating.value || !canUpgradeFirmware.value || ['connecting', 'reading', 'writing'].includes(status.value)) return
     diagnostics.reset()
     firmwareLogAvailable.value = true
-    diagnostics.record({ kind: 'stage', outcome: 'started', stage: 'validating', total: file.size })
+    diagnostics.record({ kind: 'stage', outcome: 'started', stage: file ? 'validating' : 'downloading', total: file?.size ?? 0 })
     firmwareUpdating.value = true
     lifecycle.clearFeedback(); status.value = 'writing'
-    firmwareProgress.value = { stage: 'validating', current: 0, total: file.size, message: '正在验证官方固件文件' }
+    firmwareProgress.value = { stage: file ? 'validating' : 'downloading', current: 0, total: file?.size ?? 0, message: file ? '正在验证官方固件文件' : '正在获取官方固件' }
     try {
-      if (file.size > 16 * 1024 * 1024 || !file.name.toLowerCase().endsWith('.bin')) throw new Error('请选择有效的官方 .bin 固件')
-      const image = new Uint8Array(await file.arrayBuffer())
+      if (file && (file.size > 16 * 1024 * 1024 || !file.name.toLowerCase().endsWith('.bin'))) throw new Error('请选择有效的官方 .bin 固件')
+      const image = file ? new Uint8Array(await file.arrayBuffer()) : await driverService.downloadFirmware((progress) => {
+        firmwareProgress.value = progress
+      })
+      firmwareProgress.value = { stage: 'validating', current: 0, total: image.length, message: '正在验证官方固件文件' }
+      diagnostics.record({ kind: 'stage', outcome: 'started', ...firmwareProgress.value })
       lifecycle.removeDeviceStateListeners()
       lifecycle.invalidateDeviceCaches()
       state.session = undefined
@@ -66,7 +70,7 @@ export function createFirmwareActions(
       if (state.session) lifecycle.observeDeviceStateChanges()
       const detail = cause instanceof Error ? cause.message : String(cause)
       diagnostics.record({ kind: 'result', outcome: 'failure', stage: firmwareProgress.value?.stage, message: detail })
-      firmwareProgress.value = { stage: 'failed', current: firmwareProgress.value?.current ?? 0, total: file.size, message: detail }
+      firmwareProgress.value = { stage: 'failed', current: firmwareProgress.value?.current ?? 0, total: firmwareProgress.value?.total ?? 0, message: detail }
       lifecycle.fail(cause)
     } finally { pendingAuthorization = undefined; firmwareUpdating.value = false }
   }
@@ -80,7 +84,7 @@ export function createFirmwareActions(
     finally { authorizationInProgress = false }
   }
   function cancelFirmwareAuthorization() {
-    pendingAuthorization?.reject(new Error('已停止等待授权；如键盘处于 Bootloader，请保持供电并重新选择固件恢复'))
+    pendingAuthorization?.reject(new Error('已停止等待授权；如键盘处于 Bootloader，请保持供电并重新在线升级恢复'))
   }
 
   return { firmwareLogAvailable, exportFirmwareLog, firmwareProgress, firmwareUpdating, canUpgradeFirmware, upgradeFirmware, authorizeFirmwareDevice, cancelFirmwareAuthorization }

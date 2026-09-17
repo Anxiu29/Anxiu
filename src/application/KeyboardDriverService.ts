@@ -29,6 +29,13 @@ export class KeyboardDriverService {
     return this.registry.get(this.activeDriverId!).requestUpgradeDevice!()
   }
 
+  async downloadFirmware(onProgress: FirmwareUpdateOptions['onProgress']) {
+    if (!this.canUpgradeFirmware) throw new Error('当前会话不支持固件升级')
+    const driver = this.registry.get(this.activeDriverId!)
+    if (!driver.downloadFirmware) throw new Error('当前设备暂无可用的官方在线固件')
+    return driver.downloadFirmware(onProgress)
+  }
+
   async upgradeFirmware(image: Uint8Array, options: FirmwareUpdateOptions) {
     if (!this.canUpgradeFirmware) throw new Error('当前会话不支持固件升级，演示模式不能刷写')
     const driver = this.registry.get(this.activeDriverId!)

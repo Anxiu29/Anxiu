@@ -9,12 +9,13 @@ import { C98_DEMO_KEYS, resolveC98PhysicalLayout } from './layout'
 import { C98_CAPABILITIES } from './capabilities'
 import { resolveC98DefaultKeymap } from './factoryKeymap'
 import { C98_DEMO_DEVICE, C98_DEVICE } from './device'
-import { upgradeC98Firmware, validateC98Firmware, requestC98UpgradeDevice } from './firmware'
+import { downloadC98Firmware, upgradeC98Firmware, validateC98Firmware, requestC98UpgradeDevice } from './firmware'
 import type { FirmwareUpdateOptions } from '@/application/FirmwareUpdate'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
 export class C98Driver implements DeviceDriver {
   private selectedDevice?: HIDDevice
+  downloadFirmware = downloadC98Firmware
   validateFirmware = validateC98Firmware
   requestUpgradeDevice = requestC98UpgradeDevice
   async upgradeFirmware(image: Uint8Array, options: FirmwareUpdateOptions) {

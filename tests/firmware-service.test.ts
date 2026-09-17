@@ -21,6 +21,7 @@ function setup() {
   const driver: DeviceDriver = {
     manifest: { id: 'test', displayName: 'Test', protocolId: 'test', transportId: 'test', capabilities: ['firmware-update'] },
     connect: async () => createSession(), reconnectAuthorized: async () => createSession(), createDemoSession: createSession,
+    downloadFirmware: vi.fn(async () => new Uint8Array(512)),
     validateFirmware, upgradeFirmware, requestUpgradeDevice,
   }
   const service = new KeyboardDriverService(new DeviceDriverRegistry().register(driver))
@@ -75,6 +76,25 @@ describe('firmware session ownership', () => {
     expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({ kind: 'result', outcome: 'success' })
   })
 
+  it('upgrades online without a local file', async () => {
+    const { store, upgradeFirmware } = setup()
+    await store.connect()
+    await store.upgradeFirmware()
+    expect(upgradeFirmware).toHaveBeenCalledOnce()
+    expect(store.firmwareProgress?.stage).toBe('complete')
+  })
+  it('preserves the session on network failure', async () => {
+    const { store, service, close, upgradeFirmware } = setup()
+    await store.connect()
+    const original = service.session
+    vi.spyOn(service, 'downloadFirmware').mockRejectedValue(new Error('network failed'))
+    await store.upgradeFirmware()
+    expect(service.session).toBe(original)
+    expect(close).not.toHaveBeenCalled()
+    expect(upgradeFirmware).not.toHaveBeenCalled()
+    expect(store.firmwareUpdating).toBe(false)
+    expect(store.firmwareProgress?.message).toBe('network failed')
+  })
   it('waits for an explicit authorization click, then passes the selected device to the updater', async () => {
     const { store, upgradeFirmware, requestUpgradeDevice } = setup()
     await store.connect()
