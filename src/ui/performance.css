@@ -63,12 +63,12 @@
 }
 .performance-keyboard-panel.travel-active .keycap.custom-lit {
   border-color: var(--cyan);
-  background: linear-gradient(var(--key-light-color), var(--key-light-color)), linear-gradient(#232a34, #171c24);
+  background: linear-gradient(var(--key-light-color), var(--key-light-color)), linear-gradient(var(--surface-control, #232a34), var(--surface-control, #171c24));
   box-shadow: 0 0 14px var(--key-light-color);
   transform: translateY(2px);
 }
 .performance-keyboard-panel.travel-active .keycap-badge {
-  color: #eafffc;
+  color: var(--text-primary, #eafffc);
   background: #12695f;
   font-size: 8px;
 }
@@ -106,30 +106,30 @@
   height: 13px;
   display: grid;
   place-items: center;
-  color: #071411;
+  color: var(--cyan-ink);
   border-radius: 50%;
   background: var(--cyan);
   font-size: 9px;
   font-weight: 800;
 }
 .performance-keyboard-panel.bulk-select .keycap.selected {
-  background: linear-gradient(rgba(69, 230, 208, 0.12), rgba(69, 230, 208, 0.05)), linear-gradient(#232a34, #171c24);
+  background: linear-gradient(rgba(69, 230, 208, 0.12), rgba(69, 230, 208, 0.05)), linear-gradient(var(--surface-control, #232a34), var(--surface-control, #171c24));
 }
 /* 校准数字记录本轮最大行程；完成“按到底并松开”的键使用绿色状态。 */
 .performance-keyboard-panel.calibration-tracking .keycap {
   cursor: default;
   border-color: #d95763;
-  background: linear-gradient(rgba(217, 87, 99, 0.16), rgba(217, 87, 99, 0.06)), linear-gradient(#232a34, #171c24);
+  background: linear-gradient(rgba(217, 87, 99, 0.16), rgba(217, 87, 99, 0.06)), linear-gradient(var(--surface-control, #232a34), var(--surface-control, #171c24));
   box-shadow: 0 0 10px rgba(217, 87, 99, 0.16);
 }
 .performance-keyboard-panel.calibration-tracking .keycap-badge {
-  color: #ffe8ea;
+  color: var(--text-primary, #ffe8ea);
   background: #a8323d;
   font-size: 8px;
 }
 .performance-keyboard-panel.calibration-tracking .keycap.custom-lit {
   border-color: #39d98a;
-  background: linear-gradient(rgba(57, 217, 138, 0.2), rgba(57, 217, 138, 0.08)), linear-gradient(#232a34, #171c24);
+  background: linear-gradient(rgba(57, 217, 138, 0.2), rgba(57, 217, 138, 0.08)), linear-gradient(var(--surface-control, #232a34), var(--surface-control, #171c24));
   box-shadow: 0 0 12px rgba(57, 217, 138, 0.22);
 }
 .performance-keyboard-panel.calibration-tracking .keycap.custom-lit .keycap-badge {
@@ -147,7 +147,7 @@
   grid-template-columns: auto minmax(280px, 1fr) auto auto;
   align-items: center;
   gap: 22px;
-  border-bottom: 1px solid #29313b;
+  border-bottom: 1px solid var(--border-subtle, #29313b);
 }
 .performance-title h2 {
   margin: 3px 0 0;
@@ -158,25 +158,25 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  border: 1px solid #2a333e;
+  border: 1px solid var(--border-subtle, #2a333e);
   border-radius: 8px;
-  background: #11161d;
+  background: var(--surface-control, #11161d);
 }
 .performance-tabs button {
   min-width: 92px;
   padding: 9px 14px;
-  color: #8e99a6;
+  color: var(--text-secondary, #8e99a6);
   border: 0;
   border-radius: 6px;
   background: transparent;
   font-size: 11px;
 }
 .performance-tabs button:hover {
-  color: #dce5eb;
-  background: #1b222b;
+  color: var(--text-primary, #dce5eb);
+  background: var(--surface-control, #1b222b);
 }
 .performance-tabs button.active {
-  color: #071310;
+  color: var(--cyan-ink);
   background: var(--cyan);
   font-weight: 700;
 }
@@ -189,7 +189,7 @@
 }
 .performance-current span {
   grid-column: 1/-1;
-  color: #75808e;
+  color: var(--text-secondary, #75808e);
   font-size: 10px;
 }
 .performance-current strong {
@@ -208,7 +208,7 @@
   height: 100%;
   display: grid;
   place-items: center;
-  color: #778291;
+  color: var(--text-secondary, #778291);
   font-size: 12px;
 }
 /* 性能参数沿用“左侧模式、右侧参数、底部通用设置”的 ATK 式信息层级。 */
@@ -230,7 +230,7 @@
 .performance-section-title p,
 .performance-polling-panel p {
   margin: 5px 0 14px;
-  color: #76818e;
+  color: var(--text-secondary, #76818e);
   font-size: 9px;
   line-height: 1.6;
 }
@@ -246,9 +246,9 @@
   gap: 3px 10px;
   padding: 14px;
   text-align: left;
-  color: #b8c1cb;
-  background: #171c23;
-  border: 1px solid #2b333e;
+  color: var(--text-primary, #b8c1cb);
+  background: var(--surface-control, #171c23);
+  border: 1px solid var(--border-subtle, #2b333e);
   border-radius: 8px;
 }
 .performance-modes button i {
@@ -263,13 +263,13 @@
   font-size: 12px;
 }
 .performance-modes button small {
-  color: #76818e;
+  color: var(--text-secondary, #76818e);
   font-size: 9px;
 }
 .performance-modes button.active {
   border-color: var(--cyan);
   background: rgba(69, 230, 208, 0.08);
-  color: #eafffb;
+  color: var(--text-primary, #eafffb);
 }
 .performance-modes button.active i {
   border: 4px solid var(--cyan);
@@ -284,9 +284,9 @@
 }
 .performance-control-group {
   padding: 16px 18px;
-  border: 1px solid #29323d;
+  border: 1px solid var(--border-subtle, #29323d);
   border-radius: 9px;
-  background: #11161d;
+  background: var(--surface-control, #11161d);
 }
 .performance-control-group h3 {
   margin: 0 0 18px;
@@ -302,7 +302,7 @@
   align-items: center;
   gap: 12px;
   margin: 16px 0;
-  color: #aeb7c2;
+  color: var(--text-secondary, #aeb7c2);
   font-size: 11px;
 }
 .performance-slider input {
@@ -321,9 +321,9 @@
   align-items: center;
   gap: 24px;
   padding: 14px 18px;
-  border: 1px solid #29323d;
+  border: 1px solid var(--border-subtle, #29323d);
   border-radius: 9px;
-  background: #11161d;
+  background: var(--surface-control, #11161d);
 }
 .performance-polling-panel p {
   margin-bottom: 0;
@@ -341,14 +341,14 @@
 }
 .polling-options button {
   padding: 9px 8px;
-  color: #aeb7c2;
-  border: 1px solid #34404c;
+  color: var(--text-secondary, #aeb7c2);
+  border: 1px solid var(--border-subtle, #34404c);
   border-radius: 6px;
-  background: #1a2028;
+  background: var(--surface-control, #1a2028);
   font-size: 10px;
 }
 .polling-options button.active {
-  color: #081512;
+  color: var(--cyan-ink);
   border-color: var(--cyan);
   background: var(--cyan);
   font-weight: 700;
@@ -372,7 +372,7 @@
 .calibration-copy p {
   max-width: 390px;
   margin: 0 0 24px;
-  color: #7d8895;
+  color: var(--text-secondary, #7d8895);
   font-size: 11px;
   line-height: 1.8;
 }
@@ -385,18 +385,18 @@
   align-content: center;
   gap: 18px 16px;
   padding: 24px;
-  border: 1px solid #29323d;
+  border: 1px solid var(--border-subtle, #29323d);
   border-radius: 10px;
-  background: #11161d;
+  background: var(--surface-control, #11161d);
 }
 .travel-global-status > i {
   grid-row: 1/3;
   align-self: center;
   width: 54px;
   height: 54px;
-  border: 1px solid #3b4652;
+  border: 1px solid var(--border-subtle, #3b4652);
   border-radius: 50%;
-  background: #202731;
+  background: var(--surface-control, #202731);
   box-shadow: inset 0 0 0 14px #151b22;
 }
 .travel-global-status > i.active {
@@ -411,7 +411,7 @@
   gap: 4px;
 }
 .travel-global-status span {
-  color: #77828f;
+  color: var(--text-secondary, #77828f);
   font-size: 9px;
 }
 .travel-global-status strong {
@@ -426,7 +426,7 @@
 }
 .travel-test-value > span {
   grid-column: 1/-1;
-  color: #7d8895;
+  color: var(--text-secondary, #7d8895);
   font-size: 10px;
 }
 .travel-test-value > strong {
@@ -436,19 +436,19 @@
   font-variant-numeric: tabular-nums;
 }
 .travel-test-value > em {
-  color: #9ba6b1;
+  color: var(--text-secondary, #9ba6b1);
   font-size: 15px;
   font-style: normal;
 }
 .travel-test-value > b {
   justify-self: end;
-  color: #dce5eb;
+  color: var(--text-primary, #dce5eb);
   font-size: 14px;
 }
 .travel-test-value > small {
   grid-column: 1/-1;
   margin-top: 8px;
-  color: #6f7a87;
+  color: var(--text-secondary, #6f7a87);
   font-size: 9px;
   line-height: 1.5;
 }
@@ -458,7 +458,7 @@
   height: 10px;
   margin-top: 18px;
   border-radius: 999px;
-  background: #27303a;
+  background: var(--surface-control, #27303a);
 }
 .travel-meter div {
   height: 100%;
@@ -503,13 +503,13 @@
   align-items: center;
   gap: 14px;
   padding: 14px;
-  color: #8994a0;
-  border: 1px solid #29323d;
+  color: var(--text-secondary, #8994a0);
+  border: 1px solid var(--border-subtle, #29323d);
   border-radius: 9px;
-  background: #11161d;
+  background: var(--surface-control, #11161d);
 }
 .calibration-steps li.active {
-  color: #e7fffb;
+  color: var(--text-primary, #e7fffb);
   border-color: var(--cyan);
   background: rgba(69, 230, 208, 0.07);
 }
@@ -518,13 +518,13 @@
   height: 40px;
   display: grid;
   place-items: center;
-  color: #778390;
-  border: 1px solid #3a4652;
+  color: var(--text-secondary, #778390);
+  border: 1px solid var(--border-subtle, #3a4652);
   border-radius: 50%;
   font-size: 15px;
 }
 .calibration-steps li.active b {
-  color: #061310;
+  color: var(--cyan-ink);
   border-color: var(--cyan);
   background: var(--cyan);
 }
@@ -536,7 +536,7 @@
   font-size: 15px;
 }
 .calibration-steps span {
-  color: #74808d;
+  color: var(--text-secondary, #74808d);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -547,7 +547,7 @@
 }
 .calibration-action span {
   text-align: center;
-  color: #7e8995;
+  color: var(--text-secondary, #7e8995);
   font-size: 14px;
 }
 .calibration-action .primary {
@@ -564,7 +564,7 @@
 .calibration-progress > div {
   display: flex;
   justify-content: space-between;
-  color: #7c8794;
+  color: var(--text-secondary, #7c8794);
   font-size: 13px;
 }
 .calibration-progress strong {
@@ -576,7 +576,7 @@
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: #27303a;
+  background: var(--surface-control, #27303a);
 }
 .calibration-progress > i > b {
   display: block;
@@ -664,7 +664,7 @@
 }
 .performance-section-title p {
   margin: 6px 0 0;
-  color: #82909d;
+  color: var(--text-secondary, #82909d);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -768,9 +768,9 @@
 .performance-logic-preview {
   min-height: 138px;
   padding: 15px 18px;
-  border: 1px solid #29343e;
+  border: 1px solid var(--border-subtle, #29343e);
   border-radius: 9px;
-  background: linear-gradient(135deg, #121820, #0f141b);
+  background: linear-gradient(135deg, var(--surface-control, #121820), var(--surface-control, #0f141b));
 }
 .performance-logic-preview > header {
   display: flex;
@@ -783,7 +783,7 @@
   gap: 3px;
 }
 .performance-logic-preview > header span {
-  color: #84909c;
+  color: var(--text-secondary, #84909c);
   font-size: 10px;
 }
 .performance-logic-preview > header strong {
@@ -792,7 +792,7 @@
 .performance-logic-preview > header p {
   max-width: 300px;
   margin: 0;
-  color: #707c88;
+  color: var(--text-secondary, #707c88);
   font-size: 10px;
   line-height: 1.5;
   text-align: right;
@@ -804,7 +804,7 @@
   position: relative;
   height: 8px;
   border-radius: 999px;
-  background: #303945;
+  background: var(--surface-control, #303945);
 }
 .logic-track > i {
   display: block;
@@ -838,7 +838,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 9px;
-  color: #697683;
+  color: var(--text-secondary, #697683);
   font-size: 9px;
 }
 .logic-scale-labels span:nth-child(2) {
@@ -856,7 +856,7 @@
   justify-content: center;
   gap: 9px;
   margin-top: 12px;
-  color: #778490;
+  color: var(--text-secondary, #778490);
   font-size: 9px;
 }
 .logic-flow span {
@@ -871,22 +871,22 @@
   background: #596572;
 }
 .logic-flow span.active {
-  color: #dffefa;
+  color: var(--text-primary, #dffefa);
 }
 .logic-flow span.active > i {
   background: var(--cyan);
   box-shadow: 0 0 7px rgba(69, 230, 208, 0.55);
 }
 .logic-flow > b {
-  color: #46515d;
+  color: var(--text-secondary, #46515d);
   font-weight: 400;
 }
 /* 普通模式只有一个固定触发点，使用次要的参考条，避免与核心参数控件争夺视觉重心。 */
 .performance-logic-preview.normal-preview {
   min-height: 0;
   padding: 10px 14px;
-  border-color: #252e37;
-  background: #10151c;
+  border-color: var(--border-subtle, #252e37);
+  background: var(--surface-control, #10151c);
 }
 .normal-preview > header {
   align-items: center;
@@ -900,7 +900,7 @@
   font-size: 9px;
 }
 .normal-preview > header strong {
-  color: #aeb8c2;
+  color: var(--text-secondary, #aeb8c2);
   font-size: 11px;
   font-weight: 600;
 }
@@ -912,7 +912,7 @@
 }
 .normal-preview .logic-track {
   height: 5px;
-  background: #29323c;
+  background: var(--surface-control, #29323c);
 }
 .normal-preview .logic-track > i {
   background: linear-gradient(90deg, #56636f, #57bbae);
@@ -928,7 +928,7 @@
 }
 .normal-preview .logic-scale-labels {
   margin-top: 6px;
-  color: #616d79;
+  color: var(--text-secondary, #616d79);
   font-size: 8px;
 }
 .normal-preview .logic-scale-labels small {
@@ -938,7 +938,7 @@
   justify-content: flex-start;
   margin-top: 7px;
   gap: 7px;
-  color: #687581;
+  color: var(--text-secondary, #687581);
   font-size: 8px;
 }
 .normal-preview .logic-flow span > i {
@@ -946,7 +946,7 @@
   height: 5px;
 }
 .normal-preview .logic-flow span.active {
-  color: #a9d8d1;
+  color: var(--text-secondary, #a9d8d1);
 }
 .normal-preview .logic-flow span.active > i {
   box-shadow: none;
@@ -965,13 +965,13 @@
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 5px;
-  border: 1px solid #2d3742;
+  border: 1px solid var(--border-subtle, #2d3742);
   border-radius: 7px;
-  background: #151b23;
+  background: var(--surface-control, #151b23);
 }
 .rt-preview-grid article > span {
   grid-column: 1/-1;
-  color: #7e8a96;
+  color: var(--text-secondary, #7e8a96);
   font-size: 9px;
 }
 .rt-preview-grid article > strong {
@@ -996,7 +996,7 @@
   display: grid;
   grid-template-rows: auto minmax(190px, 1fr) 70px auto;
   justify-items: center;
-  border-left: 1px solid #2b343e;
+  border-left: 1px solid var(--border-subtle, #2b343e);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent);
 }
 .performance-live-travel header {
@@ -1011,7 +1011,7 @@
   gap: 4px;
 }
 .performance-live-travel header span {
-  color: #dbe3e9;
+  color: var(--text-primary, #dbe3e9);
   font-size: 14px;
   font-weight: 600;
 }
@@ -1021,14 +1021,14 @@
 }
 .performance-live-travel header em {
   padding: 3px 7px;
-  color: #8a96a2;
-  border: 1px solid #39434e;
+  color: var(--text-secondary, #8a96a2);
+  border: 1px solid var(--border-subtle, #39434e);
   border-radius: 999px;
   font-size: 9px;
   font-style: normal;
 }
 .performance-live-travel header em.reading {
-  color: #071310;
+  color: var(--cyan-ink);
   border-color: var(--cyan);
   background: var(--cyan);
 }
@@ -1055,7 +1055,7 @@
 .travel-scale span {
   position: absolute;
   right: 8px;
-  color: #74808b;
+  color: var(--text-secondary, #74808b);
   font-size: 9px;
   font-variant-numeric: tabular-nums;
   transform: translateY(-50%);
@@ -1066,14 +1066,14 @@
   top: 50%;
   left: calc(100% + 4px);
   width: 5px;
-  border-top: 1px solid #52606d;
+  border-top: 1px solid var(--border-subtle, #52606d);
 }
 .travel-rail {
   position: absolute;
   inset: 4px auto 4px 54px;
   width: 30px;
   border-radius: 4px;
-  background: #303740;
+  background: var(--surface-control, #303740);
   box-shadow: inset 0 0 0 1px #3b444e;
 }
 .travel-rail > i {
@@ -1096,7 +1096,7 @@
 .travel-rail > output {
   position: absolute;
   left: 43px;
-  color: #f2f5f7;
+  color: var(--text-primary, #f2f5f7);
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
@@ -1111,17 +1111,17 @@
 }
 .performance-selection-tools small {
   margin-bottom: 2px;
-  color: #7f8b97;
+  color: var(--text-secondary, #7f8b97);
   font-size: 9px;
   text-align: center;
 }
 .performance-selection-tools button {
   min-height: 29px;
   padding: 6px 7px;
-  color: #c7d0d8;
-  border: 1px solid #35404b;
+  color: var(--text-primary, #c7d0d8);
+  border: 1px solid var(--border-subtle, #35404b);
   border-radius: 5px;
-  background: #171d25;
+  background: var(--surface-control, #171d25);
   font-size: 10px;
 }
 .performance-selection-tools button:hover {
@@ -1197,7 +1197,7 @@
 }
 .performance-live-travel > p {
   margin: 4px 0 0;
-  color: #77838f;
+  color: var(--text-secondary, #77838f);
   font-size: 10px;
   text-align: center;
   line-height: 1.45;
@@ -1208,7 +1208,7 @@
   align-items: center;
   gap: 9px;
   padding: 6px 8px;
-  color: #8d98a4;
+  color: var(--text-secondary, #8d98a4);
   border-radius: 7px;
   background: transparent;
   font-size: 12px;
@@ -1227,7 +1227,7 @@
   width: 42px;
   height: 22px;
   border-radius: 999px;
-  background: #39424c;
+  background: var(--surface-control, #39424c);
   transition: 0.18s;
 }
 .travel-test-toggle > i::after {

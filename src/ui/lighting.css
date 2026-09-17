@@ -46,8 +46,8 @@
 }
 
 .lighting-keyboard-preview .keycap {
-  border-color: color-mix(in srgb, var(--light-color) 34%, #3b4553);
-  background: #11151b;
+  border-color: color-mix(in srgb, var(--light-color) 34%, var(--border-subtle, #3b4553));
+  background: var(--surface-control, #11151b);
   box-shadow:
     0 0 calc(12px * var(--light-strength)) color-mix(in srgb, var(--light-color) 68%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -60,7 +60,7 @@
 }
 
 .lighting-keyboard-preview.custom-mode .keycap.custom-lit {
-  border-color: color-mix(in srgb, var(--key-light-color) 50%, #3b4553);
+  border-color: color-mix(in srgb, var(--key-light-color) 50%, var(--border-subtle, #3b4553));
   box-shadow:
     0 0 calc(12px * var(--light-strength)) color-mix(in srgb, var(--key-light-color) 72%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -92,7 +92,7 @@
 }
 
 .lighting-keyboard-preview .keycap-label {
-  color: #f0f5fa;
+  color: var(--text-primary, #f0f5fa);
 }
 
 .lighting-dashboard {
@@ -134,7 +134,7 @@
 
 .lighting-section-title h3 {
   font-size: 16px;
-  color: #f2f5f8;
+  color: var(--text-primary, #f2f5f8);
 }
 
 .lighting-section-title > div:first-child { min-width: 0; }
@@ -154,7 +154,7 @@
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: #d5dde7;
+  color: var(--text-primary, #d5dde7);
   background: rgba(255, 255, 255, 0.07);
   font-size: 12px;
   text-align: left;
@@ -196,7 +196,7 @@
 .lighting-control label,
 .lighting-inline-setting label,
 .lighting-toggle-label {
-  color: #d8e0e9;
+  color: var(--text-primary, #d8e0e9);
   font-size: 13px;
 }
 
@@ -208,7 +208,7 @@
 }
 
 .lighting-control-value output {
-  color: #b7c5d4;
+  color: var(--text-primary, #b7c5d4);
   font-size: 12px;
 }
 
@@ -254,7 +254,7 @@
   padding: 0 8px;
   border: 1px solid var(--lighting-border);
   border-radius: 6px;
-  color: #eef5fa;
+  color: var(--text-primary, #eef5fa);
   background: rgba(255, 255, 255, 0.05);
   text-align: center;
 }
@@ -335,7 +335,7 @@
   top: 45%;
   width: 18px;
   height: 18px;
-  border: 3px solid #202630;
+  border: 3px solid var(--border-subtle, #202630);
   border-radius: 50%;
   background: var(--selected-color);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
@@ -373,7 +373,7 @@
   gap: 6px;
   border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 6px;
-  color: #cbd4de;
+  color: var(--text-primary, #cbd4de);
   background: rgba(255, 255, 255, .05);
   font-size: 10px;
 }
@@ -400,7 +400,7 @@
   min-width: 48px;
   height: 30px;
   padding: 0 10px;
-  color: #8592a1;
+  color: var(--text-secondary, #8592a1);
   background: rgba(255, 255, 255, 0.04);
   font-size: 12px;
 }
@@ -426,7 +426,7 @@
 .lighting-hex-value {
   min-width: 84px;
   justify-content: center;
-  color: #d7e0e8;
+  color: var(--text-primary, #d7e0e8);
   background: rgba(255, 255, 255, 0.06);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
@@ -441,7 +441,7 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  color: #8e9aa8;
+  color: var(--text-secondary, #8e9aa8);
   font-size: 11px;
 }
 
@@ -451,7 +451,7 @@
   padding: 0 3px;
   border: 1px solid var(--lighting-border);
   border-radius: 5px;
-  color: #dce5ec;
+  color: var(--text-primary, #dce5ec);
   background: rgba(255, 255, 255, 0.05);
   font-size: 11px;
   text-align: center;
@@ -467,7 +467,7 @@
 
 .custom-lighting-hint {
   margin: 9px 0 0;
-  color: #8d9aac;
+  color: var(--text-secondary, #8d9aac);
   font-size: 10px;
   line-height: 1.45;
 }

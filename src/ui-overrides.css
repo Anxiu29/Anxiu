@@ -83,7 +83,7 @@ main {
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #202630;
+  border-right: 1px solid var(--border-subtle, #202630);
   background: rgba(11, 14, 20, .96);
   z-index: 4;
 }
@@ -97,10 +97,10 @@ main {
   padding: 0;
   display: grid;
   place-items: center;
-  border: 1px solid #2b3541;
+  border: 1px solid var(--border-subtle, #2b3541);
   border-radius: 6px;
-  color: #8c98a7;
-  background: #111720;
+  color: var(--text-secondary, #8c98a7);
+  background: var(--surface-control, #111720);
   box-shadow: 0 5px 14px rgba(0, 0, 0, .28);
   z-index: 2;
 }
@@ -126,7 +126,7 @@ main {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid #202630;
+  border-bottom: 1px solid var(--border-subtle, #202630);
 }
 
 .sidebar-device img {
@@ -143,14 +143,14 @@ main {
 }
 
 .sidebar-device small {
-  color: #596472;
+  color: var(--text-secondary, #596472);
   font-size: 11px;
 }
 
 .sidebar-device strong {
   margin-top: 4px;
   overflow: hidden;
-  color: #dce2e8;
+  color: var(--text-primary, #dce2e8);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -158,13 +158,13 @@ main {
 
 .sidebar-configurations {
   padding: 12px 8px 14px;
-  border-bottom: 1px solid #202630;
+  border-bottom: 1px solid var(--border-subtle, #202630);
 }
 
 .sidebar-configurations > small {
   display: block;
   margin-bottom: 8px;
-  color: #596472;
+  color: var(--text-secondary, #596472);
   font-size: 12px;
 }
 
@@ -177,20 +177,20 @@ main {
 .sidebar-configurations button {
   height: 34px;
   min-width: 0;
-  border: 1px solid #252c37;
+  border: 1px solid var(--border-subtle, #252c37);
   border-radius: 4px;
-  color: #788391;
-  background: #0d1118;
+  color: var(--text-secondary, #788391);
+  background: var(--surface-control, #0d1118);
   font-size: 12px;
 }
 
 .sidebar-configurations button:hover:not(:disabled) {
-  color: #cbd2db;
-  border-color: #546070;
+  color: var(--text-primary, #cbd2db);
+  border-color: var(--border-subtle, #546070);
 }
 
 .sidebar-configurations button.active {
-  color: #071412;
+  color: var(--cyan-ink);
   border-color: var(--cyan);
   background: var(--cyan);
   font-weight: 700;
@@ -216,7 +216,7 @@ main {
   gap: 11px;
   border: 1px solid transparent;
   border-radius: 7px;
-  color: #788391;
+  color: var(--text-secondary, #788391);
   background: transparent;
   text-align: left;
   font-size: 12px;
@@ -254,14 +254,14 @@ main {
   gap: 11px;
   border: 1px solid transparent;
   border-radius: 7px;
-  color: #788391;
+  color: var(--text-secondary, #788391);
   background: transparent;
   font-size: 12px;
 }
 
 .sidebar-settings:hover:not(:disabled) {
-  color: #cbd2db;
-  background: #141922;
+  color: var(--text-primary, #cbd2db);
+  background: var(--surface-control, #141922);
 }
 
 .sidebar-settings.active {
@@ -292,8 +292,8 @@ main {
 }
 
 .sidebar-nav button:hover:not(:disabled) {
-  color: #cbd2db;
-  background: #141922;
+  color: var(--text-primary, #cbd2db);
+  background: var(--surface-control, #141922);
 }
 
 .sidebar-nav button.active {
@@ -397,7 +397,7 @@ main {
 
 .overview-heading p {
   margin: 0;
-  color: #707b89;
+  color: var(--text-secondary, #707b89);
   font-size: 11px;
 }
 
@@ -415,9 +415,9 @@ main {
   padding: 14px 20px;
   display: grid;
   place-items: center;
-  border: 1px solid #252e39;
+  border: 1px solid var(--border-subtle, #252e39);
   border-radius: 12px;
-  background: radial-gradient(circle at 50% 50%, rgba(69,230,208,.08), transparent 58%), #0a0d12;
+  background: radial-gradient(circle at 50% 50%, rgba(69,230,208,.08), transparent 58%), var(--surface-control, #0a0d12);
   cursor: pointer;
   transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
@@ -453,9 +453,9 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border: 1px solid #252d38;
+  border: 1px solid var(--border-subtle, #252d38);
   border-radius: 7px;
-  background: #0c1016;
+  background: var(--surface-control, #0c1016);
 }
 
 .overview-details h2 {
@@ -464,7 +464,7 @@ main {
 }
 
 .connected-label {
-  color: #8e98a5;
+  color: var(--text-secondary, #8e98a5);
   font-size: 10px;
 }
 
@@ -490,19 +490,19 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border: 1px solid #252d38;
+  border: 1px solid var(--border-subtle, #252d38);
   border-radius: 7px;
-  background: #0c1016;
+  background: var(--surface-control, #0c1016);
 }
 
 .device-specs small {
   margin-bottom: 7px;
-  color: #596472;
+  color: var(--text-secondary, #596472);
   font-size: 8px;
 }
 
 .device-specs strong {
-  color: #cbd2db;
+  color: var(--text-primary, #cbd2db);
   font-size: 11px;
 }
 
@@ -526,29 +526,29 @@ main {
   gap: 4px;
   padding: 4px;
   border-radius: 7px;
-  background: #0b0f15;
+  background: var(--surface-control, #0b0f15);
 }
 
 .picker-modes button {
   padding: 9px 16px;
   border-radius: 5px;
-  color: #7f8998;
+  color: var(--text-secondary, #7f8998);
   background: transparent;
 }
 
 .picker-modes button.active {
-  color: #061210;
+  color: var(--cyan-ink);
   background: var(--cyan);
   font-weight: 600;
 }
 
 .picker-current {
-  color: #7f8998;
+  color: var(--text-secondary, #7f8998);
   font-size: 11px;
 }
 
 .picker-hint {
-  color: #71808d;
+  color: var(--text-secondary, #71808d);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -568,9 +568,9 @@ main {
   height: calc(6 * (var(--picker-unit) + var(--picker-gap)) - var(--picker-gap) + 36px);
   padding: 18px;
   overflow-x: auto;
-  border: 1px solid #232a35;
+  border: 1px solid var(--border-subtle, #232a35);
   border-radius: 10px;
-  background: #0a0d12;
+  background: var(--surface-control, #0a0d12);
 }
 
 .picker-key-row {
@@ -605,11 +605,11 @@ main {
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  border: 1px solid #343d49;
+  border: 1px solid var(--border-subtle, #343d49);
   border-bottom-width: 2px;
   border-radius: 5px;
-  color: #d9dee5;
-  background: linear-gradient(#232a34, #171c24);
+  color: var(--text-primary, #d9dee5);
+  background: linear-gradient(var(--surface-control, #232a34), var(--surface-control, #171c24));
   font-size: 9px;
   transition: border-color .15s, color .15s, opacity .15s;
   z-index: 1;
@@ -617,7 +617,7 @@ main {
 
 .picker-key small {
   margin-top: 2px;
-  color: #596472;
+  color: var(--text-secondary, #596472);
   font-size: 7px;
 }
 
@@ -651,15 +651,15 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #2a323d;
+  border: 1px solid var(--border-subtle, #2a323d);
   border-radius: 5px;
-  color: #788391;
-  background: #0c1017;
+  color: var(--text-secondary, #788391);
+  background: var(--surface-control, #0c1017);
   font-size: 10px;
 }
 
 .extended-category-tabs button.active {
-  color: #071412;
+  color: var(--cyan-ink);
   border-color: var(--cyan);
   background: var(--cyan);
 }
@@ -682,10 +682,10 @@ main {
   display: flex;
   justify-content: space-between;
   padding: 11px;
-  border: 1px solid #252c36;
+  border: 1px solid var(--border-subtle, #252c36);
   border-radius: 5px;
-  color: #a9b1bd;
-  background: #0c1017;
+  color: var(--text-secondary, #a9b1bd);
+  background: var(--surface-control, #0c1017);
   font-size: 10px;
 }
 
@@ -696,14 +696,14 @@ main {
 }
 
 .extended-key-list small {
-  color: #596472;
+  color: var(--text-secondary, #596472);
 }
 
 .extended-key-empty {
   min-height: 220px;
   display: grid;
   place-items: center;
-  color: #596472;
+  color: var(--text-secondary, #596472);
   font-size: 11px;
 }
 
@@ -734,9 +734,9 @@ main {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  border: 1px solid #242d38;
+  border: 1px solid var(--border-subtle, #242d38);
   border-radius: 9px;
-  background: #0a0e14;
+  background: var(--surface-control, #0a0e14);
 }
 
 .keymap-side-controls h2 {
@@ -746,13 +746,13 @@ main {
 
 .side-control-group {
   padding-top: 12px;
-  border-top: 1px solid #242b35;
+  border-top: 1px solid var(--border-subtle, #242b35);
 }
 
 .side-control-group > small {
   display: block;
   margin-bottom: 8px;
-  color: #66717f;
+  color: var(--text-secondary, #66717f);
   font-size: 11px;
   font-weight: 600;
 }
@@ -795,7 +795,7 @@ main {
   padding: 9px 12px;
   border: 0;
   border-radius: 5px;
-  color: #e8f8fb;
+  color: var(--text-primary, #e8f8fb);
   background: transparent;
   text-align: left;
   font-size: 12px;
@@ -812,7 +812,7 @@ main {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #798491;
+  color: var(--text-secondary, #798491);
   font-size: 11px;
 }
 

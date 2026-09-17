@@ -21,12 +21,16 @@
 }
 
 html[data-theme='light'] {
+  --border-subtle: #d5dee5;
+  --surface-control: #edf2f5;
+  --text-primary: #24323d;
+  --text-secondary: #435360;
   color: #1b252e;
   background: #f4f7f8;
   --cyan: #087f74;
   --cyan-ink: #ffffff;
   --panel: #ffffff;
-  --muted: #64717d;
+  --muted: #435360;
 }
 
 html[data-theme='light'] body {
@@ -48,7 +52,7 @@ html[data-theme='light'] .topbar {
 }
 
 html[data-theme='light'] .brand small,
-html[data-theme='light'] .requirements { color: #71808b; }
+html[data-theme='light'] .requirements { color: var(--text-secondary, #71808b); }
 html[data-theme='light'] .brand-mark,
 html[data-theme='light'] .primary,
 html[data-theme='light'] .layer-tabs button.active,
@@ -60,7 +64,7 @@ html[data-theme='light'] .primary:hover { background: #0a6f67; }
 
 html[data-theme='light'] .ghost,
 html[data-theme='light'] .status-pill {
-  color: #52616d;
+  color: var(--text-secondary, #52616d);
   border-color: #d5dde3;
   background: #f8fafb;
 }
@@ -70,15 +74,15 @@ html[data-theme='light'] .hero-orb {
   border-color: rgba(8, 127, 116, .16);
   background: repeating-radial-gradient(circle, transparent 0 50px, rgba(8, 127, 116, .045) 51px 52px), linear-gradient(135deg, transparent 30%, rgba(8, 127, 116, .06));
 }
-html[data-theme='light'] .hero p { color: #5f6d78; }
-html[data-theme='light'] .text-button { color: #52616d; border-color: #a9b5be; }
+html[data-theme='light'] .hero p { color: var(--text-secondary, #5f6d78); }
+html[data-theme='light'] .text-button { color: var(--text-secondary, #52616d); border-color: #a9b5be; }
 
 html[data-theme='light'] .app-sidebar {
   border-color: #d8e0e5;
   background: rgba(249, 251, 252, .97);
 }
 html[data-theme='light'] .sidebar-collapse-toggle {
-  color: #64737f;
+  color: var(--text-secondary, #64737f);
   border-color: #ccd6dd;
   background: #fff;
   box-shadow: 0 5px 14px rgba(45, 61, 72, .12);
@@ -86,15 +90,15 @@ html[data-theme='light'] .sidebar-collapse-toggle {
 html[data-theme='light'] .sidebar-device,
 html[data-theme='light'] .sidebar-configurations { border-color: #dce3e8; }
 html[data-theme='light'] .sidebar-device small,
-html[data-theme='light'] .sidebar-configurations > small { color: #72808b; }
+html[data-theme='light'] .sidebar-configurations > small { color: var(--text-secondary, #72808b); }
 html[data-theme='light'] .sidebar-device strong { color: #28343e; }
 html[data-theme='light'] .sidebar-configurations button {
-  color: #61707c;
+  color: var(--text-secondary, #61707c);
   border-color: #d4dde3;
   background: #fff;
 }
 html[data-theme='light'] .sidebar-nav button,
-html[data-theme='light'] .sidebar-settings { color: #62717d; }
+html[data-theme='light'] .sidebar-settings { color: var(--text-secondary, #62717d); }
 html[data-theme='light'] .sidebar-nav button:hover:not(:disabled),
 html[data-theme='light'] .sidebar-settings:hover:not(:disabled) { color: #1f2d36; background: #e9f0f2; }
 html[data-theme='light'] .sidebar-nav button.active {
@@ -117,7 +121,7 @@ html[data-theme='light'] .overview-heading p,
 html[data-theme='light'] .device-summary p,
 html[data-theme='light'] .hint,
 html[data-theme='light'] .picker-current,
-html[data-theme='light'] .picker-hint { color: #667580; }
+html[data-theme='light'] .picker-hint { color: var(--text-secondary, #667580); }
 html[data-theme='light'] .overview-image {
   border-color: #d7e0e5;
   background: radial-gradient(circle at 50% 50%, rgba(8, 127, 116, .08), transparent 58%), #f5f8f9;
@@ -128,7 +132,7 @@ html[data-theme='light'] .device-specs div {
   background: #f7f9fa;
 }
 html[data-theme='light'] .connected-label,
-html[data-theme='light'] .device-specs small { color: #6d7b86; }
+html[data-theme='light'] .device-specs small { color: var(--text-secondary, #6d7b86); }
 html[data-theme='light'] .device-specs strong { color: #35424c; }
 
 html[data-theme='light'] .keyboard-shell,
@@ -144,13 +148,13 @@ html[data-theme='light'] .picker-key {
   box-shadow: 0 2px 2px rgba(49, 64, 75, .09);
 }
 html[data-theme='light'] .keycap small,
-html[data-theme='light'] .picker-key small { color: #74838e; }
+html[data-theme='light'] .picker-key small { color: var(--text-secondary, #74838e); }
 html[data-theme='light'] .keycap.changed { background: linear-gradient(#dff3ef, #cce8e3); }
 html[data-theme='light'] .performance-keyboard-panel.bulk-select .keycap.selected {
   background: linear-gradient(rgba(23, 154, 136, .12), rgba(23, 154, 136, .05)), linear-gradient(#fff, #e5ebef);
 }
 html[data-theme='light'] .performance-selection-tools button {
-  color: #42515c;
+  color: var(--text-secondary, #42515c);
   border-color: #c9d4db;
   background: #fff;
 }
@@ -168,7 +172,7 @@ html[data-theme='light'] .picker-modes,
 html[data-theme='light'] .extended-category-tabs button,
 html[data-theme='light'] .extended-key-list button,
 html[data-theme='light'] .key-list button {
-  color: #596974;
+  color: var(--text-secondary, #596974);
   border-color: #d3dce2;
   background: #f6f8f9;
 }
@@ -178,11 +182,11 @@ html[data-theme='light'] .picker-search {
   border-color: #ccd7de;
   background: #fff;
 }
-html[data-theme='light'] .hex { color: #596974; border-color: #d3dce2; background: #f3f6f7; }
-html[data-theme='light'] .editor-footer { color: #687782; border-color: #d7dfe4; }
+html[data-theme='light'] .hex { color: var(--text-secondary, #596974); border-color: #d3dce2; background: #f3f6f7; }
+html[data-theme='light'] .editor-footer { color: var(--text-secondary, #687782); border-color: #d7dfe4; }
 html[data-theme='light'] .keymap-side-controls { border-color: #d6dfe5; background: #f6f9fa; }
 html[data-theme='light'] .side-control-group { border-color: #d8e0e5; }
-html[data-theme='light'] .side-control-group > small { color: #677681; }
+html[data-theme='light'] .side-control-group > small { color: var(--text-secondary, #677681); }
 html[data-theme='light'] .key-context-menu,
 html[data-theme='light'] .key-code-dialog,
 html[data-theme='light'] .macro-binding-dialog {
@@ -197,7 +201,7 @@ html[data-theme='light'] .lighting-workspace {
   --lighting-panel: rgba(255, 255, 255, .97);
   --lighting-panel-soft: rgba(245, 248, 249, .96);
   --lighting-border: rgba(91, 112, 126, .24);
-  --lighting-text-muted: #64737f;
+  --lighting-text-muted: #435360;
 }
 html[data-theme='light'] .lighting-keyboard-preview,
 html[data-theme='light'] .lighting-dashboard { box-shadow: 0 12px 34px rgba(35, 52, 64, .08); }
@@ -207,7 +211,7 @@ html[data-theme='light'] .lighting-format-tabs,
 html[data-theme='light'] .lighting-rgb-fields input { color: #3b4954; background: #f4f7f8; }
 html[data-theme='light'] .lighting-mode-button.active,
 html[data-theme='light'] .lighting-format-tabs button.active { color: #fff; }
-html[data-theme='light'] .lighting-rainbow-option { color: #596974; background: #f4f7f8; }
+html[data-theme='light'] .lighting-rainbow-option { color: var(--text-secondary, #596974); background: #f4f7f8; }
 
 html[data-theme='light'] .advanced-editor-heading,
 html[data-theme='light'] .advanced-form-panel,
@@ -217,7 +221,7 @@ html[data-theme='light'] .macro-options,
 html[data-theme='light'] .macro-sequence { border-color: #d5dee4; }
 html[data-theme='light'] .advanced-editor-heading p,
 html[data-theme='light'] .advanced-placeholder,
-html[data-theme='light'] .macro-workspace header p { color: #687782; }
+html[data-theme='light'] .macro-workspace header p { color: var(--text-secondary, #687782); }
 html[data-theme='light'] .advanced-type-list > button,
 html[data-theme='light'] .advanced-form-section,
 html[data-theme='light'] .advanced-test-card,
@@ -251,12 +255,12 @@ html[data-theme='light'] .macro-action-key,
 html[data-theme='light'] .macro-action-states button,
 html[data-theme='light'] .macro-action-time button,
 html[data-theme='light'] .macro-number-control button {
-  color: #42515c;
+  color: var(--text-secondary, #42515c);
   border-color: #d1dbe1;
   background: #fff;
 }
 html[data-theme='light'] .macro-slot-list button.active,
-html[data-theme='light'] .macro-action-states button.active { color: #fff; background: var(--cyan); }
+html[data-theme='light'] .macro-action-states button.active { color: var(--cyan-ink); background: var(--cyan); }
 html[data-theme='light'] .macro-mode-card.active { border-color: #8797a2; background: #edf2f4; }
 html[data-theme='light'] .macro-binding-keyboard { border-color: #d3dde3; background: #edf2f4; }
 html[data-theme='light'] .macro-number-control input,
@@ -267,7 +271,7 @@ html[data-theme='light'] .macro-record-button { color: #fff; background: #087f74
 html[data-theme='light'] .performance-heading { border-color: #d4dee4; }
 html[data-theme='light'] .performance-heading p,
 html[data-theme='light'] .performance-current span,
-html[data-theme='light'] .performance-placeholder { color: #687782; }
+html[data-theme='light'] .performance-placeholder { color: var(--text-secondary, #687782); }
 html[data-theme='light'] .performance-modes button.active { color: #075f57; }
 
 html[data-theme='light'] .key-test-records article {
@@ -277,7 +281,7 @@ html[data-theme='light'] .key-test-records article {
 html[data-theme='light'] .key-test-records strong { color: #2c3943; }
 html[data-theme='light'] .key-test-heading p,
 html[data-theme='light'] .key-test-stats,
-html[data-theme='light'] .key-test-history > header small { color: #687782; }
+html[data-theme='light'] .key-test-history > header small { color: var(--text-secondary, #687782); }
 
 html[data-theme='light'] .settings-workspace { color: #25323c; border-color: #d5dee4; background: linear-gradient(145deg, #fff, #f6f9fa); box-shadow: 0 14px 38px rgba(38, 55, 67, .08); }
 html[data-theme='light'] .settings-heading,
@@ -285,18 +289,18 @@ html[data-theme='light'] .settings-navigation { border-color: #d8e1e6; }
 html[data-theme='light'] .settings-heading p,
 html[data-theme='light'] .settings-section-title p,
 html[data-theme='light'] .settings-card-copy p,
-html[data-theme='light'] .settings-action-card p { color: #667580; }
+html[data-theme='light'] .settings-action-card p { color: var(--text-secondary, #667580); }
 html[data-theme='light'] .settings-navigation { background: #f5f8f9; }
-html[data-theme='light'] .settings-navigation button { color: #667580; }
+html[data-theme='light'] .settings-navigation button { color: var(--text-secondary, #667580); }
 html[data-theme='light'] .settings-navigation button:hover { color: #24313b; background: #e9f0f2; }
 html[data-theme='light'] .settings-navigation button.active { color: #087f74; border-color: rgba(8, 127, 116, .2); background: rgba(8, 127, 116, .09); }
-html[data-theme='light'] .settings-navigation small { color: #7b8892; }
+html[data-theme='light'] .settings-navigation small { color: var(--text-secondary, #7b8892); }
 html[data-theme='light'] .settings-card,
 html[data-theme='light'] .settings-action-card,
 html[data-theme='light'] .firmware-version-card,
 html[data-theme='light'] .firmware-upload-card,
 html[data-theme='light'] .settings-about-brand { border-color: #d5dee4; background: #f7f9fa; }
-html[data-theme='light'] .theme-options > button { color: #53636e; border-color: #cdd8de; background: #fff; }
+html[data-theme='light'] .theme-options > button { color: var(--text-secondary, #53636e); border-color: #cdd8de; background: #fff; }
 html[data-theme='light'] .theme-options > button:hover { color: #23313a; border-color: #93a2ad; }
 html[data-theme='light'] .theme-options > button.active { color: #087f74; border-color: #087f74; background: rgba(8, 127, 116, .07); }
 html[data-theme='light'] .settings-device-summary { border-color: rgba(8, 127, 116, .2); background: rgba(8, 127, 116, .055); }
@@ -305,7 +309,7 @@ html[data-theme='light'] .settings-device-details div { border-color: #dce4e8; b
 html[data-theme='light'] .settings-device-details dd { color: #34424c; }
 html[data-theme='light'] .settings-secondary-button,
 html[data-theme='light'] .settings-cancel-button,
-html[data-theme='light'] .firmware-upload-card button { color: #52616d; border-color: #ccd7de; background: #fff; }
+html[data-theme='light'] .firmware-upload-card button { color: var(--text-secondary, #52616d); border-color: #ccd7de; background: #fff; }
 html[data-theme='light'] .firmware-upload-card:hover,
 html[data-theme='light'] .firmware-upload-card.selected { border-color: rgba(8, 127, 116, .45); background: rgba(8, 127, 116, .035); }
 html[data-theme='light'] .firmware-unavailable { border-color: rgba(170, 126, 30, .3); background: rgba(206, 157, 48, .07); }
@@ -323,3 +327,35 @@ html[data-theme='light'] .feedback-toast.warning { color: #7b5a0b; background: r
   .theme-toggle { min-width: 40px; padding-inline: 10px; }
   .theme-toggle span { display: none; }
 }
+
+/* 禁用状态通过底色和边框区分，保留可读文字。 */
+html[data-theme="light"] button:disabled { opacity: 1; color: #52616d; box-shadow: none; }
+
+html[data-theme='light'] .primary:disabled { background: #e7edf1; color: #435360; }
+html[data-theme='light'] .lighting-mode-button.active,
+html[data-theme='light'] .lighting-format-tabs button.active { background: #087f74; color: #fff; }
+
+/* 实色选中项同时声明前景与底色，避免普通浅色按钮规则覆盖底色。 */
+html[data-theme='light'] .sidebar-configurations button.active,
+html[data-theme='light'] .layer-tabs button.active,
+html[data-theme='light'] .category-tabs button.active,
+html[data-theme='light'] .picker-modes button.active,
+html[data-theme='light'] .extended-category-tabs button.active {
+  color: #fff;
+  background: #087f74;
+  border-color: #087f74;
+}
+html[data-theme='light'] .sidebar-configurations button.active:hover:not(:disabled),
+html[data-theme='light'] .macro-slot-list button.active small { color: #fff; }
+html[data-theme='light'] .macro-mode-card.active { border-color: #a7c9c4; background: #edf6f4; }
+/* 性能面板只保留一层底色，内部键盘不再盖上灰色矩形。 */
+html[data-theme='light'] .performance-keyboard-panel .keyboard-shell {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+html[data-theme='light'] .performance-keyboard-panel .keycap-top-label { color: #176a3c; }
+html[data-theme='light'] .performance-keyboard-panel .keycap-bottom-label { color: #215f9d; }
+html[data-theme='light'] .performance-keyboard-panel.travel-active .keycap-badge,
+html[data-theme='light'] .performance-keyboard-panel.calibration-tracking .keycap-badge { color: #fff; }
+html[data-theme='light'] .performance-keyboard-panel.calibration-tracking .keycap.custom-lit .keycap-badge { color: #123d26; }
