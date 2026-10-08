@@ -18,6 +18,8 @@ npm install
 npm run dev
 ```
 
+CB75 Keyboard 与其他设备共用首页的“连接设备”入口。识别到 CB75 后进入 `rk-cb75-source/` 中的 RK 原版页面，保留其页面、状态管理和 USB/2.4G 协议。首次运行会按该目录的锁文件安装依赖，并生成 `public/cb75/`；单独调试该页面可运行 `npm run dev:cb75`。
+
 启动脚本先检查 5173 是否空闲，已占用则向后寻找空闲端口，成功启动后打开实际地址，以终端输出为准。请使用 `npm run dev` 启动，以执行端口检查。
 
 WebHID 正式环境必须使用 HTTPS；本地开发可使用 `localhost`。支持桌面 Chrome/Edge。

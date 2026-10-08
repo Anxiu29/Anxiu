@@ -1,4 +1,5 @@
 import { createServer as createNetServer } from 'node:net'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -78,5 +79,6 @@ const isExecutedDirectly =
   process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 
 if (isExecutedDirectly) {
+  execFileSync(process.execPath, [resolve('scripts/build-cb75.mjs')], { stdio: 'inherit' })
   await startDevServer()
 }

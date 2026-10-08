@@ -1,5 +1,6 @@
 node_modules
 dist
+public/cb75
 .vite
 *.local
 *.tsbuildinfo
