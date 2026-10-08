@@ -3,7 +3,12 @@ import { computed, ref, watch } from 'vue'
 import type { KeyAssignment, KeyboardProfile, SessionStatus } from '@/domain/keyboard'
 import type { KeyGeometryResolver } from '@/ui/keyboardGeometry'
 import type { LightingModePresentation, LightingRangePresentation } from '@/ui/DevicePresentation'
-import { cloneLightingSettings, type CustomKeyLighting, type LightingSettings } from '@/domain/lighting'
+import {
+  cloneLightingSettings,
+  type CustomKeyLighting,
+  type LightingModeType,
+  type LightingSettings,
+} from '@/domain/lighting'
 import KeyboardCanvas from '@/components/KeyboardCanvas.vue'
 import { useFittedKeyboardUnit } from '@/ui/useFittedKeyboardUnit'
 import { useHorizontalKeyboardScroll } from '@/ui/useHorizontalKeyboardScroll'
@@ -27,7 +32,14 @@ const speedDraft = ref(0)
 const colorFormat = ref<'hex' | 'rgb'>('rgb')
 const selectedCustomPositionIds = ref<string[]>([])
 const customDraft = ref<Record<number, string>>({})
-const isCustomMode = computed(() => props.settings?.type === 'custom' || props.settings?.mode === 21)
+const typeForMode = (mode: number): LightingModeType =>
+  props.lightingModes.find((item) => item.value === mode)?.type ??
+  (mode === 0 ? 'static' : mode <= 20 ? 'dynamic' : 'custom')
+const isCustomMode = computed(
+  () =>
+    props.settings?.type === 'custom' ||
+    (props.settings !== undefined && typeForMode(props.settings.mode) === 'custom'),
+)
 const isStaticRainbow = computed(() => props.settings?.type === 'static' && props.settings.staticColor === 7)
 const canEditColor = computed(() => !!props.settings?.open && (props.settings.type === 'static' || isCustomMode.value))
 const selectionBox = ref<{ left: number; top: number; width: number; height: number }>()
@@ -57,7 +69,7 @@ const rangeValue = (event: Event) => Number((event.target as HTMLInputElement).v
 const update = (patch: Partial<LightingSettings>) => {
   if (!props.settings || busy.value) return
   const next = { ...cloneLightingSettings(props.settings), ...patch }
-  next.type = next.mode === 0 ? 'static' : next.mode <= 20 ? 'dynamic' : 'custom'
+  next.type = typeForMode(next.mode)
   emit('update', next)
 }
 const updatePrimaryColor = (color: string) => {

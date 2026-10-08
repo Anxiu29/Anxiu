@@ -61,6 +61,10 @@ export function createMacroActions(
         verified = await session.updateMacro({ ...settings, sourceCode, boundSourceCodes: bindings })
         if (!isCurrent() || state.session !== session) return
       }
+      if (!bindings.length && session.supportsOnboardMacroSlots) {
+        verified = await session.updateMacro({ ...settings, sourceCode: 0xff, boundSourceCodes: [] })
+        if (!isCurrent() || state.session !== session) return
+      }
       // 没有绑定键时固件没有可寻址入口，先保存为网页草稿；首次绑定时再写入设备。
       const saved = { ...(verified ?? settings), sourceCode: bindings[0] ?? 0xff, boundSourceCodes: bindings, actions: settings.actions, storedActionCount: settings.actions.length, actionsAvailable: true }
       saveMacroSnapshot(context, saved)
@@ -77,8 +81,8 @@ export function createMacroActions(
       macro.value = saved
       rebuildMacroBindings()
       status.value = 'ready'
-      messageWarning.value = !bindings.length
-      message.value = bindings.length ? '宏已写入，槽位和执行参数已通过设备回读验证' : '宏已保存为未绑定草稿，绑定按键并保存后可写入键盘'
+      messageWarning.value = !bindings.length && !session.supportsOnboardMacroSlots
+      message.value = bindings.length ? '宏已写入，槽位和执行参数已通过设备回读验证' : session.supportsOnboardMacroSlots ? '宏动作已写入键盘槽位，绑定按键后即可触发' : '宏已保存为未绑定草稿，绑定按键并保存后可写入键盘'
     }
     catch (cause) { if (isCurrent() && state.session === session) feedback.fail(cause) }
   }
@@ -99,6 +103,8 @@ export function createMacroActions(
         await session.deleteMacroBinding(sourceCode)
         if (!isCurrent() || state.session !== session) return
       }
+      await session.deleteMacroSlot(index)
+      if (!isCurrent() || state.session !== session) return
       deleteMacroSnapshot(context, index)
       const nextSlots = { ...macroSlots.value }
       delete nextSlots[index]
@@ -156,6 +162,10 @@ export function createMacroActions(
           ...(existing.actionsAvailable ? existing : restored),
           boundSourceCodes: [...new Set([...(existing.boundSourceCodes ?? []), restored.sourceCode])],
         }
+      }
+      for (const slot of await observedSession.listMacroSlots()) {
+        if (state.session !== observedSession || readRevision !== macroReadRevision) return
+        if (!nextSlots[slot.index]) nextSlots[slot.index] = slot
       }
       for (const draft of localUnbound) if (!nextSlots[draft.index]) nextSlots[draft.index] = draft
       macroSlots.value = nextSlots

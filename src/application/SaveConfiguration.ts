@@ -26,7 +26,10 @@ export async function saveConfiguration(device: KeyboardDevice, profile: Keyboar
 
   // 使用 layer + positionId 比较，不依赖设备返回数组的排列顺序。
   const originals = new Map(original.map((item) => [identity(item), item]))
-  const changes = draft.filter((item) => originals.get(identity(item))?.keyCode !== item.keyCode)
+  const changes = draft.filter((item) => {
+    const originalItem = originals.get(identity(item))
+    return originalItem?.keyCode !== item.keyCode || originalItem?.rawCode !== item.rawCode
+  })
   if (!changes.length) {
     onProgress({ phase: 'completed', completed: 0, total: 0 })
     return { changedAssignments: 0, profile }

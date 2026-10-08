@@ -42,7 +42,15 @@ let previousEventTime = 0
 const busy = computed(() => props.loading || ['connecting', 'reading', 'writing'].includes(props.status))
 const macroSlotCount = computed(() => props.profile.capabilities.macroSlots ?? 1)
 const maxMacroActions = computed(() => props.profile.capabilities.macroMaxActions ?? 1)
+const maxActionDelay = 0xffffff
 const keyLabel = (code: number) => props.keyLabels[code] ?? `0x${code.toString(16).padStart(4, '0').toUpperCase()}`
+const mouseButtonNames: Record<number, string> = { 1: '鼠标左键', 2: '鼠标右键', 4: '鼠标中键', 8: '侧键 1', 16: '侧键 2' }
+function actionLabel(action: MacroSettings['actions'][number]) {
+  if (action.type === 2) return mouseButtonNames[action.keyCode] ?? `鼠标按钮 ${action.keyCode}`
+  if (action.type === 3 || action.type === 4) return `${action.type === 3 ? '横向移动' : '纵向移动'} ${action.keyCode > 127 ? action.keyCode - 256 : action.keyCode}`
+  if (action.type === 5) return action.pressed ? '滚轮向下' : '滚轮向上'
+  return keyLabel(action.keyCode)
+}
 const bindingCodes = computed(() => draft.value?.boundSourceCodes ?? [])
 const boundPositionIds = computed(() => props.profile.positions.filter((position) => bindingCodes.value.includes(position.sourceCode)).map((position) => position.id))
 const bindingBadges = computed(() => Object.fromEntries(boundPositionIds.value.map((id) => [id, '✓'])))
@@ -50,12 +58,14 @@ const actionsUnavailable = computed(() => draft.value?.actionsAvailable === fals
 const pairingIssue = computed(() => {
   const heldKeyCounts = new Map<number, number>()
   for (const action of draft.value?.actions ?? []) {
-    const heldCount = heldKeyCounts.get(action.keyCode) ?? 0
-    if (action.pressed) heldKeyCounts.set(action.keyCode, heldCount + 1)
-    else if (heldCount > 0) heldKeyCounts.set(action.keyCode, heldCount - 1)
-    else return `${keyLabel(action.keyCode)} 缺少对应的按下动作`
+    if (action.type === 3 || action.type === 4 || action.type === 5) continue
+    const key = (action.type ?? 0) * 256 + action.keyCode
+    const heldCount = heldKeyCounts.get(key) ?? 0
+    if (action.pressed) heldKeyCounts.set(key, heldCount + 1)
+    else if (heldCount > 0) heldKeyCounts.set(key, heldCount - 1)
+    else return `${actionLabel(action)} 缺少对应的按下动作`
   }
-  for (const [keyCode, heldCount] of heldKeyCounts) if (heldCount > 0) return `${keyLabel(keyCode)} 缺少对应的抬起动作`
+  for (const [key, heldCount] of heldKeyCounts) if (heldCount > 0) return `${key < 512 ? keyLabel(key % 256) : mouseButtonNames[key % 256] ?? '鼠标按钮'} 缺少对应的抬起动作`
   return ''
 })
 // 宏列表收缩和执行模式压缩后，允许矩阵继续利用新增空间放大，而不是停在原来的 30px 上限。
@@ -128,7 +138,7 @@ function pairedActionIndex(index: number) {
   if (selected.pressed) {
     for (let cursor = index + 1; cursor < actions.length; cursor++) {
       const candidate = actions[cursor]!
-      if (candidate.keyCode !== selected.keyCode) continue
+      if (candidate.keyCode !== selected.keyCode || candidate.type !== selected.type) continue
       if (candidate.pressed) nested++
       else if (nested > 0) nested--
       else return cursor
@@ -136,7 +146,7 @@ function pairedActionIndex(index: number) {
   } else {
     for (let cursor = index - 1; cursor >= 0; cursor--) {
       const candidate = actions[cursor]!
-      if (candidate.keyCode !== selected.keyCode) continue
+      if (candidate.keyCode !== selected.keyCode || candidate.type !== selected.type) continue
       if (!candidate.pressed) nested++
       else if (nested > 0) nested--
       else return cursor
@@ -151,7 +161,7 @@ function pairedActionIndex(index: number) {
 function removeAction(index: number) { draft.value?.actions.splice(index, 1) }
 function adjustActionDelay(index: number, delta: number) {
   const action = draft.value?.actions[index]
-  if (action) action.delay = Math.min(0xffffff, Math.max(0, action.delay + delta))
+  if (action) action.delay = Math.min(maxActionDelay, Math.max(0, action.delay + delta))
 }
 function adjustRepeatDelay(delta: number) {
   if (!draft.value) return
@@ -275,7 +285,7 @@ onMounted(() => emit('load'))
       <div v-else-if="!draft?.actions.length" class="macro-placeholder">点击“开始录制”，依次记录按下、松开和动作间隔。</div>
       <TransitionGroup v-else tag="ol" name="macro-action" class="macro-action-list">
         <li v-for="(action, index) in draft.actions" :key="actionRenderKey(action)" :class="{ dragging: draggedActionIndex === index }" draggable="true" @dragstart="startDraggingAction(index, $event)" @dragenter.prevent="previewActionOrder(index)" @dragover.prevent @drop.prevent="finishDraggingAction" @dragend="finishDraggingAction">
-          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" @click="keyPickerTarget = { kind: 'action', index }">{{ keyLabel(action.keyCode) }}</button><div class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><div class="macro-action-time"><button title="减少 1 ms" @click="adjustActionDelay(index, -1)"><span class="macro-control-symbol">−</span></button><input v-model.number="action.delay" type="number" min="0" max="16777215" step="1" /><span class="macro-number-unit">ms</span><button title="增加 1 ms" @click="adjustActionDelay(index, 1)"><span class="macro-control-symbol">+</span></button></div><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
+          <span class="macro-drag" title="拖动排序">⠿</span><button class="macro-action-key" :disabled="!!action.type && action.type >= 2" @click="keyPickerTarget = { kind: 'action', index }">{{ actionLabel(action) }}</button><div v-if="!action.type || action.type <= 2" class="macro-action-states"><button :class="{ active: action.pressed }" @click="action.pressed = true">按下</button><button :class="{ active: !action.pressed }" @click="action.pressed = false">抬起</button></div><div class="macro-action-time"><button title="减少 1 ms" @click="adjustActionDelay(index, -1)"><span class="macro-control-symbol">−</span></button><input v-model.number="action.delay" type="number" min="0" :max="maxActionDelay" step="1" /><span class="macro-number-unit">ms</span><button title="增加 1 ms" @click="adjustActionDelay(index, 1)"><span class="macro-control-symbol">+</span></button></div><button class="macro-remove" title="删除动作" aria-label="删除动作" @click="removeAction(index)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
         </li>
       </TransitionGroup>
       <footer class="macro-add-footer"><button class="ghost" :disabled="busy || (draft?.actions.length ?? 0) > maxMacroActions - 2" @click="openNewKeyPicker"><span>＋</span>添加按键</button><small v-if="pairingIssue">{{ pairingIssue }}，请补齐或重新选择键值</small></footer>

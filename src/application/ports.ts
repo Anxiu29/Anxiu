@@ -3,6 +3,7 @@ import type { CustomKeyLighting, LightingSettings } from '@/domain/lighting'
 import type { AdvancedKeySettings, AdvancedKeyType } from '@/domain/advancedKey'
 import type { MacroSettings } from '@/domain/macro'
 import type { KeyPerformanceSettings, PollingRate, TravelMatrix } from '@/domain/performance'
+import type { RawKeyboardProfile } from '@/domain/rawKeyboardProfile'
 
 /** 应用核心依赖的设备传输端口；WebHID、WebUSB 或桌面桥接均可实现。 */
 export interface DeviceTransport {
@@ -25,11 +26,20 @@ export interface DeviceProfileCapability {
 
 export interface KeymapCapability {
   writeAssignments(assignments: KeyAssignment[]): Promise<void>
+  writeRawKey?(positionId: string, layer: number, rawCode: number): Promise<void>
+  toRawCode?(keyCode: number): number
 }
 
 export interface ConfigurationCapability {
   save(): Promise<void>
   reload(): Promise<void>
+}
+
+export interface RawProfileCapability {
+  readRawProfile(mode: 'win' | 'mac'): Promise<RawKeyboardProfile>
+  writeRawProfile(profile: RawKeyboardProfile): Promise<void>
+  restoreKeyDefault?(positionId: string, layer: number): Promise<void>
+  restoreAllKeyDefaults?(): Promise<void>
 }
 
 export interface FactoryResetCapability {
@@ -70,6 +80,9 @@ export interface MacroCapability {
   getMacro(sourceCode: number): Promise<MacroSettings>
   setMacro(settings: MacroSettings): Promise<void>
   deleteMacroBinding(sourceCode: number): Promise<void>
+  /** 部分设备把宏正文保存在独立槽位，允许尚未绑定物理键的宏。 */
+  listMacroSlots?(): Promise<MacroSettings[]>
+  deleteMacroSlot?(index: number): Promise<void>
 }
 
 export interface PerformanceCapability {
@@ -90,6 +103,7 @@ export interface KeyboardDevice {
   readonly profile: DeviceProfileCapability
   readonly keymap?: KeymapCapability
   readonly configuration?: ConfigurationCapability
+  readonly rawProfile?: RawProfileCapability
   readonly factoryReset?: FactoryResetCapability
   readonly systemMode?: SystemModeCapability
   readonly configurationSwitch?: ConfigurationSwitchCapability

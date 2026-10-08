@@ -10,6 +10,8 @@ export interface LightingSettings {
   mode: number
   luminance: number
   sleepDelay: number
+  /** CB75 Tap layer delay in milliseconds; zero disables the Tap layer. */
+  tapDelay?: number
   staticColor: number
   type: LightingModeType
   dynamicColorId: number

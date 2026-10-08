@@ -31,6 +31,23 @@ const mountWorkspace = (lighting: LightingSettings) => mount(LightingWorkspace, 
 })
 
 describe('LightingWorkspace custom selection', () => {
+  it('treats a presentation-declared custom mode as custom lighting', () => {
+    const wrapper = mount(LightingWorkspace, {
+      props: {
+        settings: settings(18, 'static'),
+        customLighting: [{ sourceCode: 4, color: '#000000' }, { sourceCode: 5, color: '#000000' }],
+        customLightingLoading: false,
+        status: 'ready',
+        profile,
+        assignments: [],
+        keyLabels: { 4: 'A', 5: 'B' },
+        lightingModes: [{ value: 18, label: '自定义', type: 'custom' }],
+        lightingRanges: { luminance: { min: 0, max: 4, step: 1 }, speed: { min: 0, max: 4, step: 1 } },
+      },
+    })
+    expect(wrapper.find('.lighting-colors').text()).toContain('已选择')
+  })
+
   it('sweep-selects multiple keys and applies one color to all selected keys', async () => {
     const originalSetPointerCapture = HTMLElement.prototype.setPointerCapture
     const originalHasPointerCapture = HTMLElement.prototype.hasPointerCapture

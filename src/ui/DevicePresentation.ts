@@ -1,9 +1,12 @@
+import type { LightingModeType } from '@/domain/lighting'
 import type { KeyGeometryResolver } from './keyboardGeometry'
 
 /** 固件灯效编号在 UI 中的型号专属名称；编号仍由设备协议负责传输。 */
 export interface LightingModePresentation {
   value: number
   label: string
+  /** 未声明时，公共灯效页按星闪 0 静态 / 1～20 动态 / 21 自定义回退。 */
+  type?: LightingModeType
 }
 
 export interface LightingRangePresentation {

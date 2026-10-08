@@ -34,6 +34,8 @@ export interface KeyAssignment {
   sourceCode: number
   layer: number
   keyCode: number
+  /** Original 32-bit RK matrix value; keeps combinations and special mappings visible. */
+  rawCode?: number
   category: KeyCategory
 }
 
@@ -92,7 +94,11 @@ export const cloneAssignments = (items: KeyAssignment[]): KeyAssignment[] =>
 export function assignmentsEqual(a: KeyAssignment[], b: KeyAssignment[]): boolean {
   if (a.length !== b.length) return false
   const byIdentity = new Map(b.map((item) => [`${item.layer}:${item.positionId}`, item]))
-  return a.every((item) => byIdentity.get(`${item.layer}:${item.positionId}`)?.keyCode === item.keyCode)
+  return a.every((item) => {
+    const other = byIdentity.get(`${item.layer}:${item.positionId}`)
+    return other?.keyCode === item.keyCode &&
+      (item.rawCode === undefined || other.rawCode === undefined || item.rawCode === other.rawCode)
+  })
 }
 
 export function validateAssignments(profile: KeyboardProfile, assignments: KeyAssignment[]): string[] {

@@ -1,7 +1,12 @@
+import { DeviceService } from '@/application/DeviceService'
+import { WebHidDeviceSelection } from '@/transport/DeviceSelection'
+import type { MousePresentation } from '@/ui/MousePresentation'
+import type { DevicePresentation } from '@/ui/DevicePresentation'
 import { KeyboardDriverService } from '@/application/KeyboardDriverService'
 import { DeviceDriverRegistry } from '@/application/DeviceDriverRegistry'
 import { createDriverStore } from '@/stores/driver'
 import { INSTALLED_DEVICES } from '@/devices/catalog'
+import { CB75_KEYBOARD_ENTRY } from '@/devices/cb75k/entry'
 
 // 唯一组合根只遍历设备插件目录，不包含任何具体型号判断。
 export const deviceDriverRegistry = INSTALLED_DEVICES.reduce(
@@ -9,7 +14,9 @@ export const deviceDriverRegistry = INSTALLED_DEVICES.reduce(
   new DeviceDriverRegistry(),
 )
 
-const presentations = new Map(INSTALLED_DEVICES.map(({ driver, presentation }) => [driver.manifest.id, presentation]))
+const presentations = new Map<string, DevicePresentation | MousePresentation>(
+  INSTALLED_DEVICES.map(({ driver, presentation }) => [driver.manifest.id, presentation]),
+)
 
 export const keyboardDriverService = new KeyboardDriverService(deviceDriverRegistry)
 // Store 工厂在这里接收应用服务，避免表现层状态反向导入组合根单例。
@@ -20,5 +27,22 @@ export const getDevicePresentation = (driverId?: string) => {
   const targetId = driverId ?? deviceDriverRegistry.defaultDriver.manifest.id
   const presentation = presentations.get(targetId)
   if (!presentation) throw new Error(`找不到设备表现配置：${targetId}`)
+  if (!('keyGeometry' in presentation)) throw new Error('当前设备不提供键盘表现配置')
   return presentation
 }
+
+export const deviceService = new DeviceService(deviceDriverRegistry, new WebHidDeviceSelection(), [CB75_KEYBOARD_ENTRY])
+export function getMousePresentation(id: string): MousePresentation {
+  const presentation = presentations.get(id)
+  if (!presentation || !('image' in presentation)) throw new Error('当前设备不提供鼠标表现配置')
+  return presentation
+}
+
+export const demoDevices = INSTALLED_DEVICES.filter(({ driver }) => !!driver.createDemoSession).map(
+  ({ driver, presentation }) => ({
+    id: driver.manifest.id,
+    name: driver.manifest.displayName,
+    kind: driver.manifest.kind,
+    image: 'image' in presentation ? presentation.image : presentation.overviewImageUrl,
+  }),
+)

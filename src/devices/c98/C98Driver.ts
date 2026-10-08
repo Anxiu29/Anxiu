@@ -9,7 +9,12 @@ import { C98_DEMO_KEYS, resolveC98PhysicalLayout } from './layout'
 import { C98_CAPABILITIES } from './capabilities'
 import { resolveC98DefaultKeymap } from './factoryKeymap'
 import { C98_DEMO_DEVICE, C98_DEVICE } from './device'
-import { downloadC98Firmware, upgradeC98Firmware, validateC98Firmware, requestC98UpgradeDevice } from './firmware'
+import {
+  downloadC98Firmware,
+  upgradeC98Firmware,
+  validateC98Firmware,
+  requestC98UpgradeDevice,
+} from './firmware'
 import type { FirmwareUpdateOptions } from '@/application/FirmwareUpdate'
 
 /** RK-C98 的组合适配器；替换协议或传输不会影响应用层和 UI。 */
@@ -22,11 +27,26 @@ export class C98Driver implements DeviceDriver {
     this.selectedDevice = await upgradeC98Firmware(this.selectedDevice, image, options)
   }
   readonly manifest = {
+    kind: 'keyboard',
+    protocolFamily: 'sparklink',
     id: 'rk-c98-xsyd-webhid',
     displayName: 'RK-C98',
     protocolId: 'xsyd-keyboard-v1',
     transportId: 'webhid',
-    capabilities: ['device-profile', 'keymap', 'configuration', 'factory-reset', 'system-mode', 'configuration-switch', 'lighting', 'custom-lighting', 'advanced-key', 'performance', 'macro', 'firmware-update'],
+    capabilities: [
+      'device-profile',
+      'keymap',
+      'configuration',
+      'factory-reset',
+      'system-mode',
+      'configuration-switch',
+      'lighting',
+      'custom-lighting',
+      'advanced-key',
+      'performance',
+      'macro',
+      'firmware-update',
+    ],
     hid: {
       vendorId: C98_DEVICE.vendorId,
       productIds: [C98_DEVICE.productId],
@@ -35,35 +55,47 @@ export class C98Driver implements DeviceDriver {
     },
   } as const
 
-  async connect(onDisconnect: () => void) {
+  async connect(onDisconnect: () => void, selectedDevice?: HIDDevice) {
     const transport = this.createTransport(onDisconnect)
-    await transport.requestDevice()
-    await transport.open()
-    return this.createSession(transport)
-  }
-
-  async connectForFirmware(onDisconnect: () => void) {
-    const device = await requestC98UpgradeDevice()
-    const transport = this.createTransport(onDisconnect)
-    transport.setDevice(device)
-    await transport.open()
-    return this.createSession(transport)
+    if (selectedDevice) transport.setDevice(selectedDevice)
+    else await transport.requestDevice()
+    try {
+      await transport.open()
+      return this.createSession(transport)
+    } catch (cause) {
+      await transport.close()
+      throw cause
+    }
   }
 
   async reconnectAuthorized(onDisconnect: () => void) {
     const transport = this.createTransport(onDisconnect)
-    if (!await transport.reconnectAuthorized(this.selectedDevice)) return undefined
+    if (!(await transport.reconnectAuthorized(this.selectedDevice))) return undefined
     await transport.open()
     return this.createSession(transport)
   }
 
   createDemoSession() {
     // 演示模式与真机共享键码目录、能力和默认表，只替换最外层协议实现。
-    return new DeviceSession(new DemoKeyboardProtocol(XSYD_KEY_CATALOG, C98_DEMO_KEYS, C98_CAPABILITIES, resolveC98DefaultKeymap, C98_DEMO_DEVICE), XSYD_KEY_CATALOG)
+    return new DeviceSession(
+      new DemoKeyboardProtocol(
+        XSYD_KEY_CATALOG,
+        C98_DEMO_KEYS,
+        C98_CAPABILITIES,
+        resolveC98DefaultKeymap,
+        C98_DEMO_DEVICE,
+      ),
+      XSYD_KEY_CATALOG,
+    )
   }
 
   private createTransport(onDisconnect: () => void) {
-    if (!('hid' in navigator)) throw new DriverError('UNSUPPORTED_BROWSER', '当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge', false)
+    if (!('hid' in navigator))
+      throw new DriverError(
+        'UNSUPPORTED_BROWSER',
+        '当前浏览器不支持 WebHID，请使用桌面版 Chrome 或 Edge',
+        false,
+      )
     const transport = new WebHidTransport(C98_DEVICE)
     transport.onDisconnect(onDisconnect)
     return transport
@@ -72,13 +104,17 @@ export class C98Driver implements DeviceDriver {
   private createSession(transport: WebHidTransport) {
     this.selectedDevice = transport.hidDevice
     // 设备层是具体实现相遇的位置：传输、协议、能力和 C98 默认数据都在这里注入。
-    return new DeviceSession(new XsydKeyboardProtocol(
-      transport,
+    return new DeviceSession(
+      new XsydKeyboardProtocol(
+        transport,
+        XSYD_KEY_CATALOG,
+        C98_CAPABILITIES,
+        resolveC98DefaultKeymap,
+        undefined,
+        resolveC98PhysicalLayout,
+      ),
       XSYD_KEY_CATALOG,
-      C98_CAPABILITIES,
-      resolveC98DefaultKeymap,
-      undefined,
-      resolveC98PhysicalLayout,
-    ), XSYD_KEY_CATALOG, transport)
+      transport,
+    )
   }
 }

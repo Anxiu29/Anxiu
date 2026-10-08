@@ -16,6 +16,8 @@ const props = withDefaults(defineProps<{
   canUpgradeFirmware?: boolean
   firmwareProgress?: FirmwareProgress
   firmwareLogAvailable?: boolean
+  initialSection?: SettingsSection
+  hideAppearance?: boolean
 }>(), { theme: 'dark', busy: false })
 
 const emit = defineEmits<{
@@ -28,7 +30,7 @@ const emit = defineEmits<{
   'export-firmware-log': []
 }>()
 
-const activeSection = ref<SettingsSection>(props.profile.device.runMode === 'boot' ? 'firmware' : 'appearance')
+const activeSection = ref<SettingsSection>(props.initialSection ?? (props.profile.device.runMode === 'boot' ? 'firmware' : props.hideAppearance ? 'device' : 'appearance'))
 const resetConfirmationVisible = ref(false)
 const deviceModeLabel = computed(() => ({ app: '应用模式', boot: 'Bootloader', unknown: '未知模式' })[props.profile.device.runMode])
 const formatHex = (value: number) => `0x${value.toString(16).toUpperCase().padStart(4, '0')}`
@@ -50,7 +52,7 @@ function requestFactoryReset() {
 
     <div class="settings-layout">
       <nav class="settings-navigation" aria-label="设置页面">
-        <button type="button" :class="{ active: activeSection === 'appearance' }" @click="activeSection = 'appearance'">
+        <button v-if="!hideAppearance" type="button" :class="{ active: activeSection === 'appearance' }" @click="activeSection = 'appearance'">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
           <span><strong>外观</strong><small>主题与显示偏好</small></span>
         </button>

@@ -47,6 +47,7 @@ export function deleteMacroSnapshot(context: MacroSnapshotContext, index: number
 }
 
 export function restoreMacroSnapshot(context: MacroSnapshotContext, deviceSettings: MacroSettings): MacroSettings {
+  if (deviceSettings.actionsAvailable) return deviceSettings
   if (typeof localStorage === 'undefined' || deviceSettings.sourceCode === EMPTY_MACRO_SOURCE) return deviceSettings
   try {
     const raw = localStorage.getItem(slotKey(context, deviceSettings.index)) ?? localStorage.getItem(legacyKey(context, deviceSettings.sourceCode))

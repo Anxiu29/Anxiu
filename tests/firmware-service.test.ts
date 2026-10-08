@@ -9,20 +9,48 @@ import type { KeyboardProfile } from '@/domain/keyboard'
 
 function setup() {
   const profile: KeyboardProfile = {
-    device: { productName: 'Test', vendorId: 1, productId: 2, firmwareVersion: '1', protocolVersion: '1', runMode: 'app' },
-    capabilities: { layers: 1, remap: false, restoreFactory: false, layoutRows: 0, layoutColumns: 0 },
-    positions: [], assignments: [], defaultAssignments: [],
+    device: {
+      productName: 'Test',
+      vendorId: 1,
+      productId: 2,
+      firmwareVersion: '1',
+      protocolVersion: '1',
+      runMode: 'app',
+    },
+    capabilities: {
+      layers: 1,
+      remap: false,
+      restoreFactory: false,
+      layoutRows: 0,
+      layoutColumns: 0,
+    },
+    positions: [],
+    assignments: [],
+    defaultAssignments: [],
   }
   const close = vi.fn()
-  const createSession = () => new DeviceSession({ profile: { getProfile: async () => profile }, close }, HID_KEY_CATALOG)
+  const createSession = () =>
+    new DeviceSession({ profile: { getProfile: async () => profile }, close }, HID_KEY_CATALOG)
   const validateFirmware = vi.fn(async () => {})
   const upgradeFirmware = vi.fn<NonNullable<DeviceDriver['upgradeFirmware']>>(async () => {})
-  const requestUpgradeDevice = vi.fn(async () => ({} as HIDDevice))
+  const requestUpgradeDevice = vi.fn(async () => ({}) as HIDDevice)
   const driver: DeviceDriver = {
-    manifest: { id: 'test', displayName: 'Test', protocolId: 'test', transportId: 'test', capabilities: ['firmware-update'] },
-    connect: async () => createSession(), reconnectAuthorized: async () => createSession(), createDemoSession: createSession,
+    manifest: {
+      kind: 'keyboard',
+      protocolFamily: 'test',
+      id: 'test',
+      displayName: 'Test',
+      protocolId: 'test',
+      transportId: 'test',
+      capabilities: ['firmware-update'],
+    },
+    connect: async () => createSession(),
+    reconnectAuthorized: async () => createSession(),
+    createDemoSession: createSession,
     downloadFirmware: vi.fn(async () => new Uint8Array(512)),
-    validateFirmware, upgradeFirmware, requestUpgradeDevice,
+    validateFirmware,
+    upgradeFirmware,
+    requestUpgradeDevice,
   }
   const service = new KeyboardDriverService(new DeviceDriverRegistry().register(driver))
   const store = createDriverStore(service)()
@@ -54,7 +82,12 @@ describe('firmware session ownership', () => {
     expect(store.firmwareUpdating).toBe(false)
     expect(store.firmwareProgress?.message).toBe('bad image')
     expect(store.firmwareLogAvailable).toBe(true)
-    expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({ kind: 'result', outcome: 'failure', stage: 'validating', message: 'bad image' })
+    expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({
+      kind: 'result',
+      outcome: 'failure',
+      stage: 'validating',
+      message: 'bad image',
+    })
   })
 
   it('closes ordinary traffic before flashing, blocks duplicate upgrades and reconnects afterward', async () => {
@@ -73,7 +106,10 @@ describe('firmware session ownership', () => {
     expect(store.status).toBe('ready')
     expect(store.firmwareUpdating).toBe(false)
     expect(store.firmwareProgress?.stage).toBe('complete')
-    expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({ kind: 'result', outcome: 'success' })
+    expect(JSON.parse(store.exportFirmwareLog()).events.at(-1)).toMatchObject({
+      kind: 'result',
+      outcome: 'success',
+    })
   })
 
   it('upgrades online without a local file', async () => {

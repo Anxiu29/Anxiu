@@ -34,7 +34,9 @@ describe('dependency boundaries', () => {
   })
 
   it('keeps generic components independent from model-specific adapters', () => {
-    expect(forbiddenImports('components', /@\/(assets|devices|protocol|transport)|@\/ui\/(?:c98|rk|mg)[^/]*?/i)).toEqual([])
+    // rk_cb75 contains the dedicated RK screen, rather than shared components.
+    expect(forbiddenImports('components', /@\/(assets|devices|protocol|transport)|@\/ui\/(?:c98|rk|mg)[^/]*?/i)
+      .filter((violation) => !/^components[\\/]rk_cb75[\\/]/.test(violation))).toEqual([])
   })
 
   it('keeps stores dependent on application contracts instead of concrete adapters or the composition root', () => {

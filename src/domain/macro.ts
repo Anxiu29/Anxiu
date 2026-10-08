@@ -3,6 +3,8 @@ export type MacroMode = 0 | 1 | 2 | 3
 
 export interface MacroAction {
   keyCode: number
+  /** CB75/RK action kind: key, modifier, mouse button, X/Y movement, or wheel. */
+  type?: 0 | 1 | 2 | 3 | 4 | 5
   /** 领域层使用易懂的布尔值；协议层再转换为 0x01/0x08 状态位。 */
   pressed: boolean
   /** 距离上一个动作的间隔，单位毫秒；释放动作的 delay 也就是该键的保持时长。 */
@@ -10,6 +12,8 @@ export interface MacroAction {
 }
 
 export interface MacroSettings {
+  /** Optional on-device name for protocols with named macro slots (CB75). */
+  name?: string
   /** 设备内的宏槽位，范围 0~15。 */
   index: number
   /** 绑定的默认布局物理键值；0xFF 表示槽位未绑定。 */
@@ -36,6 +40,16 @@ export function cloneMacroSettings(value: MacroSettings): MacroSettings {
   return { ...value, boundSourceCodes: [...(value.boundSourceCodes ?? (value.sourceCode === EMPTY_MACRO_SOURCE ? [] : [value.sourceCode]))], actions: value.actions.map((action) => ({ ...action })) }
 }
 
+export function sameMacroActions(expected: readonly MacroAction[], actual: readonly MacroAction[]) {
+  return expected.length === actual.length && expected.every((action, index) => {
+    const received = actual[index]!
+    const expectedType = action.type ?? (action.keyCode >= 0xe0 && action.keyCode <= 0xe7 ? 1 : 0)
+    const receivedType = received.type ?? (received.keyCode >= 0xe0 && received.keyCode <= 0xe7 ? 1 : 0)
+    return action.keyCode === received.keyCode && action.delay === received.delay &&
+      action.pressed === received.pressed && expectedType === receivedType
+  })
+}
+
 /** 在进入协议层前集中验证，避免无效 UI 数据被截断后悄悄写入设备。 */
 export function validateMacroSettings(value: MacroSettings): string[] {
   const errors: string[] = []
@@ -47,8 +61,10 @@ export function validateMacroSettings(value: MacroSettings): string[] {
   if (!Number.isInteger(value.repeatCount) || value.repeatCount < 0 || value.repeatCount > 0xffff) errors.push('宏重复次数必须在 0~65535 之间')
   if (!Number.isInteger(value.repeatDelay) || value.repeatDelay < 0 || value.repeatDelay > 0xffffff) errors.push('宏重复延迟超出协议范围')
   if (value.actions.length > 0xff) errors.push('宏动作数量超出协议字段范围')
+  if (value.name !== undefined && (value.name.length > 60 || ![...value.name].every((char) => char.charCodeAt(0) <= 0xffff))) errors.push('宏名称过长或包含不支持的字符')
   value.actions.forEach((action, index) => {
     if (!Number.isInteger(action.keyCode) || action.keyCode < 0 || action.keyCode > 0xffff) errors.push(`第 ${index + 1} 个动作的键码无效`)
+    if (action.type !== undefined && ![0, 1, 2, 3, 4, 5].includes(action.type)) errors.push(`第 ${index + 1} 个动作的类型无效`)
     if (!Number.isInteger(action.delay) || action.delay < 0 || action.delay > 0xffffff) errors.push(`第 ${index + 1} 个动作的延迟超出协议范围`)
   })
   return errors
